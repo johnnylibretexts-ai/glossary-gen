@@ -23,5 +23,8 @@ build-backend = "setuptools.build_meta"
 line-length = 100
 target-version = "py312"
 
+[tool.ruff.lint]
+extend-select = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

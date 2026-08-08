@@ -79,6 +79,20 @@ def test_near_duplicate_paragraphs_collapse():
     assert len(result) == 1
 
 
+def test_text_with_suffix_collapses():
+    """Text differing only in a short suffix should collapse (near-duplicate)."""
+    text = (
+        "Recursion is a technique where a function calls itself "
+        "repeatedly."
+    )
+    pages = [
+        Page(url="https://a", blocks=(para(text),)),
+        Page(url="https://b", blocks=(para(text + " [edit]"),)),
+    ]
+    result = excerpts_for_term(pages, make_term())
+    assert len(result) == 1
+
+
 def test_max_excerpts_is_respected():
     blocks = tuple(para(f"Recursion note number {i}.") for i in range(10))
     page = Page(url="https://a", blocks=blocks)

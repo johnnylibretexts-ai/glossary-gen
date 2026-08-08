@@ -45,7 +45,11 @@ def test_load_csv_has_no_book(tmp_path):
     path = write(
         tmp_path,
         "in.csv",
-        "term,aliases,pages\nRecursion,recursive|recursing,https://eng.libretexts.org/a|https://eng.libretexts.org/b\n",
+        (
+            "term,aliases,pages\n"
+            "Recursion,recursive|recursing,"
+            "https://eng.libretexts.org/a|https://eng.libretexts.org/b\n"
+        ),
     )
 
     result = load_input(path)
