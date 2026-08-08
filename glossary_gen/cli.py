@@ -1,20 +1,40 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
 
+from glossary_gen.csv_out import write_csv
 from glossary_gen.excerpt import excerpts_for_term
 from glossary_gen.fetch import FetchError, PageCache
+from glossary_gen.generate import generate_entry, load_prompt, prompt_versions
 from glossary_gen.input import InputError, load_input
-from glossary_gen.models import Page, Term
+from glossary_gen.ledger import Ledger, LedgerRecord
+from glossary_gen.llm import (
+    GeminiClient,
+    LLMClient,
+    LLMError,
+    OpenAICompatClient,
+    ProviderChain,
+)
+from glossary_gen.models import Book, Page, Term
 
 EXIT_OK = 0
 EXIT_INPUT_ERROR = 2
+EXIT_RUN_ABORTED = 3
+
+PRICES_PATH = Path(__file__).parent / "prices.json"
+
+# Rough per-term shape used only for the pre-run estimate.
+EST_TOKENS_IN = 1200
+EST_TOKENS_OUT = 220
 
 USER_AGENT = "glossary-gen/0.1 (+https://github.com/johnnylibretexts/glossary-gen)"
 
@@ -26,6 +46,150 @@ class CoverageReport:
     without_excerpts: int = 0
     failed_pages: list[str] = field(default_factory=list)
     missing_terms: list[str] = field(default_factory=list)
+
+
+@dataclass
+class RunSummary:
+    ok: int = 0
+    no_excerpt: int = 0
+    fetch_error: int = 0
+    llm_error: int = 0
+    skipped: int = 0
+    aborted: bool = False
+
+
+def load_prices(path: Path = PRICES_PATH) -> dict[str, dict[str, float]]:
+    if not path.is_file():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def estimate_cost(model: str, term_count: int, prices: dict[str, dict[str, float]]) -> float | None:
+    """USD estimate, or None when the model has no configured price."""
+    entry = prices.get(model)
+    if not entry:
+        return None
+    per_term = (
+        EST_TOKENS_IN * entry["input_per_mtok"] + EST_TOKENS_OUT * entry["output_per_mtok"]
+    ) / 1_000_000
+    return per_term * term_count
+
+
+def _now() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def build_client(args: argparse.Namespace) -> LLMClient:
+    """Gemini first when a key is present; an OpenAI-compatible endpoint as fallback."""
+    clients: list[LLMClient] = []
+    gemini_key = os.environ.get("GLOSSARY_GEN_GEMINI_API_KEY")
+    if gemini_key:
+        clients.append(GeminiClient(api_key=gemini_key, model=args.model))
+    base_url = os.environ.get("GLOSSARY_GEN_OPENAI_BASE_URL")
+    if base_url:
+        clients.append(
+            OpenAICompatClient(
+                base_url=base_url,
+                model=os.environ.get("GLOSSARY_GEN_OPENAI_MODEL", "llama3.1"),
+                api_key=os.environ.get("GLOSSARY_GEN_OPENAI_API_KEY"),
+            )
+        )
+    if not clients:
+        raise InputError(
+            "no provider configured: set GLOSSARY_GEN_GEMINI_API_KEY "
+            "or GLOSSARY_GEN_OPENAI_BASE_URL"
+        )
+    return ProviderChain(clients)
+
+
+def execute(
+    terms: Sequence[Term],
+    book: Book,
+    cache: PageCache,
+    client: LLMClient,
+    ledger: Ledger,
+    template: str,
+    prompt_version: str,
+    *,
+    max_consecutive_failures: int = 5,
+    budget_usd: float | None = None,
+) -> RunSummary:
+    """Generate one entry per term, recording every outcome in the ledger."""
+    summary = RunSummary()
+    consecutive_failures = 0
+
+    for term in terms:
+        if ledger.has(term.slug, prompt_version, client.model):
+            summary.skipped += 1
+            continue
+
+        failed_pages: list[str] = []
+        pages = collect_pages(term, cache, failed_pages)
+        base = {
+            "slug": term.slug,
+            "term": term.term,
+            "prompt_version": prompt_version,
+            "model": client.model,
+            "provider": getattr(client, "name", ""),
+            "generated_at": _now(),
+            "pages": list(term.pages),
+        }
+
+        if not pages:
+            ledger.append(LedgerRecord(**base, status="fetch_error", error="; ".join(failed_pages)))
+            summary.fetch_error += 1
+            continue
+
+        excerpts = excerpts_for_term(pages, term)
+        if not excerpts:
+            ledger.append(LedgerRecord(**base, status="no_excerpt"))
+            summary.no_excerpt += 1
+            continue
+
+        try:
+            result = generate_entry(client, template, term, excerpts)
+        except LLMError as exc:  # base class of LLMTransportError and LLMStructuredOutputError
+            ledger.append(LedgerRecord(**base, status="llm_error", error=str(exc)))
+            summary.llm_error += 1
+            consecutive_failures += 1
+            if consecutive_failures >= max_consecutive_failures:
+                summary.aborted = True
+                break
+            continue
+
+        consecutive_failures = 0
+        entry = result.entry
+        ledger.append(
+            LedgerRecord(
+                # `model` stays the chain's DECLARED primary (already in `base`) so the
+                # resume key matches what ledger.has() looks up. `served_by_model` records
+                # which model actually answered. Overriding `model` here would write a
+                # fallback-served term under a key its own lookup can never find, and it
+                # would regenerate and re-bill on every later run.
+                **{**base, "provider": result.provider},
+                status="ok",
+                served_by_model=result.model,
+                definition=entry.definition,
+                x_category=entry.category,
+                x_context=entry.context,
+                x_example=entry.example,
+                x_related=entry.related,
+                aliases=sorted({*term.aliases, *entry.aliases}),
+                source_pages=sorted({e.page_url for e in excerpts}),
+                excerpt_chars=sum(len(e.text) for e in excerpts),
+                tokens_in=result.tokens_in,
+                tokens_out=result.tokens_out,
+            )
+        )
+        summary.ok += 1
+
+        if budget_usd is not None:
+            spent = estimate_cost(client.model, summary.ok, load_prices())
+            if spent is not None and spent > budget_usd:
+                summary.aborted = True
+                break
+
+    return summary
 
 
 def build_http_client() -> httpx.Client:
@@ -65,11 +229,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--input", required=True, type=Path, help="step-1 index file (.json or .csv)"
     )
     parser.add_argument(
-        "--cache-dir",
-        type=Path,
-        default=Path("cache"),
-        help="page cache directory",
+        "--out", type=Path, default=Path("out/glossary.csv"), help="output CSV path"
     )
+    parser.add_argument(
+        "--cache-dir", type=Path, default=Path("cache"), help="page cache directory"
+    )
+    parser.add_argument(
+        "--ledger", type=Path, default=Path("out/run.jsonl"), help="run ledger path"
+    )
+    parser.add_argument("--prompt-version", default="v1", choices=prompt_versions())
+    parser.add_argument("--model", default="gemini-flash-3.6", help="Gemini model name")
+    parser.add_argument("--library", help="overrides the input file's book block")
+    parser.add_argument("--cover-id", help="overrides the input file's book block")
+    parser.add_argument("--book-id", help="overrides the input file's book block")
+    parser.add_argument("--max-terms", type=int, help="process at most N terms (smoke runs)")
+    parser.add_argument(
+        "--budget-usd", type=float, help="abort if the estimated spend exceeds this"
+    )
+    parser.add_argument("--yes", action="store_true", help="skip the cost confirmation prompt")
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -92,6 +269,30 @@ def _print_coverage(report: CoverageReport) -> None:
     print("dry run: no model was called and nothing was spent")
 
 
+def _resolve_book(parsed_book: Book | None, args: argparse.Namespace) -> Book:
+    library = args.library or (parsed_book.library if parsed_book else None)
+    cover_id = args.cover_id or (parsed_book.cover_id if parsed_book else None)
+    book_id = args.book_id or (parsed_book.book_id if parsed_book else None)
+    missing = [
+        name
+        for name, value in (
+            ("--library", library),
+            ("--cover-id", cover_id),
+            ("--book-id", book_id),
+        )
+        if not value
+    ]
+    if missing:
+        raise InputError(f"missing book identity: supply {', '.join(missing)} or a book block")
+    return Book(
+        library=library,
+        cover_id=cover_id,
+        book_id=book_id,
+        title=parsed_book.title if parsed_book else "",
+        index_url=parsed_book.index_url if parsed_book else "",
+    )
+
+
 def run(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -100,12 +301,60 @@ def run(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_INPUT_ERROR
 
-    client = build_http_client()
-    cache = PageCache(args.cache_dir, client)
+    terms = parsed.terms[: args.max_terms] if args.max_terms else parsed.terms
+    cache = PageCache(args.cache_dir, build_http_client())
 
     if args.dry_run:
-        _print_coverage(dry_run(parsed.terms, cache))
+        _print_coverage(dry_run(terms, cache))
         return EXIT_OK
 
-    print("error: only --dry-run is implemented so far", file=sys.stderr)
-    return EXIT_INPUT_ERROR
+    try:
+        book = _resolve_book(parsed.book, args)
+        client = build_client(args)
+    except InputError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+
+    estimate = estimate_cost(client.model, len(terms), load_prices())
+    if estimate is None:
+        print(f"warning: no price configured for {client.model}; --budget-usd is disabled")
+        if args.budget_usd is not None:
+            print("warning: --budget-usd will not be enforced", file=sys.stderr)
+    else:
+        print(f"{len(terms)} terms, estimated ~${estimate:.2f}")
+        if args.budget_usd is not None and estimate > args.budget_usd:
+            print(
+                f"error: estimate ${estimate:.2f} exceeds --budget-usd {args.budget_usd:.2f}",
+                file=sys.stderr,
+            )
+            return EXIT_INPUT_ERROR
+    if not args.yes and sys.stdin.isatty():
+        if input("proceed? [y/N] ").strip().casefold() not in {"y", "yes"}:
+            print("aborted by user")
+            return EXIT_OK
+
+    ledger = Ledger(args.ledger)
+    if ledger.skipped_lines:
+        print(f"note: skipped {ledger.skipped_lines} unreadable ledger line(s)")
+
+    summary = execute(
+        terms,
+        book,
+        cache,
+        client,
+        ledger,
+        load_prompt(args.prompt_version),
+        args.prompt_version,
+        budget_usd=args.budget_usd,
+    )
+
+    written = write_csv(args.out, ledger.records(), book)
+    print(
+        f"ok={summary.ok} no_excerpt={summary.no_excerpt} "
+        f"fetch_error={summary.fetch_error} llm_error={summary.llm_error} skipped={summary.skipped}"
+    )
+    print(f"wrote {written} row(s) to {args.out}")
+    if summary.aborted:
+        print("error: run aborted early — see the ledger", file=sys.stderr)
+        return EXIT_RUN_ABORTED
+    return EXIT_OK

@@ -1,0 +1,3 @@
+{
+  "gemini-flash-3.6": { "input_per_mtok": 0.30, "output_per_mtok": 2.50 }
+}
