@@ -81,10 +81,7 @@ def test_near_duplicate_paragraphs_collapse():
 
 def test_text_with_suffix_collapses():
     """Text differing only in a short suffix should collapse (near-duplicate)."""
-    text = (
-        "Recursion is a technique where a function calls itself "
-        "repeatedly."
-    )
+    text = "Recursion is a technique where a function calls itself repeatedly."
     pages = [
         Page(url="https://a", blocks=(para(text),)),
         Page(url="https://b", blocks=(para(text + " [edit]"),)),

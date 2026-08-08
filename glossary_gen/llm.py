@@ -10,7 +10,6 @@ from pydantic import BaseModel, ValidationError
 
 from glossary_gen.models import GlossaryEntry
 
-RETRYABLE_STATUS = frozenset({408, 409, 429, 500, 502, 503, 504})
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
 _OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 

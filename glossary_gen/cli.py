@@ -384,10 +384,13 @@ def run(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return EXIT_INPUT_ERROR
-    if not args.yes and sys.stdin.isatty():
-        if input("proceed? [y/N] ").strip().casefold() not in {"y", "yes"}:
-            print("aborted by user")
-            return EXIT_OK
+    if (
+        not args.yes
+        and sys.stdin.isatty()
+        and input("proceed? [y/N] ").strip().casefold() not in {"y", "yes"}
+    ):
+        print("aborted by user")
+        return EXIT_OK
 
     ledger = Ledger(args.ledger)
     if ledger.skipped_lines:

@@ -82,12 +82,9 @@ def excerpts_for_term(
                     rank = RANK_MENTION
             else:
                 # No rank - skip this paragraph
-                heading_matched = False
                 continue
             heading_matched = False
-            excerpt = Excerpt(
-                page_url=page.url, text=block.text, rank=rank
-            )
+            excerpt = Excerpt(page_url=page.url, text=block.text, rank=rank)
             candidates.append((rank, page_index, block_index, excerpt))
 
     candidates.sort(key=lambda item: (item[0], item[1], item[2]))
@@ -101,8 +98,7 @@ def excerpts_for_term(
         normalized_text = _normalize(excerpt.text)
         # Check for exact or near-duplicate match
         is_duplicate = any(
-            _should_collapse(seen_norm, normalized_text)
-            for seen_norm in seen_normalized
+            _should_collapse(seen_norm, normalized_text) for seen_norm in seen_normalized
         )
         if is_duplicate:
             continue

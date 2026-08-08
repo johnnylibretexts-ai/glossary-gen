@@ -95,6 +95,7 @@ def test_get_enforces_size_cap(tmp_path):
 
 def test_get_follows_allowed_redirect(tmp_path):
     """Redirect to another allowed libretexts.org host succeeds."""
+
     def handler(request):
         if request.url == "https://eng.libretexts.org/a":
             return httpx.Response(302, headers={"location": "https://chem.libretexts.org/b"})
@@ -107,6 +108,7 @@ def test_get_follows_allowed_redirect(tmp_path):
 
 def test_get_rejects_redirect_to_disallowed_host(tmp_path):
     """Redirect to a disallowed host is rejected."""
+
     def handler(request):
         return httpx.Response(302, headers={"location": "https://evil.example.com/x"})
 
@@ -117,6 +119,7 @@ def test_get_rejects_redirect_to_disallowed_host(tmp_path):
 
 def test_get_rejects_redirect_to_http(tmp_path):
     """Redirect to http (non-https) is rejected."""
+
     def handler(request):
         return httpx.Response(302, headers={"location": "http://eng.libretexts.org/a"})
 
@@ -127,6 +130,7 @@ def test_get_rejects_redirect_to_http(tmp_path):
 
 def test_get_rejects_redirect_chain_exceeding_limit(tmp_path):
     """Redirect chain exceeding 3 hops is rejected."""
+
     def handler(request):
         url = str(request.url)
         if "a" in url:
