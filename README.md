@@ -5,6 +5,10 @@ Generate page-grounded glossary definitions for LibreTexts books.
 Step 2 of the three-step glossary pipeline: it consumes a book index (terms plus the pages
 each term appears on) and emits a CSV of AI-generated definitions for review and import.
 
+> **New here? Go straight to the [Walkthrough](#walkthrough--from-a-fresh-clone-to-a-csv).**
+> It takes you from `git clone` to a CSV, and the first real step needs no API key and costs
+> nothing. Everything below the walkthrough is reference material.
+
 - Step 1 (build the index) and step 3 (import into Conductor) are out of scope.
 - Every row ships as `x_status = needs-review`. Nothing here is reviewed or approved content.
 
