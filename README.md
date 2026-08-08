@@ -48,9 +48,15 @@ To regenerate already-succeeded terms after editing a prompt, copy `prompts/v1.m
 free — but the CSV only ever contains rows from *this* invocation: `status == "ok"` **and**
 `prompt_version` **and** `model` matching the current run **and** the term's slug present
 in the current input file. So running `v1` then `v2` from the same `--ledger` never mixes
-both definitions into one CSV, and pointing `--ledger` at a file that already holds another
-book's terms never leaks that book's rows into this one. If you want a side-by-side
-comparison of two prompt versions or two models, run each to a different `--out` path.
+both definitions into one CSV. If you want a side-by-side comparison of two prompt versions
+or two models, run each to a different `--out` path.
+
+**Give every book its own `--ledger` path.** Pointing `--ledger` at a file that already
+holds another book's terms keeps that book's rows out of this CSV — *unless the two books
+share a term*. The ledger key is `(slug, prompt_version, model)` and carries no book
+identity, so for a slug present in both books the lookup counts it as already done, skips
+regeneration, and the CSV emits the first book's definition stamped with this book's
+`library` / `coverID` / `bookId`. A separate ledger per book avoids this entirely.
 
 ### Options
 
