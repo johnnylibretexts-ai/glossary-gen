@@ -91,3 +91,61 @@ def test_get_enforces_size_cap(tmp_path):
     )
     with pytest.raises(FetchError, match="too large"):
         cache.get("https://eng.libretexts.org/a")
+
+
+def test_get_follows_allowed_redirect(tmp_path):
+    """Redirect to another allowed libretexts.org host succeeds."""
+    def handler(request):
+        if request.url == "https://eng.libretexts.org/a":
+            return httpx.Response(302, headers={"location": "https://chem.libretexts.org/b"})
+        return httpx.Response(200, text=HTML)
+
+    cache = PageCache(tmp_path, make_client(handler))
+    page = cache.get("https://eng.libretexts.org/a")
+    assert page.blocks
+
+
+def test_get_rejects_redirect_to_disallowed_host(tmp_path):
+    """Redirect to a disallowed host is rejected."""
+    def handler(request):
+        return httpx.Response(302, headers={"location": "https://evil.example.com/x"})
+
+    cache = PageCache(tmp_path, make_client(handler))
+    with pytest.raises(FetchError, match="not allowed"):
+        cache.get("https://eng.libretexts.org/a")
+
+
+def test_get_rejects_redirect_to_http(tmp_path):
+    """Redirect to http (non-https) is rejected."""
+    def handler(request):
+        return httpx.Response(302, headers={"location": "http://eng.libretexts.org/a"})
+
+    cache = PageCache(tmp_path, make_client(handler))
+    with pytest.raises(FetchError, match="not allowed"):
+        cache.get("https://eng.libretexts.org/a")
+
+
+def test_get_rejects_redirect_chain_exceeding_limit(tmp_path):
+    """Redirect chain exceeding 3 hops is rejected."""
+    def handler(request):
+        url = str(request.url)
+        if "a" in url:
+            return httpx.Response(302, headers={"location": "https://eng.libretexts.org/b"})
+        if "b" in url:
+            return httpx.Response(302, headers={"location": "https://chem.libretexts.org/c"})
+        if "c" in url:
+            return httpx.Response(302, headers={"location": "https://eng.libretexts.org/d"})
+        if "d" in url:
+            return httpx.Response(302, headers={"location": "https://chem.libretexts.org/e"})
+        return httpx.Response(200, text=HTML)
+
+    cache = PageCache(tmp_path, make_client(handler))
+    with pytest.raises(FetchError, match="exceeded.*hops"):
+        cache.get("https://eng.libretexts.org/a")
+
+
+def test_get_rejects_redirect_without_location(tmp_path):
+    """3xx response without Location header is rejected."""
+    cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(302)))
+    with pytest.raises(FetchError, match="without Location"):
+        cache.get("https://eng.libretexts.org/a")
