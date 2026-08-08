@@ -127,3 +127,40 @@ def test_invalid_status_skipped_on_reload(tmp_path):
     assert ledger.skipped_lines == 1
     assert len(ledger.records()) == 1
     assert ledger.records()[0].slug == "recursion"
+
+
+def test_served_by_model_round_trips(tmp_path):
+    path = tmp_path / "run.jsonl"
+    record = make_record()
+    record.served_by_model = "llama-fallback"
+    Ledger(path).append(record)
+    reloaded = Ledger(path).records()[0]
+    assert reloaded.served_by_model == "llama-fallback"
+
+
+def test_served_by_model_defaults_to_empty_when_not_set(tmp_path):
+    path = tmp_path / "run.jsonl"
+    # Manually write a record without served_by_model field
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "slug": "old-record",
+                    "term": "Old",
+                    "prompt_version": "v1",
+                    "model": "gemini-flash-3.6",
+                    "provider": "gemini",
+                    "generated_at": "2026-08-07T00:00:00Z",
+                    "status": "ok",
+                    "definition": "Old record.",
+                    "pages": ["https://a"],
+                    "source_pages": ["https://a"],
+                    "excerpt_chars": 42,
+                }
+            )
+            + "\n"
+        )
+
+    ledger = Ledger(path)
+    reloaded = ledger.records()[0]
+    assert reloaded.served_by_model == ""

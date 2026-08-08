@@ -14,6 +14,7 @@ class LedgerRecord(BaseModel):
     term: str
     prompt_version: str
     model: str
+    served_by_model: str = ""
     provider: str = ""
     generated_at: str
     status: Status
