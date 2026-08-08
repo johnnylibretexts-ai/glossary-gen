@@ -403,7 +403,14 @@ def run(argv: list[str] | None = None) -> int:
         budget_usd=args.budget_usd,
     )
 
-    written = write_csv(args.out, ledger.records(), book)
+    written = write_csv(
+        args.out,
+        ledger.records(),
+        book,
+        prompt_version=args.prompt_version,
+        model=client.model,
+        slugs={t.slug for t in parsed.terms},
+    )
     print(
         f"ok={summary.ok} no_excerpt={summary.no_excerpt} "
         f"fetch_error={summary.fetch_error} llm_error={summary.llm_error} skipped={summary.skipped}"
