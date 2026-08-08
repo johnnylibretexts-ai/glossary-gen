@@ -1,14 +1,20 @@
 import httpx
 import pytest
 
-from glossary_gen.cli import RunSummary, estimate_cost, execute, load_prices
+from glossary_gen.cli import (
+    RunSummary,
+    actual_cost,
+    build_parser,
+    estimate_cost,
+    execute,
+    load_prices,
+)
 from glossary_gen.fetch import PageCache
 from glossary_gen.generate import load_prompt
 from glossary_gen.ledger import Ledger
-from glossary_gen.llm import LLMResult, LLMTransportError
-from glossary_gen.models import Book, GlossaryEntry, Term
+from glossary_gen.llm import LLMResult, LLMTransportError, ProviderChain
+from glossary_gen.models import GlossaryEntry, Term
 
-BOOK = Book(library="eng", cover_id="1", book_id="b", title="T", index_url="https://i")
 HTML_HIT = "<html><body><p>Recursion is a technique.</p></body></html>"
 HTML_MISS = "<html><body><p>Nothing relevant.</p></body></html>"
 
@@ -39,6 +45,34 @@ class StubClient:
         )
 
 
+class NamedModelStubClient:
+    """An LLMClient stub with an independently settable `.model`, for testing chain
+    fallback: the declared primary and the model that actually serves a call can differ.
+    """
+
+    def __init__(self, name, model, outcomes):
+        self.name = name
+        self.model = model
+        self._outcomes = list(outcomes)
+        self.calls = 0
+
+    def complete(self, prompt):
+        self.calls += 1
+        outcome = self._outcomes.pop(0) if self._outcomes else self._default()
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    def _default(self):
+        return LLMResult(
+            entry=GlossaryEntry(definition="d"),
+            model=self.model,
+            provider=self.name,
+            tokens_in=10,
+            tokens_out=5,
+        )
+
+
 def make_cache(tmp_path, routes):
     def handler(request):
         url = str(request.url)
@@ -54,7 +88,6 @@ def term(slug, url):
 def run_execute(tmp_path, terms, routes, client, **kwargs):
     return execute(
         terms,
-        BOOK,
         make_cache(tmp_path, routes),
         client,
         Ledger(tmp_path / "run.jsonl"),
@@ -95,7 +128,6 @@ def test_already_ledgered_term_is_skipped(tmp_path):
     first = StubClient([])
     execute(
         terms,
-        BOOK,
         make_cache(tmp_path, routes),
         first,
         Ledger(tmp_path / "run.jsonl"),
@@ -105,7 +137,6 @@ def test_already_ledgered_term_is_skipped(tmp_path):
     second = StubClient([])
     summary = execute(
         terms,
-        BOOK,
         make_cache(tmp_path, routes),
         second,
         Ledger(tmp_path / "run.jsonl"),
@@ -145,3 +176,147 @@ def test_estimate_cost_scales_with_term_count():
     hundred = estimate_cost("gemini-flash-3.6", 100, prices)
     assert one is not None and hundred is not None
     assert hundred == pytest.approx(one * 100)
+
+
+def test_actual_cost_returns_none_for_unpriced_model():
+    assert actual_cost("mystery-model", 1_000, 1_000, load_prices()) is None
+
+
+def test_actual_cost_scales_with_real_token_counts():
+    prices = load_prices()
+    small = actual_cost("gemini-flash-3.6", 100, 100, prices)
+    large = actual_cost("gemini-flash-3.6", 1_000, 1_000, prices)
+    assert small is not None and large is not None
+    assert large == pytest.approx(small * 10)
+
+
+def test_failed_term_is_retried_on_second_run(tmp_path):
+    """A term that fails does not get treated as done — the resumability rule lives in
+    Ledger.has(), which only counts `ok` records; execute() just consults it.
+    """
+    routes = {"https://eng.libretexts.org/a": HTML_HIT}
+    terms = [term("t1", "https://eng.libretexts.org/a")]
+    ledger_path = tmp_path / "run.jsonl"
+
+    first = StubClient([LLMTransportError("down")])
+    first_summary = execute(
+        terms,
+        make_cache(tmp_path, routes),
+        first,
+        Ledger(ledger_path),
+        load_prompt("v1"),
+        "v1",
+    )
+    assert first_summary.llm_error == 1
+    assert first_summary.skipped == 0
+
+    second = StubClient([])
+    second_summary = execute(
+        terms,
+        make_cache(tmp_path, routes),
+        second,
+        Ledger(ledger_path),
+        load_prompt("v1"),
+        "v1",
+    )
+    assert second_summary.ok == 1
+    assert second_summary.skipped == 0
+    assert second.calls == 1
+
+
+def test_budget_check_uses_actual_tokens_not_flat_estimate(tmp_path):
+    """The mid-run budget check must price real accumulated tokens, not the flat
+    per-term guess used for the pre-run estimate — otherwise it can only ever trip at
+    the same term count the pre-run estimate already predicted.
+    """
+    routes = {f"https://eng.libretexts.org/p{i}": HTML_HIT for i in range(5)}
+    terms = [term(f"t{i}", f"https://eng.libretexts.org/p{i}") for i in range(5)]
+
+    def huge_result():
+        return LLMResult(
+            entry=GlossaryEntry(definition="d"),
+            model="gemini-flash-3.6",
+            provider="stub",
+            tokens_in=1_000_000,
+            tokens_out=1_000_000,
+        )
+
+    client = StubClient([huge_result() for _ in range(5)])
+    client.model = "gemini-flash-3.6"  # a priced model
+
+    # The flat, pre-run-style estimate for all 5 terms is well under $1 — if the
+    # mid-run check still used it (flat-per-term * successes-so-far), it would never
+    # trip across this whole run. Only real per-call token counts can trip it this fast.
+    flat_five_term_estimate = estimate_cost("gemini-flash-3.6", 5, load_prices())
+    assert flat_five_term_estimate < 1.0
+
+    summary = run_execute(tmp_path, terms, routes, client, budget_usd=1.0)
+
+    assert summary.aborted is True
+    assert summary.ok == 1
+    assert client.calls == 1
+
+
+def test_ledger_records_declared_primary_even_when_fallback_serves(tmp_path):
+    """Guards the property this task was explicitly warned about: `model` on the ledger
+    row must stay the chain's declared primary (the resume key `Ledger.has()` looks
+    up), even when a fallback client actually serves the call. `served_by_model` carries
+    the model that really answered. This uses a real two-client ProviderChain and a real
+    Ledger — not stubs of the chain's own resume-key logic — so reintroducing
+    `model=result.model` in the ok branch would fail this test.
+    """
+    routes = {"https://eng.libretexts.org/a": HTML_HIT}
+    terms = [term("t1", "https://eng.libretexts.org/a")]
+    ledger_path = tmp_path / "run.jsonl"
+
+    primary = NamedModelStubClient("primary", "primary-model", [LLMTransportError("down")])
+    secondary = NamedModelStubClient("secondary", "secondary-model", [])
+    chain = ProviderChain([primary, secondary])
+
+    summary = execute(
+        terms,
+        make_cache(tmp_path, routes),
+        chain,
+        Ledger(ledger_path),
+        load_prompt("v1"),
+        "v1",
+    )
+    assert summary.ok == 1
+
+    record = Ledger(ledger_path).records()[0]
+    assert record.model == "primary-model"  # declared primary, unchanged by who served it
+    assert record.served_by_model == "secondary-model"  # who actually answered
+
+    # A fresh chain with the SAME declared primary must resume-skip, not regenerate.
+    second_primary = NamedModelStubClient("primary", "primary-model", [])
+    second_secondary = NamedModelStubClient("secondary", "secondary-model", [])
+    second_chain = ProviderChain([second_primary, second_secondary])
+    second_summary = execute(
+        terms,
+        make_cache(tmp_path, routes),
+        second_chain,
+        Ledger(ledger_path),
+        load_prompt("v1"),
+        "v1",
+    )
+    assert second_summary.skipped == 1
+    assert second_primary.calls == 0
+    assert second_secondary.calls == 0
+
+
+def test_max_terms_zero_is_rejected_at_parse_time():
+    """0 reads as "no limit" if left as a plain int — the opposite of what it should mean
+    for a value this low — so the parser must reject it rather than running the whole book.
+    """
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["--input", "x.json", "--max-terms", "0"])
+
+
+def test_max_terms_negative_is_rejected_at_parse_time():
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["--input", "x.json", "--max-terms", "-1"])
+
+
+def test_max_terms_positive_is_accepted():
+    args = build_parser().parse_args(["--input", "x.json", "--max-terms", "5"])
+    assert args.max_terms == 5

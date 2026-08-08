@@ -138,6 +138,38 @@ def test_served_by_model_round_trips(tmp_path):
     assert reloaded.served_by_model == "llama-fallback"
 
 
+def test_llm_error_record_does_not_count_as_done(tmp_path):
+    """A failed attempt is history, not completion — it must be retried, not skipped."""
+    ledger = Ledger(tmp_path / "run.jsonl")
+    ledger.append(make_record(status="llm_error"))
+    assert not ledger.has("recursion", "v1", "gemini-flash-3.6")
+
+
+def test_fetch_error_and_no_excerpt_records_do_not_count_as_done(tmp_path):
+    ledger = Ledger(tmp_path / "run.jsonl")
+    ledger.append(make_record(slug="a", status="fetch_error"))
+    ledger.append(make_record(slug="b", status="no_excerpt"))
+    assert not ledger.has("a", "v1", "gemini-flash-3.6")
+    assert not ledger.has("b", "v1", "gemini-flash-3.6")
+
+
+def test_ok_record_counts_as_done(tmp_path):
+    ledger = Ledger(tmp_path / "run.jsonl")
+    ledger.append(make_record(status="ok"))
+    assert ledger.has("recursion", "v1", "gemini-flash-3.6")
+
+
+def test_failed_then_ok_record_counts_as_done(tmp_path):
+    """A term that failed and later succeeded under the same key is done — the ok
+    record is what matters, not the failure history alongside it.
+    """
+    ledger = Ledger(tmp_path / "run.jsonl")
+    ledger.append(make_record(status="llm_error"))
+    ledger.append(make_record(status="ok"))
+    assert ledger.has("recursion", "v1", "gemini-flash-3.6")
+    assert len(ledger.records()) == 2  # both rows kept — no dedup
+
+
 def test_served_by_model_defaults_to_empty_when_not_set(tmp_path):
     path = tmp_path / "run.jsonl"
     # Manually write a record without served_by_model field

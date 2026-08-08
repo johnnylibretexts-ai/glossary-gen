@@ -65,7 +65,10 @@ def load_prices(path: Path = PRICES_PATH) -> dict[str, dict[str, float]]:
 
 
 def estimate_cost(model: str, term_count: int, prices: dict[str, dict[str, float]]) -> float | None:
-    """USD estimate, or None when the model has no configured price."""
+    """USD estimate from the flat per-term guess, or None when the model has no configured
+    price. For the pre-run gate only, where no actuals exist yet — see `actual_cost` for
+    the mid-run check, which prices real accumulated token counts instead.
+    """
     entry = prices.get(model)
     if not entry:
         return None
@@ -73,6 +76,16 @@ def estimate_cost(model: str, term_count: int, prices: dict[str, dict[str, float
         EST_TOKENS_IN * entry["input_per_mtok"] + EST_TOKENS_OUT * entry["output_per_mtok"]
     ) / 1_000_000
     return per_term * term_count
+
+
+def actual_cost(
+    model: str, tokens_in: int, tokens_out: int, prices: dict[str, dict[str, float]]
+) -> float | None:
+    """USD cost of tokens already spent, or None when the model has no configured price."""
+    entry = prices.get(model)
+    if not entry:
+        return None
+    return (tokens_in * entry["input_per_mtok"] + tokens_out * entry["output_per_mtok"]) / 1_000_000
 
 
 def _now() -> str:
@@ -104,7 +117,6 @@ def build_client(args: argparse.Namespace) -> LLMClient:
 
 def execute(
     terms: Sequence[Term],
-    book: Book,
     cache: PageCache,
     client: LLMClient,
     ledger: Ledger,
@@ -117,6 +129,10 @@ def execute(
     """Generate one entry per term, recording every outcome in the ledger."""
     summary = RunSummary()
     consecutive_failures = 0
+    # Loaded once, not per term: prices.json doesn't change mid-run.
+    prices = load_prices()
+    tokens_in_spent = 0
+    tokens_out_spent = 0
 
     for term in terms:
         if ledger.has(term.slug, prompt_version, client.model):
@@ -182,9 +198,11 @@ def execute(
             )
         )
         summary.ok += 1
+        tokens_in_spent += result.tokens_in
+        tokens_out_spent += result.tokens_out
 
         if budget_usd is not None:
-            spent = estimate_cost(client.model, summary.ok, load_prices())
+            spent = actual_cost(client.model, tokens_in_spent, tokens_out_spent, prices)
             if spent is not None and spent > budget_usd:
                 summary.aborted = True
                 break
@@ -220,6 +238,16 @@ def dry_run(terms: Sequence[Term], cache: PageCache) -> CoverageReport:
     return report
 
 
+def _positive_int(value: str) -> int:
+    """argparse type for --max-terms: 0 or negative reads as "no limit" if left as a plain
+    int, which is the opposite of what a value that low should mean — reject it instead.
+    """
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError(f"must be a positive integer, got {value!r}")
+    return parsed
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="glossary-gen",
@@ -242,7 +270,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--library", help="overrides the input file's book block")
     parser.add_argument("--cover-id", help="overrides the input file's book block")
     parser.add_argument("--book-id", help="overrides the input file's book block")
-    parser.add_argument("--max-terms", type=int, help="process at most N terms (smoke runs)")
+    parser.add_argument(
+        "--max-terms", type=_positive_int, help="process at most N terms (smoke runs)"
+    )
     parser.add_argument(
         "--budget-usd", type=float, help="abort if the estimated spend exceeds this"
     )
@@ -317,7 +347,10 @@ def run(argv: list[str] | None = None) -> int:
 
     estimate = estimate_cost(client.model, len(terms), load_prices())
     if estimate is None:
-        print(f"warning: no price configured for {client.model}; --budget-usd is disabled")
+        print(
+            f"warning: no price configured for {client.model}; --budget-usd is disabled",
+            file=sys.stderr,
+        )
         if args.budget_usd is not None:
             print("warning: --budget-usd will not be enforced", file=sys.stderr)
     else:
@@ -339,7 +372,6 @@ def run(argv: list[str] | None = None) -> int:
 
     summary = execute(
         terms,
-        book,
         cache,
         client,
         ledger,

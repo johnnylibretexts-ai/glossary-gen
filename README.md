@@ -34,9 +34,13 @@ no API key and costs nothing. Run it first.
     # 3. Full run with a spend ceiling.
     glossary-gen --input index.json --budget-usd 5.00 --out out/glossary.csv
 
-Re-running with an unchanged prompt costs nothing: the ledger skips finished terms.
-To regenerate after editing a prompt, copy `prompts/v1.md` to `prompts/v2.md`, edit it,
-and pass `--prompt-version v2`.
+Re-running with an unchanged prompt costs nothing for terms that already succeeded: the
+ledger skips any term with a recorded `ok` row. Terms that failed — a provider outage,
+an unfetchable page, no excerpt found — are **not** treated as done and are retried on
+the next run; a failed term can accumulate more than one row in the ledger before it
+finally succeeds, which is expected and used as failure history.
+To regenerate already-succeeded terms after editing a prompt, copy `prompts/v1.md` to
+`prompts/v2.md`, edit it, and pass `--prompt-version v2`.
 
 ### Output columns
 

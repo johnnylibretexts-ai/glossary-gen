@@ -37,13 +37,19 @@ class Ledger:
 
     A partially written final line is skipped rather than fatal, so a crash mid-append
     costs one term instead of the run.
+
+    Only `status == "ok"` counts as done. `llm_error`, `fetch_error`, and `no_excerpt`
+    rows are history, not completion — a term that failed is retried on the next run,
+    not silently treated as finished. A term that fails repeatedly can therefore
+    accumulate several rows under the same key; that's intentional (it's a useful
+    failure history) and `write_csv` already filters to `ok`, so no dedup is needed here.
     """
 
     def __init__(self, path: Path) -> None:
         self._path = Path(path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._records: list[LedgerRecord] = []
-        self._keys: set[tuple[str, str, str]] = set()
+        self._ok_keys: set[tuple[str, str, str]] = set()
         self.skipped_lines = 0
         self._load()
 
@@ -63,16 +69,22 @@ class Ledger:
                 self.skipped_lines += 1
                 continue
             self._records.append(record)
-            self._keys.add(self._key(record.slug, record.prompt_version, record.model))
+            if record.status == "ok":
+                self._ok_keys.add(self._key(record.slug, record.prompt_version, record.model))
 
     def has(self, slug: str, prompt_version: str, model: str) -> bool:
-        return self._key(slug, prompt_version, model) in self._keys
+        """True only when a successful ('ok') record already exists for this key.
+
+        A failed attempt does not count as done: it must be retried, not skipped.
+        """
+        return self._key(slug, prompt_version, model) in self._ok_keys
 
     def append(self, record: LedgerRecord) -> None:
         with self._path.open("a", encoding="utf-8") as handle:
             handle.write(record.model_dump_json() + "\n")
         self._records.append(record)
-        self._keys.add(self._key(record.slug, record.prompt_version, record.model))
+        if record.status == "ok":
+            self._ok_keys.add(self._key(record.slug, record.prompt_version, record.model))
 
     def records(self) -> list[LedgerRecord]:
         return list(self._records)

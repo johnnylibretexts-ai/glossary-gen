@@ -67,6 +67,10 @@ def test_full_run_writes_reviewable_csv(tmp_path, monkeypatch, capsys):
     real_client = httpx.Client
     monkeypatch.setenv("GLOSSARY_GEN_OPENAI_BASE_URL", "http://localhost:11434/v1")
     monkeypatch.delenv("GLOSSARY_GEN_GEMINI_API_KEY", raising=False)
+    # An operator's own exported GLOSSARY_GEN_OPENAI_MODEL/_API_KEY must not leak into a
+    # test run and change client.model or send unexpected headers.
+    monkeypatch.delenv("GLOSSARY_GEN_OPENAI_MODEL", raising=False)
+    monkeypatch.delenv("GLOSSARY_GEN_OPENAI_API_KEY", raising=False)
     monkeypatch.setattr(
         "glossary_gen.cli.build_http_client",
         lambda: real_client(transport=httpx.MockTransport(page_handler)),
@@ -141,6 +145,10 @@ def test_second_run_is_free_and_reproduces_the_csv(tmp_path, monkeypatch, capsys
     real_client = httpx.Client
     monkeypatch.setenv("GLOSSARY_GEN_OPENAI_BASE_URL", "http://localhost:11434/v1")
     monkeypatch.delenv("GLOSSARY_GEN_GEMINI_API_KEY", raising=False)
+    # An operator's own exported GLOSSARY_GEN_OPENAI_MODEL/_API_KEY must not leak into a
+    # test run and change client.model or send unexpected headers.
+    monkeypatch.delenv("GLOSSARY_GEN_OPENAI_MODEL", raising=False)
+    monkeypatch.delenv("GLOSSARY_GEN_OPENAI_API_KEY", raising=False)
     monkeypatch.setattr(
         "glossary_gen.cli.build_http_client",
         lambda: real_client(
