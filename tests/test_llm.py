@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 from glossary_gen.llm import (
+    GeminiClient,
     LLMResult,
     LLMStructuredOutputError,
     LLMTransportError,
@@ -121,4 +122,77 @@ def test_openai_compat_client_maps_429_to_transport_error():
         client=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(429))),
     )
     with pytest.raises(LLMTransportError, match="429"):
+        client.complete("prompt")
+
+
+def test_openai_compat_client_maps_non_json_200_to_structured_output_error():
+    client = OpenAICompatClient(
+        base_url="http://localhost:11434/v1",
+        model="llama3.1",
+        api_key=None,
+        client=httpx.Client(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200, text="not json"))
+        ),
+    )
+    with pytest.raises(LLMStructuredOutputError):
+        client.complete("prompt")
+
+
+def test_gemini_client_posts_and_parses():
+    captured = {}
+
+    def handler(request):
+        captured["url"] = str(request.url)
+        captured["api_key_header"] = request.headers.get("x-goog-api-key")
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [{"content": {"parts": [{"text": VALID_JSON}]}}],
+                "usageMetadata": {"promptTokenCount": 13, "candidatesTokenCount": 9},
+            },
+        )
+
+    client = GeminiClient(
+        api_key="test-key",
+        model="gemini-flash-3.6",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    result = client.complete("prompt")
+
+    assert captured["url"].endswith(":generateContent")
+    assert captured["api_key_header"] == "test-key"
+    assert result.entry.definition == "A function calling itself."
+    assert result.tokens_in == 13
+    assert result.tokens_out == 9
+    assert result.provider == "gemini"
+
+
+def test_gemini_client_maps_429_to_transport_error():
+    client = GeminiClient(
+        api_key="test-key",
+        client=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(429))),
+    )
+    with pytest.raises(LLMTransportError, match="429"):
+        client.complete("prompt")
+
+
+def test_gemini_client_maps_unexpected_shape_to_structured_output_error():
+    client = GeminiClient(
+        api_key="test-key",
+        client=httpx.Client(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"candidates": []}))
+        ),
+    )
+    with pytest.raises(LLMStructuredOutputError):
+        client.complete("prompt")
+
+
+def test_gemini_client_maps_non_json_200_to_structured_output_error():
+    client = GeminiClient(
+        api_key="test-key",
+        client=httpx.Client(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200, text="not json"))
+        ),
+    )
+    with pytest.raises(LLMStructuredOutputError):
         client.complete("prompt")

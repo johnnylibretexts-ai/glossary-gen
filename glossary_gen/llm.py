@@ -99,7 +99,10 @@ class OpenAICompatClient:
             raise LLMTransportError(f"{self.name}: transport error ({exc})") from exc
         if response.status_code != 200:
             raise LLMTransportError(f"{self.name}: HTTP {response.status_code}")
-        payload = response.json()
+        try:
+            payload = response.json()
+        except json.JSONDecodeError as exc:
+            raise LLMStructuredOutputError(f"{self.name}: response body is not JSON") from exc
         try:
             text = payload["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
@@ -146,7 +149,10 @@ class GeminiClient:
             raise LLMTransportError(f"{self.name}: transport error ({exc})") from exc
         if response.status_code != 200:
             raise LLMTransportError(f"{self.name}: HTTP {response.status_code}")
-        payload = response.json()
+        try:
+            payload = response.json()
+        except json.JSONDecodeError as exc:
+            raise LLMStructuredOutputError(f"{self.name}: response body is not JSON") from exc
         try:
             text = payload["candidates"][0]["content"]["parts"][0]["text"]
         except (KeyError, IndexError, TypeError) as exc:
@@ -171,10 +177,23 @@ class ProviderChain:
 
     @property
     def model(self) -> str:
+        """The chain's declared primary model — a stable ledger resume key.
+
+        This is always the first client's model, regardless of which client
+        actually served a given `complete()` call (you can't know that until
+        after you've already paid for the call). For the model that actually
+        served a specific result, use that result's `LLMResult.model`.
+        """
         return self._clients[0].model
 
     @property
     def name(self) -> str:
+        """The chain's declared primary provider name — a stable ledger resume key.
+
+        This is always the first client's name, regardless of which client
+        actually served a given `complete()` call. For the provider that
+        actually served a specific result, use that result's `LLMResult.provider`.
+        """
         return self._clients[0].name
 
     def complete(self, prompt: str) -> LLMResult:
