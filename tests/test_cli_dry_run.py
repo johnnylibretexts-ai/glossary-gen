@@ -75,3 +75,22 @@ def test_run_reports_input_error_as_exit_two(tmp_path, capsys):
     exit_code = run(["--input", str(missing), "--dry-run"])
     assert exit_code == 2
     assert "does not exist" in capsys.readouterr().err
+
+
+def test_module_entry_points_are_runnable():
+    """`python -m glossary_gen` and `python -m glossary_gen.cli` must actually run.
+
+    Both previously imported and exited 0 silently, which reads as a broken install.
+    """
+    import subprocess
+    import sys
+
+    for target in ("glossary_gen", "glossary_gen.cli"):
+        result = subprocess.run(
+            [sys.executable, "-m", target, "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, f"{target}: exit {result.returncode}"
+        assert "--dry-run" in result.stdout, f"{target}: no usage output"

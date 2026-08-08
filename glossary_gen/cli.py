@@ -423,3 +423,7 @@ def run(argv: list[str] | None = None) -> int:
         print("error: run aborted early — see the ledger", file=sys.stderr)
         return EXIT_RUN_ABORTED
     return EXIT_OK
+
+
+if __name__ == "__main__":  # `python -m glossary_gen.cli`
+    raise SystemExit(run())
