@@ -92,3 +92,23 @@ def test_unknown_extension_is_rejected(tmp_path):
 
     with pytest.raises(InputError, match="unsupported"):
         load_input(path)
+
+
+def test_shipped_example_is_valid_input():
+    """The README's walkthrough runs against examples/ — it must stay loadable.
+
+    Network-free: this only parses the file, it does not fetch the pages.
+    """
+    from pathlib import Path
+
+    example = Path(__file__).resolve().parent.parent / "examples" / "openstax-python-index.json"
+    assert example.is_file(), "the README walkthrough references this file"
+
+    result = load_input(example)
+
+    assert result.book is not None
+    assert len(result.terms) == 19
+    assert all(t.pages for t in result.terms), "every term needs at least one page"
+    assert all(
+        p.startswith("https://") and ".libretexts.org" in p for t in result.terms for p in t.pages
+    ), "page URLs must satisfy the fetcher's allowlist"

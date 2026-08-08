@@ -61,13 +61,71 @@ against your own hardware with no third-party API involved.
 Keys are read from the environment and travel only in request headers. They are never
 written to the ledger, the CSV, or any error message.
 
-## Quick start
+## Walkthrough — from a fresh clone to a CSV
 
-    pip install -e ".[dev]"
-    glossary-gen --input index.json --dry-run
+A worked example ships in `examples/`, so you can go end to end before wiring up a book of
+your own.
 
-`--dry-run` fetches pages and reports excerpt coverage without calling any model. It needs
-no API key and costs nothing. Run it first.
+**1. Install.** No API key needed yet.
+
+    git clone https://github.com/johnnylibretexts/glossary-gen
+    cd glossary-gen
+    pip install .
+
+**2. See it work, for free.** `--dry-run` fetches the real pages, finds the passages that
+define each term, and reports coverage — **without calling any model**. No key, no cost.
+
+    glossary-gen --input examples/openstax-python-index.json --dry-run
+
+Expected output:
+
+    terms total: 19
+    terms with excerpts: 18
+    terms without: 1
+    pages failed: 0
+    terms with no excerpt: algorithm
+    dry run: no model was called and nothing was spent
+
+That "1 without" is the tool doing its job: *algorithm* is listed against a page that never
+really defines it. **Run this against any index before paying to generate from it** — it
+tells you how good the index is, which is the cheapest quality signal you will get.
+
+**3. Add a provider.** Either a Gemini key:
+
+    export GLOSSARY_GEN_GEMINI_API_KEY=…
+
+…or nothing but your own hardware, with no third-party API involved:
+
+    export GLOSSARY_GEN_OPENAI_BASE_URL=http://localhost:11434/v1
+    export GLOSSARY_GEN_OPENAI_MODEL=llama3.1
+
+**4. Generate a small batch first.** Pennies, and it shows you real output before you commit
+to a whole book.
+
+    glossary-gen --input examples/openstax-python-index.json --max-terms 5 --out out/sample.csv
+
+**5. Read `out/sample.csv`.** Every row is `x_status = needs-review`. If the definitions read
+well, scale up; if they don't, edit the prompt (see [below](#usage)) rather than the code.
+
+**6. Run the whole thing, with a spend ceiling.**
+
+    glossary-gen --input examples/openstax-python-index.json --budget-usd 5.00 --out out/glossary.csv
+
+### Pointing it at your own book
+
+The one thing this tool does **not** do is build the index — that is deliberately upstream
+of it. You supply a file in the [input format](#input-format): each term plus the page URLs
+where that term is discussed.
+
+Practical sources for that list, in rough order of effort:
+
+- A book's back-matter **Index** page, which already pairs keywords with the pages they
+  appear on — this is what `examples/openstax-python-index.json` was built from.
+- Any existing keyword or co-author index export, converted to the three-column CSV form.
+- Hand-written, for a first pass. Twenty terms is enough to judge output quality.
+
+`examples/openstax-python-index.json` has `coverID` set to `REPLACE-ME` — substitute the
+real Conductor coverID for your book, or pass `--cover-id` on the command line.
 
 ## Input format
 

@@ -1,0 +1,196 @@
+{
+  "_comment": "Worked example. 19 terms from Python Programming (OpenStax) with the real chapter pages each term is discussed on. Run --dry-run against this first: it needs no API key and costs nothing.",
+  "book": {
+    "library": "eng",
+    "coverID": "REPLACE-ME",
+    "bookId": "python-openstax",
+    "title": "Python Programming (OpenStax)",
+    "index_url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/zz%3A_Back_Matter/10%3A_Index"
+  },
+  "terms": [
+    {
+      "term": "Abstraction",
+      "aliases": [
+        "data abstraction"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/11%3A_Classes/11.01%3A_Object-Oriented_Programming_Basics"
+      ]
+    },
+    {
+      "term": "Algorithm",
+      "aliases": [
+        "algorithms"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/12%3A_Recursion/12.01%3A_Recursion_Basics"
+      ]
+    },
+    {
+      "term": "Argument",
+      "aliases": [
+        "arguments",
+        "keyword argument"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/06%3A_Functions/6.06%3A_Keyword_Arguments"
+      ]
+    },
+    {
+      "term": "Base case",
+      "aliases": [
+        "stopping condition"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/12%3A_Recursion/12.02%3A_Simple_Math_Recursion"
+      ]
+    },
+    {
+      "term": "Boolean",
+      "aliases": [
+        "bool",
+        "Boolean value",
+        "booleans"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/04%3A__Decisions/4.01%3A_Boolean_Values"
+      ]
+    },
+    {
+      "term": "Class",
+      "aliases": [
+        "classes",
+        "class definition"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/11%3A_Classes/11.02%3A_Classes_and_Instances"
+      ]
+    },
+    {
+      "term": "DataFrame",
+      "aliases": [
+        "data frame"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/15%3A_Data_Science/15.03%3A_Pandas"
+      ]
+    },
+    {
+      "term": "Dictionary",
+      "aliases": [
+        "dict",
+        "dictionaries"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/10%3A_Dictionaries/10.01%3A_Dictionary_Basics"
+      ]
+    },
+    {
+      "term": "Exception",
+      "aliases": [
+        "exceptions",
+        "error handling"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/14%3A_Files/14.04%3A_Handling_Exceptions"
+      ]
+    },
+    {
+      "term": "Function",
+      "aliases": [
+        "functions",
+        "function definition"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/06%3A_Functions/6.01%3A_Defining_Functions"
+      ]
+    },
+    {
+      "term": "Inheritance",
+      "aliases": [
+        "subclassing"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/13%3A_Inheritance/13.01%3A_Inheritance_Basics"
+      ]
+    },
+    {
+      "term": "Instance",
+      "aliases": [
+        "object",
+        "class instance"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/11%3A_Classes/11.02%3A_Classes_and_Instances"
+      ]
+    },
+    {
+      "term": "List",
+      "aliases": [
+        "lists"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/03%3A_Objects/3.04%3A_List_Basics"
+      ]
+    },
+    {
+      "term": "List comprehension",
+      "aliases": [
+        "list comprehensions",
+        "comprehension"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/09%3A_Lists/9.05%3A_List_Comprehensions"
+      ]
+    },
+    {
+      "term": "Method",
+      "aliases": [
+        "methods",
+        "instance method"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/13%3A_Inheritance/13.03%3A_Methods"
+      ]
+    },
+    {
+      "term": "Parameter",
+      "aliases": [
+        "parameters"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/06%3A_Functions/6.01%3A_Defining_Functions"
+      ]
+    },
+    {
+      "term": "Recursion",
+      "aliases": [
+        "recursive function"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/12%3A_Recursion/12.01%3A_Recursion_Basics"
+      ]
+    },
+    {
+      "term": "Scope",
+      "aliases": [
+        "variable scope",
+        "local scope",
+        "global scope"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/06%3A_Functions/6.03%3A_Variable_Scope"
+      ]
+    },
+    {
+      "term": "Variable",
+      "aliases": [
+        "variables",
+        "assignment"
+      ],
+      "pages": [
+        "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/01%3A_Statements/1.03%3A_Variables"
+      ]
+    }
+  ]
+}
