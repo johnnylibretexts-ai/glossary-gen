@@ -29,6 +29,22 @@ class _RetryableError(Exception):
         super().__init__(f"HTTP {status_code} (retryable)")
 
 
+def _decode(url: str, body: bytes) -> str:
+    """Decode a page body as UTF-8, replacing undecodable bytes rather than raising.
+
+    A single non-UTF-8 byte on one page must not kill an otherwise long, unattended
+    run: `errors="replace"` swaps bad bytes for U+FFFD instead of raising, so the
+    page still yields whatever text is recoverable. The try/except is defense in
+    depth for the rare case decoding still fails for some other reason (e.g. an
+    unknown codec) — that, too, becomes a `FetchError` so the caller (`collect_pages`
+    in cli.py) already knows how to record it as `fetch_error` and continue.
+    """
+    try:
+        return body.decode("utf-8", errors="replace")
+    except LookupError as exc:  # pragma: no cover - "utf-8" is always a valid codec
+        raise FetchError(f"{url}: could not decode response body ({exc})") from exc
+
+
 def is_allowed_url(url: str) -> bool:
     """Only https on a *.libretexts.org host. Everything else is refused."""
     parts = urlsplit(url)
@@ -90,21 +106,18 @@ class PageCache:
         """
         current_url = url
         for hop in range(MAX_REDIRECTS + 1):
-            if hop > 0:
-                if not is_allowed_url(current_url):
-                    raise FetchError(
-                        f"{url}: redirect to {current_url} is not allowed (not https on "
-                        "*.libretexts.org)"
-                    )
+            if hop > 0 and not is_allowed_url(current_url):
+                raise FetchError(
+                    f"{url}: redirect to {current_url} is not allowed (not https on "
+                    "*.libretexts.org)"
+                )
             with self._client.stream("GET", current_url, timeout=30.0) as response:
                 if response.status_code in RETRYABLE_STATUS:
                     raise _RetryableError(response.status_code)
                 if response.status_code >= 300 and response.status_code < 400:
                     location = response.headers.get("location")
                     if not location:
-                        raise FetchError(
-                            f"{current_url}: redirect without Location header"
-                        )
+                        raise FetchError(f"{current_url}: redirect without Location header")
                     current_url = urljoin(current_url, location)
                     continue
                 if response.status_code != 200:
@@ -113,23 +126,20 @@ class PageCache:
                 for chunk in response.iter_bytes():
                     body += chunk
                     if len(body) > self._max_bytes:
-                        raise FetchError(
-                            f"{url}: response too large (> {self._max_bytes} "
-                            "bytes)"
-                        )
-                return body.decode("utf-8")
-        raise FetchError(
-            f"{url}: redirect chain exceeded {MAX_REDIRECTS} hops"
-        )
+                        raise FetchError(f"{url}: response too large (> {self._max_bytes} bytes)")
+                return _decode(url, body)
+        raise FetchError(f"{url}: redirect chain exceeded {MAX_REDIRECTS} hops")
 
     def get(self, url: str) -> Page:
         if not is_allowed_url(url):
-            raise FetchError(
-                f"{url}: not an allowed source URL (https on *.libretexts.org only)"
-            )
+            raise FetchError(f"{url}: not an allowed source URL (https on *.libretexts.org only)")
         cached = self._path_for(url)
         if cached.exists():
-            return parse_page(url, cached.read_text(encoding="utf-8"))
+            try:
+                html = cached.read_text(encoding="utf-8", errors="replace")
+            except (UnicodeDecodeError, LookupError) as exc:
+                raise FetchError(f"{url}: could not decode cached file ({exc})") from exc
+            return parse_page(url, html)
         body = self._download(url)
         cached.write_text(body, encoding="utf-8")
         return parse_page(url, body)

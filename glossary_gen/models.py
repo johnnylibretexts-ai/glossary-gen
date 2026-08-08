@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -32,7 +33,7 @@ class Book:
 
 @dataclass(frozen=True)
 class Block:
-    kind: str  # "heading" | "paragraph"
+    kind: Literal["heading", "paragraph"]
     text: str
 
 

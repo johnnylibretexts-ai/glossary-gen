@@ -167,6 +167,68 @@ def test_get_retries_on_transport_error_then_succeeds(tmp_path):
     assert len(calls) == 2
 
 
+def test_get_handles_non_utf8_body_without_raising(tmp_path):
+    """A regression guard from the Task-4 streaming rewrite: `response.text` used to
+    apply charset detection, but the manual `body.decode("utf-8")` decoded strictly
+    and raised UnicodeDecodeError on any page with a Latin-1 byte, which propagated
+    out of `run()` as an unhandled traceback and killed an otherwise long unattended
+    run over one bad page. A non-UTF-8 body must decode (with replacement characters
+    for the bad bytes) instead of raising.
+    """
+    # "Café" encoded as Latin-1: the 0xe9 byte is not valid standalone UTF-8.
+    bad_bytes = b"<html><body><h2>Term</h2><p>Caf\xe9 is not valid UTF-8.</p></body></html>"
+
+    def handler(request):
+        return httpx.Response(200, content=bad_bytes)
+
+    cache = PageCache(tmp_path, make_client(handler))
+    page = cache.get("https://eng.libretexts.org/a")
+
+    assert page.blocks
+    assert page.blocks[0].kind == "heading"
+    assert page.blocks[0].text == "Term"
+    paragraph_text = next(b.text for b in page.blocks if b.kind == "paragraph")
+    assert "Caf" in paragraph_text
+    assert "is not valid UTF-8." in paragraph_text
+
+
+def test_get_serves_non_utf8_body_from_cache_without_raising(tmp_path):
+    """The cache read path (`Path.read_text`) must tolerate the same bad bytes as the
+    live fetch path, since the cache stores exactly what the live path decoded.
+    """
+    bad_bytes = b"<html><body><p>Caf\xe9 again.</p></body></html>"
+
+    def handler(request):
+        return httpx.Response(200, content=bad_bytes)
+
+    cache = PageCache(tmp_path, make_client(handler))
+    first = cache.get("https://eng.libretexts.org/a")
+    second = cache.get("https://eng.libretexts.org/a")  # served from the on-disk cache
+    assert first.blocks == second.blocks
+
+
+def test_parse_page_only_ever_emits_heading_or_paragraph_kinds():
+    """Guards a live hazard in excerpt.py: it gives rank-0 (top) status to any
+    non-heading block following a matching heading. If parse_page ever grew a third
+    kind (e.g. a future `find_all([..., "li"])` promoting list items), excerpt.py
+    would silently treat list items as paragraphs and could rank them as the top
+    grounding excerpt.
+    """
+    html = """
+    <html><body>
+    <h1>Title</h1>
+    <h3>Subheading</h3>
+    <p>A paragraph.</p>
+    <ul><li>A list item that must not become a block kind of its own.</li></ul>
+    <div>A div that is not extracted at all.</div>
+    </body></html>
+    """
+    page = parse_page("https://eng.libretexts.org/a", html)
+    assert page.blocks
+    assert {b.kind for b in page.blocks} <= {"heading", "paragraph"}
+    assert not any("list item" in b.text for b in page.blocks)
+
+
 def test_get_raises_on_persistent_transport_error(tmp_path):
     """Transport errors that persist after all retries raise FetchError."""
     calls = []
