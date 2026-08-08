@@ -179,3 +179,73 @@ def test_second_run_is_free_and_reproduces_the_csv(tmp_path, monkeypatch, capsys
     assert run(argv) == 0
     assert len(llm_calls) == 1  # nothing regenerated
     assert "skipped=1" in capsys.readouterr().out
+
+
+def test_budget_usd_with_unpriced_model_refuses_to_start(tmp_path, monkeypatch, capsys):
+    """The human partner ruled: an explicit --budget-usd the tool cannot verify must
+    refuse to start (EXIT_INPUT_ERROR), not warn-and-proceed. No client may be called.
+    """
+    payload = {
+        "book": {
+            "library": "eng",
+            "coverID": "1",
+            "bookId": "b",
+            "title": "T",
+            "index_url": "https://i",
+        },
+        "terms": [{"term": "Recursion", "pages": ["https://eng.libretexts.org/hit"]}],
+    }
+    input_path = tmp_path / "in.json"
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    llm_calls = []
+
+    def llm_handler(request):
+        llm_calls.append(1)
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": REPLY}}],
+                "usage": {"prompt_tokens": 100, "completion_tokens": 30},
+            },
+        )
+
+    real_client = httpx.Client
+    monkeypatch.setenv("GLOSSARY_GEN_OPENAI_BASE_URL", "http://localhost:11434/v1")
+    monkeypatch.delenv("GLOSSARY_GEN_GEMINI_API_KEY", raising=False)
+    # Left unset, this defaults to "llama3.1" in build_client() — a model deliberately
+    # absent from glossary_gen/prices.json, i.e. unpriced.
+    monkeypatch.delenv("GLOSSARY_GEN_OPENAI_MODEL", raising=False)
+    monkeypatch.delenv("GLOSSARY_GEN_OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(
+        "glossary_gen.cli.build_http_client",
+        lambda: real_client(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200, text=PAGE_HIT))
+        ),
+    )
+    monkeypatch.setattr(
+        "glossary_gen.llm.httpx.Client",
+        lambda **kwargs: real_client(transport=httpx.MockTransport(llm_handler)),
+    )
+
+    exit_code = run(
+        [
+            "--input",
+            str(input_path),
+            "--out",
+            str(tmp_path / "out.csv"),
+            "--cache-dir",
+            str(tmp_path / "cache"),
+            "--ledger",
+            str(tmp_path / "run.jsonl"),
+            "--budget-usd",
+            "1.0",
+            "--yes",
+        ]
+    )
+
+    assert exit_code == 2
+    assert llm_calls == []
+    err = capsys.readouterr().err
+    assert "llama3.1" in err
+    assert "prices.json" in err

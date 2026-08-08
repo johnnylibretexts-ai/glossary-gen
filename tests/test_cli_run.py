@@ -11,7 +11,7 @@ from glossary_gen.cli import (
 )
 from glossary_gen.fetch import PageCache
 from glossary_gen.generate import load_prompt
-from glossary_gen.ledger import Ledger
+from glossary_gen.ledger import Ledger, LedgerRecord
 from glossary_gen.llm import LLMResult, LLMTransportError, ProviderChain
 from glossary_gen.models import GlossaryEntry, Term
 
@@ -320,3 +320,38 @@ def test_max_terms_negative_is_rejected_at_parse_time():
 def test_max_terms_positive_is_accepted():
     args = build_parser().parse_args(["--input", "x.json", "--max-terms", "5"])
     assert args.max_terms == 5
+
+
+def test_resumed_run_already_over_budget_aborts_without_calling_client(tmp_path):
+    """The ceiling is total spend across resumes of this ledger, not per-invocation.
+    A ledger that already holds enough `tokens_in`/`tokens_out` to exceed the budget
+    (from a prior run, possibly on an unrelated term — the ledger is a single running
+    total, not scoped per slug) must abort THIS run before doing any new work at all:
+    no page fetch, no LLM call, for any term.
+    """
+    routes = {"https://eng.libretexts.org/a": HTML_HIT}
+    terms = [term("t1", "https://eng.libretexts.org/a")]
+    ledger_path = tmp_path / "run.jsonl"
+
+    prior_ledger = Ledger(ledger_path)
+    prior_ledger.append(
+        LedgerRecord(
+            slug="already-done",
+            term="Already Done",
+            prompt_version="v1",
+            model="gemini-flash-3.6",
+            generated_at="2026-08-01T00:00:00Z",
+            status="ok",
+            definition="d",
+            tokens_in=1_000_000,
+            tokens_out=1_000_000,
+        )
+    )
+
+    client = StubClient([])
+    client.model = "gemini-flash-3.6"  # a priced model
+    summary = run_execute(tmp_path, terms, routes, client, budget_usd=1.0)
+
+    assert summary.aborted is True
+    assert summary.ok == 0
+    assert client.calls == 0

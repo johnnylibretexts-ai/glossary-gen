@@ -131,13 +131,29 @@ def execute(
     consecutive_failures = 0
     # Loaded once, not per term: prices.json doesn't change mid-run.
     prices = load_prices()
-    tokens_in_spent = 0
-    tokens_out_spent = 0
+    # Seeded from the ledger, not zero: --budget-usd is a ceiling on TOTAL spend across
+    # resumes of this ledger file, not per-invocation. Without this, a resumed run's
+    # counters restart at zero and the ceiling can be crossed once per resume.
+    if budget_usd is not None:
+        tokens_in_spent = sum(r.tokens_in for r in ledger.records())
+        tokens_out_spent = sum(r.tokens_out for r in ledger.records())
+    else:
+        tokens_in_spent = 0
+        tokens_out_spent = 0
 
     for term in terms:
         if ledger.has(term.slug, prompt_version, client.model):
             summary.skipped += 1
             continue
+
+        if budget_usd is not None:
+            spent_so_far = actual_cost(client.model, tokens_in_spent, tokens_out_spent, prices)
+            if spent_so_far is not None and spent_so_far > budget_usd:
+                # Already over budget before doing any work this term — e.g. a resumed
+                # run whose prior spend alone exceeds the ceiling. Abort without
+                # spending anything further (no fetch, no LLM call).
+                summary.aborted = True
+                break
 
         failed_pages: list[str] = []
         pages = collect_pages(term, cache, failed_pages)
@@ -347,12 +363,19 @@ def run(argv: list[str] | None = None) -> int:
 
     estimate = estimate_cost(client.model, len(terms), load_prices())
     if estimate is None:
+        if args.budget_usd is not None:
+            # The human partner has ruled: an explicit ceiling the tool cannot verify
+            # is not a ceiling — refuse to start rather than silently ignore it.
+            print(
+                f"error: --budget-usd was given but {client.model} has no configured "
+                "price; add it to glossary_gen/prices.json or drop --budget-usd",
+                file=sys.stderr,
+            )
+            return EXIT_INPUT_ERROR
         print(
             f"warning: no price configured for {client.model}; --budget-usd is disabled",
             file=sys.stderr,
         )
-        if args.budget_usd is not None:
-            print("warning: --budget-usd will not be enforced", file=sys.stderr)
     else:
         print(f"{len(terms)} terms, estimated ~${estimate:.2f}")
         if args.budget_usd is not None and estimate > args.budget_usd:
