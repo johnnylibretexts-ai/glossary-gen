@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
-Status = str  # "ok" | "no_excerpt" | "fetch_error" | "llm_error"
+Status = Literal["ok", "no_excerpt", "fetch_error", "llm_error"]
 
 
 class LedgerRecord(BaseModel):

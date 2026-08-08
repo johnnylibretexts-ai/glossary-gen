@@ -1,3 +1,8 @@
+import json
+
+import pytest
+from pydantic import ValidationError
+
 from glossary_gen.ledger import Ledger, LedgerRecord
 
 
@@ -73,3 +78,52 @@ def test_error_status_round_trips(tmp_path):
     Ledger(path).append(record)
     reloaded = Ledger(path).records()[0]
     assert (reloaded.status, reloaded.error) == ("llm_error", "schema violation")
+
+
+def test_invalid_status_rejected_at_construction():
+    with pytest.raises(ValidationError):
+        LedgerRecord(
+            slug="test",
+            term="Test",
+            prompt_version="v1",
+            model="gemini-flash-3.6",
+            provider="gemini",
+            generated_at="2026-08-07T00:00:00Z",
+            status="bogus",
+            definition="A test.",
+            pages=["https://a"],
+            source_pages=["https://a"],
+            excerpt_chars=42,
+        )
+
+
+def test_invalid_status_skipped_on_reload(tmp_path):
+    path = tmp_path / "run.jsonl"
+    # Write a valid record first
+    Ledger(path).append(make_record())
+    # Manually append a line with an invalid status
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "slug": "bad-status",
+                    "term": "Bad",
+                    "prompt_version": "v1",
+                    "model": "gemini-flash-3.6",
+                    "provider": "gemini",
+                    "generated_at": "2026-08-07T00:00:00Z",
+                    "status": "invalid_status",
+                    "definition": "Invalid.",
+                    "pages": ["https://a"],
+                    "source_pages": ["https://a"],
+                    "excerpt_chars": 42,
+                }
+            )
+            + "\n"
+        )
+
+    ledger = Ledger(path)
+
+    assert ledger.skipped_lines == 1
+    assert len(ledger.records()) == 1
+    assert ledger.records()[0].slug == "recursion"
