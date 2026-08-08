@@ -1,37 +1,30 @@
 # Glossary definition generator — design
 
 **Date:** 2026-08-07
-**Status:** approved, not yet implemented
-**Repo (to be created):** `johnnylibretexts/glossary-gen`
+**Status:** approved
 
 ---
 
 ## 1. Where this came from
 
-The original project brief,
-2026-07-24. the project sponsor wants AI-generated glossary terms for LibreTexts books, starting from the
-co-author AI prompt that already generates a keyword index per book.
+A request to generate glossary terms for LibreTexts books, starting from the co-author AI prompt
+that already produces a keyword index per book.
 
-In the brief (cc the Conductor developer, the platform developer) he specified a three-step
-pipeline and assigned owners:
+The work was scoped as a three-step pipeline with separate owners:
 
 | # | Step | Owner |
 |---|---|---|
-| 1 | Get the existing index — keywords/phrases **with the pages associated to each term** | the platform developer |
-| 2 | AI reviews those pages to generate definitions | **Johnny — this spec** |
-| 3 | Push to the book's glossary with terms, definitions, pages | the Conductor developer |
+| 1 | Get the existing index — keywords/phrases **with the pages associated to each term** | upstream |
+| 2 | AI reviews those pages to generate definitions | **this spec** |
+| 3 | Push to the book's glossary with terms, definitions, pages | Conductor side |
 
-The load-bearing architectural instruction in that message: **"centralize the terms on the Conductor
-instead of on the book."**
+The load-bearing architectural instruction: **centralize the terms on Conductor rather than on the
+book.**
 
 ### What already exists
 
-**the Conductor developer's Glossary Manager is already merged upstream** — `libretexts/conductor` PR #833,
-merged 2026-06-29, 24 files / 3,621 insertions. A follow-up commit with `bb759f1d`, restricting it to
-internal access during beta. It is *not* in the local `conductor/` checkout (local HEAD `bf8d8396`,
-2026-07-02, forked before the merge); read it with `git show origin/master:<path>`.
-
-Its two Mongoose models are the brief's instruction expressed in code:
+A **Glossary Manager is already merged upstream** in `libretexts/conductor` (PR #833). Its two
+Mongoose models express the centralization decision directly:
 
 - `Glossary` — `term, definition, slug, termID, aliasesIDs` → the centralized term
 - `GlossaryUsage` — `usageID, termID, term, definition, aliases, author, bookID, coverID, pages[],
@@ -39,18 +32,16 @@ Its two Mongoose models are the brief's instruction expressed in code:
 
 The write contract is `AddGlossaryParams` in `server/api/services/glossary-service.ts`.
 
-**There is no CSV import endpoint.** The commit title says "import/export features", but the import
-is `addExternalGlossaryToGlossaryUsage` — *"read from cxone glossary and add to glossary usage"*,
-i.e. ingesting an existing CXone glossary page. the project sponsor predicted this gap in his first message:
-The brief anticipated this gap: an endpoint would be needed to accept an AI-generated CSV, which the Conductor side can
-build into the glossary system. That endpoint is step 3 and belongs to the Conductor developer.
+**There is no HTTP endpoint that accepts a posted CSV.** Bulk-ingest machinery exists
+(`GlossaryService.addGlossaryEntries`), but it is a service method rather than a route, its only
+caller is the Pressbooks scraper, and it accepts `{term, definition}` only — dropping the page
+associations that step 3 needs. Exposing a route and widening that shape is step 3's work, on the
+Conductor side.
 
-**The 2026-07-24 prototype** (`mirror/`, commits `836339b`…`4484531`) produced 19 hand-authored
-entries and a static renderer at
-`https://library.libretexts.dev/Books/Python_Programming_OpenStax/Glossary/`. It writes pages *into
-the book*, which is the architecture the project sponsor steered away from four hours after it was shared. What
-survives it is the entry schema and the demonstration of entry quality. **No AI definition
-generation was ever built** — that is precisely what this spec covers.
+An **earlier prototype** produced 19 hand-authored entries and a static renderer, writing glossary
+pages *into the book* — the architecture this design deliberately moves away from. What survives it
+is the entry schema and the demonstration of entry quality. **No AI definition generation was ever
+built** before this project, which is precisely what this spec covers.
 
 ---
 
@@ -65,8 +56,8 @@ generation was ever built** — that is precisely what this spec covers.
 
 ### Non-goals
 
-- Scraping the book index (step 1 — upstream's). This tool consumes an index; it does not build one.
-- Any live Conductor integration (step 3 — the Conductor developer's). The deliverable is a file.
+- Scraping the book index (step 1 — upstream). This tool consumes an index; it does not build one.
+- Any live Conductor integration (step 3 — Conductor side). The deliverable is a file.
 - Rendering glossary pages. The `mirror/` prototype did this and the architecture moved on.
 - Judging definition quality automatically. Every row ships as `needs-review`.
 
@@ -76,10 +67,10 @@ generation was ever built** — that is precisely what this spec covers.
 
 | # | Decision | Rationale |
 |---|---|---|
-| D1 | **CLI emitting a CSV file** | Matches the handoff the project sponsor described; runs today with zero dependency on the Conductor developer; reviewable as an email attachment |
-| D2 | **Standalone repo**, not inside `assessment-ai` | Keeps an offline tool out of a deployed service under a qualification regime; shareable with the project sponsor/the Conductor developer, same precedent as `adapt-jingo`. Cost accepted: no reuse of `assessment-ai/app/llm.py` or `content.py` |
+| D1 | **CLI emitting a CSV file** | Matches the handoff that was described; runs today with zero dependency on steps 1 or 3; reviewable as an email attachment |
+| D2 | **Standalone repo**, not inside `assessment-ai` | Keeps an offline tool out of a deployed service under a qualification regime; shareable with the wider team, same precedent as `adapt-jingo`. Cost accepted: no reuse of `assessment-ai/app/llm.py` or `content.py` |
 | D3 | **Core columns + `x_`-prefixed extensions** | Core maps exactly to `AddGlossaryParams`; the prefix makes "ignorable" mechanical. Since step 3 does not exist, we propose the schema rather than conform to one |
-| D4 | **Excerpt windows around term occurrences** | the brief's step 2 is "AI reviews *the pages*" — grounding is what makes it this book's glossary. Keeps per-term cost flat instead of scaling with chapter length |
+| D4 | **Excerpt windows around term occurrences** | Step 2 is defined as "AI reviews *the pages*" — grounding is what makes it this book's glossary. Keeps per-term cost flat instead of scaling with chapter length |
 | D5 | **Gemini-first, self-hosted fallback** | Matches what is running today (Gemini Flash 3.6, personal account). The provider abstraction plus a working fallback satisfies the open-source rule; a public release must document the key requirement |
 | D6 | **Provenance columns, `needs-review` default** | Consistent with how this project already labels AI output (BUILD-08's 380 drafts are explicitly AI-generated and unreviewed) |
 | D7 | **Cached + resumable pipeline** | Prompt iteration is certain. Ledger keyed by `(slug, prompt_version, model)` means a re-run with an unchanged prompt is free and a tweaked prompt re-pays only for affected terms |
@@ -110,8 +101,8 @@ Boundaries that carry weight:
 
 - **`excerpt.py` is pure.** Definition quality is won or lost here, so it must be iterable against
   fixtures in milliseconds rather than by paying a provider to find out.
-- **`csv_out.py` is the only module that knows Conductor exists.** When the Conductor developer publishes the real
-  importer contract, one file changes.
+- **`csv_out.py` is the only module that knows Conductor exists.** When the real importer
+  contract is published, one file changes.
 - **`generate.py` does no file I/O.** The expensive, hard-to-test stage stays free of path handling
   and is drivable from a fake client.
 - **`ledger.py` is the only place resumability lives.** If resume semantics are wrong, the blast
@@ -127,7 +118,7 @@ all speak, so the self-hosted fallback is a single adapter.
 ### 5.1 Input (the step-1 contract)
 
 Publishing this precisely is deliberate leverage: it converts "get me the index somehow" into a
-concrete ask for the platform developer.
+concrete ask upstream.
 
 ```json
 {
@@ -177,7 +168,7 @@ Notes:
   asserting its own authorship is the fail-open shape that
   `assessment-ai/docs/adr/0001-forward-auth-identity-binding.md` exists to prevent.
 - **`pages` and `x_source_pages` are distinct on purpose.** `pages` is where the term is *used*
-  (Conductor's field, from upstream's input). `x_source_pages` is which pages actually yielded an
+  (Conductor's field, from the index input). `x_source_pages` is which pages actually yielded an
   excerpt. Divergence indicates either a bad index mapping or a term listed but never discussed —
   both worth seeing during review, and invisible if collapsed.
 - **`pages` and `x_source_pages` both carry page URLs, not Conductor page IDs.** URLs are what the
@@ -288,14 +279,14 @@ met it: *a test that has only ever run locally has not been tested.*
    README must state plainly that the default path requires a Google API key (D5), because a
    LibreTexts-facing tool that hard-requires a proprietary API is in tension with the open-source
    rule. The self-hosted fallback is the mitigation and should be documented as a first-class path.
-2. **Whether upstream's eventual index format matches §5.1.** It will not exactly. The input parser
+2. **Whether the eventual upstream index format matches §5.1.** It will not exactly. The input parser
    should be the thing that adapts; nothing downstream should learn his format.
 3. **`coverID` / `bookId` values** for the OpenStax Python book are not yet known and must come from
    Conductor.
 
 ## 11. References
 
-- Email thread, 2026-07-24 (the project brief)
+- Original project brief, 2026-07-24
 - `libretexts/conductor` PR #833 — `server/api/services/glossary-service.ts`,
   `server/models/glossary.ts`, `server/models/glossaryusage.ts` (read via `git show origin/master:`)
 - `mirror/` prototype: `glossary_demo.py`, `glossary_openstax_python.json`, commits

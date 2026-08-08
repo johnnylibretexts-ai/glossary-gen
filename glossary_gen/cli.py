@@ -36,7 +36,7 @@ PRICES_PATH = Path(__file__).parent / "prices.json"
 EST_TOKENS_IN = 1200
 EST_TOKENS_OUT = 220
 
-USER_AGENT = "glossary-gen/0.1 (+https://github.com/johnnylibretexts/glossary-gen)"
+USER_AGENT = "glossary-gen/0.1 (+https://github.com/LibreTexts/glossary-gen)"
 
 
 @dataclass
