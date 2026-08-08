@@ -149,3 +149,33 @@ def test_get_rejects_redirect_without_location(tmp_path):
     cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(302)))
     with pytest.raises(FetchError, match="without Location"):
         cache.get("https://eng.libretexts.org/a")
+
+
+def test_get_retries_on_transport_error_then_succeeds(tmp_path):
+    """Transport errors (ConnectError, etc.) are retried and succeed on later attempt."""
+    calls = []
+
+    def handler(request):
+        calls.append(request.url)
+        if len(calls) < 2:
+            raise httpx.ConnectError("connection failed")
+        return httpx.Response(200, text=HTML)
+
+    cache = PageCache(tmp_path, make_client(handler))
+    page = cache.get("https://eng.libretexts.org/a")
+    assert page.blocks
+    assert len(calls) == 2
+
+
+def test_get_raises_on_persistent_transport_error(tmp_path):
+    """Transport errors that persist after all retries raise FetchError."""
+    calls = []
+
+    def handler(request):
+        calls.append(request.url)
+        raise httpx.ConnectError("connection failed")
+
+    cache = PageCache(tmp_path, make_client(handler))
+    with pytest.raises(FetchError, match="transport error"):
+        cache.get("https://eng.libretexts.org/a")
+    assert len(calls) == 3

@@ -82,7 +82,12 @@ class PageCache:
         raise FetchError(f"{url}: HTTP {last_status} after {MAX_ATTEMPTS} attempts")
 
     def _fetch_with_redirects(self, url: str) -> str:
-        """Fetch URL with manual redirect following (max 3 hops), each validated."""
+        """Fetch URL with manual redirect following (max 3 hops), each validated.
+
+        Raises _RetryableError for 429/500/502/503/504 to signal retry.
+        Raises FetchError for non-retryable errors.
+        Lets httpx.HTTPError (transport errors) propagate for retry handling.
+        """
         current_url = url
         for hop in range(MAX_REDIRECTS + 1):
             if hop > 0:
@@ -91,35 +96,28 @@ class PageCache:
                         f"{url}: redirect to {current_url} is not allowed (not https on "
                         "*.libretexts.org)"
                     )
-            try:
-                with self._client.stream(
-                    "GET", current_url, timeout=30.0
-                ) as response:
-                    if response.status_code in RETRYABLE_STATUS:
-                        raise _RetryableError(response.status_code)
-                    if response.status_code >= 300 and response.status_code < 400:
-                        location = response.headers.get("location")
-                        if not location:
-                            raise FetchError(
-                                f"{current_url}: redirect without Location header"
-                            )
-                        current_url = urljoin(current_url, location)
-                        continue
-                    if response.status_code != 200:
-                        raise FetchError(f"{current_url}: HTTP {response.status_code}")
-                    body = b""
-                    for chunk in response.iter_bytes():
-                        body += chunk
-                        if len(body) > self._max_bytes:
-                            raise FetchError(
-                                f"{url}: response too large (> {self._max_bytes} "
-                                "bytes)"
-                            )
-                    return body.decode("utf-8")
-            except (FetchError, _RetryableError):
-                raise
-            except httpx.HTTPError as exc:
-                raise FetchError(f"{current_url}: transport error ({exc})") from exc
+            with self._client.stream("GET", current_url, timeout=30.0) as response:
+                if response.status_code in RETRYABLE_STATUS:
+                    raise _RetryableError(response.status_code)
+                if response.status_code >= 300 and response.status_code < 400:
+                    location = response.headers.get("location")
+                    if not location:
+                        raise FetchError(
+                            f"{current_url}: redirect without Location header"
+                        )
+                    current_url = urljoin(current_url, location)
+                    continue
+                if response.status_code != 200:
+                    raise FetchError(f"{current_url}: HTTP {response.status_code}")
+                body = b""
+                for chunk in response.iter_bytes():
+                    body += chunk
+                    if len(body) > self._max_bytes:
+                        raise FetchError(
+                            f"{url}: response too large (> {self._max_bytes} "
+                            "bytes)"
+                        )
+                return body.decode("utf-8")
         raise FetchError(
             f"{url}: redirect chain exceeded {MAX_REDIRECTS} hops"
         )
