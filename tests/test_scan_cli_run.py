@@ -1,0 +1,108 @@
+from glossary_gen.ledger import Ledger
+from glossary_gen.llm import RawResult
+from glossary_gen.models import Block, Page
+from glossary_gen.scan.models import ScanRecord
+from glossary_gen.scan.propose import load_scan_prompt
+from glossary_gen.scan_cli import estimate_scan_cost, execute
+
+PAGE = Page(
+    url="https://eng.libretexts.org/a",
+    blocks=(
+        Block(kind="heading", text="Recursion"),
+        Block(kind="paragraph", text="Recursion is a technique where a function calls itself."),
+    ),
+)
+GOOD = (
+    '{"terms": [{"term": "Recursion", "aliases": [], '
+    '"evidence": "Recursion is a technique where a function calls itself.", '
+    '"confidence": 0.8}]}'
+)
+HALLUCINATED = (
+    '{"terms": [{"term": "Monad", "aliases": [], '
+    '"evidence": "A monad is a monoid in the category of endofunctors.", '
+    '"confidence": 0.9}]}'
+)
+
+
+class _FakeClient:
+    name = "fake"
+    model = "fake-model"
+
+    def __init__(self, replies):
+        self._replies = list(replies)
+        self.calls = 0
+
+    def complete_raw(self, prompt):
+        self.calls += 1
+        return RawResult(
+            text=self._replies.pop(0),
+            model=self.model,
+            provider=self.name,
+            tokens_in=100,
+            tokens_out=20,
+        )
+
+
+def _ledger(tmp_path):
+    return Ledger(tmp_path / "scan.jsonl", record_cls=ScanRecord)
+
+
+def test_execute_keeps_a_verified_candidate(tmp_path):
+    summary = execute([PAGE], _FakeClient([GOOD]), _ledger(tmp_path), load_scan_prompt("v1"), "v1")
+
+    assert summary.ok == 1
+    assert [c.term for c in summary.candidates] == ["Recursion"]
+
+
+def test_execute_drops_a_candidate_whose_evidence_is_absent(tmp_path):
+    summary = execute(
+        [PAGE], _FakeClient([HALLUCINATED]), _ledger(tmp_path), load_scan_prompt("v1"), "v1"
+    )
+
+    assert summary.candidates == []
+    assert summary.unverified == 1
+
+
+def test_a_page_with_no_terms_is_ok_not_a_failure(tmp_path):
+    ledger = _ledger(tmp_path)
+    summary = execute([PAGE], _FakeClient(['{"terms": []}']), ledger, load_scan_prompt("v1"), "v1")
+
+    assert summary.ok == 1
+    assert ledger.records()[0].status == "ok"
+    assert ledger.records()[0].n_proposed == 0
+
+
+def test_a_term_free_page_is_not_rescanned_on_resume(tmp_path):
+    path = tmp_path / "scan.jsonl"
+    template = load_scan_prompt("v1")
+    execute(
+        [PAGE],
+        _FakeClient(['{"terms": []}']),
+        Ledger(path, record_cls=ScanRecord),
+        template,
+        "v1",
+    )
+
+    client = _FakeClient([])
+    summary = execute([PAGE], client, Ledger(path, record_cls=ScanRecord), template, "v1")
+
+    assert client.calls == 0
+    assert summary.skipped == 1
+
+
+def test_budget_ceiling_stops_the_run(tmp_path):
+    # The client's model MUST be one that prices.json prices. `actual_cost` returns None
+    # for an unpriced model, and the ceiling check short-circuits on None — so a fake
+    # model name would make this test silently pass through the guard it means to prove.
+    client = _FakeClient([GOOD, GOOD])
+    client.model = "gemini-3.5-flash"
+    summary = execute(
+        [PAGE, PAGE], client, _ledger(tmp_path), load_scan_prompt("v1"), "v1", budget_usd=0.0
+    )
+
+    assert summary.aborted is True
+    assert summary.ok == 1  # first page ran, second was stopped by the ceiling
+
+
+def test_estimate_scan_cost_returns_none_for_an_unpriced_model():
+    assert estimate_scan_cost("no-such-model", 100, {}) is None

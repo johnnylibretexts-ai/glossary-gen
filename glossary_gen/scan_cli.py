@@ -14,12 +14,23 @@ from glossary_gen.cli import (
     EXIT_INPUT_ERROR,
     EXIT_OK,
     EXIT_RUN_ABORTED,
+    PRICES_PATH,
+    _now,
     _positive_int,
+    actual_cost,
+    build_client,
     build_http_client,
+    load_prices,
 )
 from glossary_gen.fetch import FetchError, PageCache
-from glossary_gen.models import Page
-from glossary_gen.scan.propose import scan_prompt_versions
+from glossary_gen.input import InputError
+from glossary_gen.ledger import Ledger
+from glossary_gen.llm import LLMClient, LLMError
+from glossary_gen.models import Page, slugify
+from glossary_gen.scan.candidates import merge, score_on_page, verify
+from glossary_gen.scan.emit import EmitError, index_payload, report_payload, write_json
+from glossary_gen.scan.models import ScanRecord, ScoredCandidate
+from glossary_gen.scan.propose import load_scan_prompt, propose_terms, scan_prompt_versions
 from glossary_gen.scan.toc import TocError, discover
 
 # Preview-only. These are OpenStax template artifacts, so they must never reach the scoring
@@ -62,6 +73,134 @@ def collect_pages(urls: Sequence[str], cache: PageCache, failed: list[str]) -> l
         except FetchError as exc:
             failed.append(f"{url}: {exc}")
     return pages
+
+
+# A scan prompt carries a full page, not three excerpts. Measured against Python
+# Programming (OpenStax): ~12KB of HTML per page, ~2000 prompt tokens after parse_page
+# strips markup. Output is a short JSON list.
+EST_SCAN_TOKENS_IN = 2000
+EST_SCAN_TOKENS_OUT = 400
+
+
+@dataclass
+class ScanSummary:
+    ok: int = 0
+    fetch_error: int = 0
+    llm_error: int = 0
+    skipped: int = 0
+    unverified: int = 0
+    aborted: bool = False
+    candidates: list[ScoredCandidate] = field(default_factory=list)
+
+
+def estimate_scan_cost(
+    model: str, page_count: int, prices: dict[str, dict[str, float]]
+) -> float | None:
+    """USD estimate for a whole book, or None when the model has no configured price."""
+    entry = prices.get(model)
+    if not entry:
+        return None
+    per_page = (
+        EST_SCAN_TOKENS_IN * entry["input_per_mtok"]
+        + EST_SCAN_TOKENS_OUT * entry["output_per_mtok"]
+    ) / 1_000_000
+    return per_page * page_count
+
+
+def execute(
+    pages: Sequence[Page],
+    client: LLMClient,
+    ledger: Ledger,
+    template: str,
+    prompt_version: str,
+    *,
+    budget_usd: float | None = None,
+    max_consecutive_failures: int = 5,
+) -> ScanSummary:
+    """Propose, verify, and score one page at a time, recording every outcome."""
+    summary = ScanSummary()
+    consecutive_failures = 0
+    prices = load_prices()
+    # Seeded from the ledger, not zero: --budget-usd is a ceiling on TOTAL spend across
+    # resumes of this ledger file, matching cli.execute. Without this the ceiling can be
+    # crossed once per resume.
+    if budget_usd is not None:
+        tokens_in_spent = sum(r.tokens_in for r in ledger.records())
+        tokens_out_spent = sum(r.tokens_out for r in ledger.records())
+    else:
+        tokens_in_spent = 0
+        tokens_out_spent = 0
+
+    for page in pages:
+        # Checked at the very top of the iteration, before the resume check, so an
+        # already-over-budget resumed run aborts without even walking past already-done
+        # pages. `actual_cost` returns None for an unpriced model; that must not be
+        # treated as "over budget" (a None ceiling never trips).
+        if budget_usd is not None:
+            spent = actual_cost(client.model, tokens_in_spent, tokens_out_spent, prices)
+            if spent is not None and spent > budget_usd:
+                summary.aborted = True
+                break
+
+        slug = slugify(page.url)
+        if ledger.has(slug, prompt_version, client.model):
+            summary.skipped += 1
+            continue
+
+        base = {
+            "slug": slug,
+            "page_url": page.url,
+            "prompt_version": prompt_version,
+            "model": client.model,
+            "provider": getattr(client, "name", ""),
+            "generated_at": _now(),
+        }
+
+        try:
+            candidates, raw = propose_terms(client, template, page)
+        except LLMError as exc:
+            ledger.append(ScanRecord(**base, status="llm_error", error=str(exc)))
+            summary.llm_error += 1
+            consecutive_failures += 1
+            if consecutive_failures >= max_consecutive_failures:
+                summary.aborted = True
+                break
+            continue
+
+        consecutive_failures = 0
+        tokens_in_spent += raw.tokens_in
+        tokens_out_spent += raw.tokens_out
+
+        verified = [c for c in candidates.terms if verify(c, page)]
+        summary.unverified += len(candidates.terms) - len(verified)
+        for candidate in verified:
+            summary.candidates.append(
+                ScoredCandidate(
+                    term=candidate.term,
+                    aliases=candidate.aliases,
+                    evidence=candidate.evidence,
+                    page_url=page.url,
+                    score=score_on_page(candidate, page),
+                )
+            )
+
+        # A page that defines nothing is `ok` with n_proposed = 0, never its own status:
+        # Ledger.has() counts only `ok`, so a distinct status would re-pay for every
+        # term-free page on every resume, forever.
+        ledger.append(
+            ScanRecord(
+                **base,
+                status="ok",
+                n_proposed=len(candidates.terms),
+                n_verified=len(verified),
+                served_by_model=raw.model,
+                tokens_in=raw.tokens_in,
+                tokens_out=raw.tokens_out,
+            )
+        )
+        summary.ok += 1
+
+    return summary
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -114,16 +253,20 @@ def run(argv: list[str] | None = None) -> int:
     failed: list[str] = []
     pages = collect_pages(urls, cache, failed)
 
+    # A paid run with zero pages is equally meaningless as a dry run with zero pages — it
+    # must not proceed to spend money or write an index. Hoisted above the dry-run branch
+    # so it guards both paths, not just the free preview.
+    if not pages:
+        if failed:
+            print(
+                f"error: every page failed to fetch ({len(failed)} failed, 0 succeeded)",
+                file=sys.stderr,
+            )
+        else:
+            print("error: the table of contents produced no content pages", file=sys.stderr)
+        return EXIT_RUN_ABORTED
+
     if args.dry_run:
-        if not pages:
-            if failed:
-                print(
-                    f"error: every page failed to fetch ({len(failed)} failed, 0 succeeded)",
-                    file=sys.stderr,
-                )
-            else:
-                print("error: the table of contents produced no content pages", file=sys.stderr)
-            return EXIT_RUN_ABORTED
         report = structural_preview(pages)
         print(f"book:       {book.title} ({book.library}/{book.cover_id})")
         print(f"pages:      {report.pages} fetched, {len(failed)} failed")
@@ -136,8 +279,63 @@ def run(argv: list[str] | None = None) -> int:
         print("a real run reads each page with a model and scores what it finds.")
         return EXIT_OK
 
-    print("error: a full run is not implemented yet; use --dry-run", file=sys.stderr)
-    return EXIT_RUN_ABORTED
+    prices = load_prices(PRICES_PATH)
+    estimate = estimate_scan_cost(args.model, len(pages), prices)
+    if args.budget_usd is not None and estimate is None:
+        print(
+            f"error: --budget-usd was given but {args.model!r} has no entry in prices.json, "
+            "so no ceiling can be enforced",
+            file=sys.stderr,
+        )
+        return EXIT_INPUT_ERROR
+    if estimate is not None:
+        print(f"estimated cost: ${estimate:.2f} for {len(pages)} pages")
+        print("note: prices.json rates are UNVERIFIED placeholders — check your provider")
+    if not args.yes:
+        reply = input("proceed? [y/N] ").strip().lower()
+        if reply != "y":
+            return EXIT_RUN_ABORTED
+
+    try:
+        llm = build_client(args)
+    except InputError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+
+    ledger = Ledger(args.ledger, record_cls=ScanRecord)
+    summary = execute(
+        pages,
+        llm,
+        ledger,
+        load_scan_prompt(args.prompt_version),
+        args.prompt_version,
+        budget_usd=args.budget_usd,
+    )
+    terms = merge(summary.candidates)
+
+    # The REPORT is written first and unconditionally. When a strict --min-score filters
+    # everything out, `index_payload` refuses to write an index at all (it would be rejected
+    # by `load_input`, which requires a non-empty terms list) — but that is exactly the run
+    # where a human most needs to see what was found and what threshold discarded it.
+    write_json(args.report, report_payload(terms))
+
+    print(
+        f"pages ok={summary.ok} skipped={summary.skipped} "
+        f"fetch_error={len(failed)} llm_error={summary.llm_error}"
+    )
+    print(f"candidates: {len(summary.candidates)} verified, {summary.unverified} rejected")
+
+    try:
+        write_json(args.out, index_payload(book, terms, min_score=args.min_score))
+    except EmitError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        print(f"scores were still written to {args.report}", file=sys.stderr)
+        return EXIT_RUN_ABORTED
+
+    kept = sum(1 for t in terms if t.score >= args.min_score)
+    print(f"terms: {len(terms)} merged, {kept} written to {args.out}")
+    print(f"scores: {args.report}")
+    return EXIT_RUN_ABORTED if summary.aborted else EXIT_OK
 
 
 if __name__ == "__main__":  # `python -m glossary_gen.scan_cli`
