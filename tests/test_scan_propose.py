@@ -80,3 +80,34 @@ def test_propose_terms_gives_up_after_the_retry_budget():
 
     with pytest.raises(LLMStructuredOutputError):
         propose_terms(client, load_scan_prompt("v1"), PAGE)
+
+
+def test_propose_terms_rejects_a_bare_json_array():
+    # extract_json's greedy `{.*}` fallback would strip the brackets off this and hand
+    # PageCandidates just the inner object, which validates as a silently empty result.
+    reply = '[{"term": "X", "evidence": "some evidence text here", "confidence": 0.5}]'
+    client = _FakeClient([reply, reply, reply])
+
+    with pytest.raises(LLMStructuredOutputError, match="JSON array"):
+        propose_terms(client, load_scan_prompt("v1"), PAGE)
+
+    assert len(client.prompts) == 3
+
+
+def test_propose_terms_rejects_an_object_with_no_terms_key():
+    reply = '{"candidates": []}'
+    client = _FakeClient([reply, reply, reply])
+
+    with pytest.raises(LLMStructuredOutputError, match="no 'terms' key"):
+        propose_terms(client, load_scan_prompt("v1"), PAGE)
+
+    assert len(client.prompts) == 3
+
+
+def test_propose_terms_accepts_a_legitimate_empty_terms_reply():
+    client = _FakeClient(['{"terms": []}'])
+
+    candidates, _ = propose_terms(client, load_scan_prompt("v1"), PAGE)
+
+    assert candidates.terms == []
+    assert len(client.prompts) == 1
