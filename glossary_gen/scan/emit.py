@@ -9,14 +9,26 @@ from glossary_gen.models import Book
 from glossary_gen.scan.models import ScoredTerm
 
 
+class EmitError(Exception):
+    """The scan produced nothing worth writing."""
+
+    pass
+
+
 def index_payload(book: Book, terms: Sequence[ScoredTerm], *, min_score: float) -> dict[str, Any]:
     """Build exactly what `glossary_gen.input.load_input` accepts — and nothing more.
 
     Scores are deliberately absent: `input.py` owns this schema, and adding a field to it
     here would make the scanner the second owner of a contract that already has one. The
     scores go to the sidecar report instead.
+
+    Raises EmitError if no terms meet the min_score threshold or if the input list is empty.
     """
     kept = [term for term in terms if term.score >= min_score]
+    if not kept:
+        raise EmitError(
+            f"min_score={min_score} filtered out all {len(terms)} terms; nothing to write"
+        )
     return {
         "book": {
             "library": book.library,

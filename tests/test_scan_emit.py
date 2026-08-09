@@ -1,8 +1,15 @@
 import json
 
+import pytest
+
 from glossary_gen.input import load_input
 from glossary_gen.models import Book
-from glossary_gen.scan.emit import index_payload, report_payload, write_json
+from glossary_gen.scan.emit import (
+    EmitError,
+    index_payload,
+    report_payload,
+    write_json,
+)
 from glossary_gen.scan.models import ScoredTerm
 
 BOOK = Book(
@@ -55,4 +62,28 @@ def test_report_carries_the_scores(tmp_path):
 
     assert report["terms"][0]["slug"] == "recursion"
     assert report["terms"][0]["score"] == 0.9
+    assert report["count"] == 2
+
+
+def test_min_score_above_all_terms_raises_emit_error():
+    with pytest.raises(EmitError):
+        index_payload(BOOK, TERMS, min_score=0.99)
+
+
+def test_emit_error_message_names_threshold_and_pre_filter_count():
+    with pytest.raises(EmitError, match=r"min_score=0\.99 filtered out all 2 terms"):
+        index_payload(BOOK, TERMS, min_score=0.99)
+
+
+def test_empty_terms_list_raises_emit_error():
+    with pytest.raises(EmitError, match=r"min_score=0\.5 filtered out all 0 terms"):
+        index_payload(BOOK, [], min_score=0.5)
+
+
+def test_report_payload_unfiltered_even_when_index_would_fail():
+    report = report_payload([])
+    assert report["count"] == 0
+    assert report["terms"] == []
+
+    report = report_payload(TERMS)
     assert report["count"] == 2
