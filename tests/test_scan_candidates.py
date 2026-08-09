@@ -3,10 +3,12 @@ from glossary_gen.scan.candidates import (
     CUE_BONUS,
     HEADING_BONUS,
     MIN_EVIDENCE_CHARS,
+    MULTIPAGE_BONUS,
+    merge,
     score_on_page,
     verify,
 )
-from glossary_gen.scan.models import Candidate
+from glossary_gen.scan.models import ScoredCandidate, Candidate
 
 PAGE = Page(
     url="https://eng.libretexts.org/x",
@@ -84,3 +86,53 @@ def test_score_adds_a_bonus_for_definitional_phrasing():
 def test_score_is_clamped_to_one():
     candidate = Candidate(term="Recursion", evidence="Recursion is the idea", confidence=1.0)
     assert score_on_page(candidate, PAGE) == 1.0
+
+
+def _scored(term, page_url, score, aliases=None):
+    return ScoredCandidate(
+        term=term, aliases=aliases or [], evidence="e", page_url=page_url, score=score
+    )
+
+
+def test_merge_deduplicates_by_slug_and_unions_pages():
+    merged = merge([_scored("Recursion", "https://a", 0.6), _scored("recursion", "https://b", 0.4)])
+
+    assert len(merged) == 1
+    assert merged[0].pages == ["https://a", "https://b"]
+
+
+def test_merge_keeps_the_highest_score_and_adds_the_multipage_bonus():
+    merged = merge([_scored("Recursion", "https://a", 0.6), _scored("Recursion", "https://b", 0.4)])
+
+    assert merged[0].score == 0.6 + MULTIPAGE_BONUS
+
+
+def test_merge_does_not_add_the_multipage_bonus_for_a_single_page():
+    merged = merge([_scored("Recursion", "https://a", 0.6)])
+    assert merged[0].score == 0.6
+
+
+def test_merge_unions_aliases_without_duplicates():
+    merged = merge(
+        [
+            _scored("Recursion", "https://a", 0.6, ["recursive"]),
+            _scored("Recursion", "https://b", 0.4, ["recursive", "recurse"]),
+        ]
+    )
+
+    assert merged[0].aliases == ["recursive", "recurse"]
+
+
+def test_merge_records_a_variant_surface_form_as_an_alias():
+    merged = merge([_scored("Recursion", "https://a", 0.6), _scored("recursion", "https://b", 0.4)])
+    assert "recursion" in merged[0].aliases
+
+
+def test_merge_orders_output_by_descending_score():
+    merged = merge([_scored("Low", "https://a", 0.2), _scored("High", "https://b", 0.9)])
+    assert [t.term for t in merged] == ["High", "Low"]
+
+
+def test_merge_emits_no_duplicate_slugs():
+    merged = merge([_scored("List", "https://a", 0.5), _scored("list", "https://b", 0.5)])
+    assert len({t.slug for t in merged}) == len(merged)

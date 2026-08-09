@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 from glossary_gen.excerpt import DEFINITIONAL
 from glossary_gen.models import Page
-from glossary_gen.scan.models import Candidate
+from glossary_gen.scan.models import Candidate, ScoredCandidate, ScoredTerm
 
 # A span shorter than this proves nothing — "a", "is", or a bare term name occurs on
 # almost any page, so accepting it would make the gate a no-op for short hallucinations.
@@ -68,3 +69,42 @@ def score_on_page(candidate: Candidate, page: Page) -> float:
     if DEFINITIONAL.search(candidate.evidence):
         score += CUE_BONUS
     return min(score, 1.0)
+
+
+def merge(scored: Sequence[ScoredCandidate]) -> list[ScoredTerm]:
+    """Collapse per-page candidates into one row per slug, highest score first.
+
+    Deduplication by slug is mandatory, not cosmetic: `input.load_input` raises
+    `InputError` on a duplicate slug, so an unmerged index would be rejected by the very
+    consumer it targets. Note this does not merge singular/plural pairs — "Dictionary"
+    and "Dictionaries" slugify differently and both survive, by design (see the spec's
+    known limitations); a string rule aggressive enough to merge them also merges
+    genuinely distinct terms.
+    """
+    groups: dict[str, list[ScoredCandidate]] = {}
+    for candidate in scored:
+        groups.setdefault(candidate.slug, []).append(candidate)
+
+    merged: list[ScoredTerm] = []
+    for members in groups.values():
+        best = max(members, key=lambda c: c.score)
+        pages: list[str] = []
+        aliases: list[str] = []
+        for member in members:
+            if member.page_url not in pages:
+                pages.append(member.page_url)
+            for alias in (*member.aliases, member.term):
+                if alias != best.term and alias not in aliases:
+                    aliases.append(alias)
+        score = best.score + (MULTIPAGE_BONUS if len(pages) > 1 else 0.0)
+        merged.append(
+            ScoredTerm(
+                term=best.term,
+                aliases=aliases,
+                pages=pages,
+                score=min(score, 1.0),
+                evidence=best.evidence,
+            )
+        )
+    merged.sort(key=lambda t: (-t.score, t.slug))
+    return merged
