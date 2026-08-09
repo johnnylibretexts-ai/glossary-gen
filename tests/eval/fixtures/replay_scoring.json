@@ -9,7 +9,7 @@
       ],
       "reply": {
         "terms": [
-          {"term": "Algorithm", "aliases": [], "evidence": "An algorithm is a step-by-step procedure for solving a problem.", "confidence": 0.8}
+          {"term": "Algorithm", "aliases": [], "evidence": "An algorithm is a step-by-step procedure for solving a problem.", "confidence": 0.5}
         ]
       }
     },
@@ -20,7 +20,7 @@
       ],
       "reply": {
         "terms": [
-          {"term": "algorithm", "aliases": [], "evidence": "The method is algorithm in nature.", "confidence": 0.6}
+          {"term": "algorithm", "aliases": [], "evidence": "The method is algorithm in nature.", "confidence": 0.4}
         ]
       }
     }

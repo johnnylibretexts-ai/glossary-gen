@@ -68,15 +68,15 @@ def test_replay_merge_picks_highest_score_and_preserves_aliases():
     assert len(terms) == 1
     term = terms[0]
 
-    # "Algorithm" on page1: confidence=0.8, heading, "is a"
-    #   -> 0.8 + HEADING_BONUS + CUE_BONUS = 1.05 -> clamped to 1.0
-    # "algorithm" on page2: confidence=0.6, no heading, no definitional cue
-    #   -> 0.6
+    # "Algorithm" on page1: confidence=0.5, heading, "is a"
+    #   -> 0.5 + HEADING_BONUS + CUE_BONUS = 0.75
+    # "algorithm" on page2: confidence=0.4, no heading, no definitional cue
+    #   -> 0.4
     # Both slug to "algorithm", so they merge.
-    # Winner is "Algorithm" with score 1.0 (higher than 0.6).
-    # After multipage merge: 1.0 + MULTIPAGE_BONUS = 1.05 -> clamped to 1.0
+    # Winner is "Algorithm" with score 0.75 (higher than 0.4).
+    # After multipage merge: 0.75 + MULTIPAGE_BONUS = 0.80 (below 1.0, bonus visible)
     assert term.slug == "algorithm"
     assert term.term == "Algorithm"
     assert "algorithm" in term.aliases
-    expected_score = min(1.0 + MULTIPAGE_BONUS, 1.0)
+    expected_score = 0.5 + HEADING_BONUS + CUE_BONUS + MULTIPAGE_BONUS
     assert term.score == expected_score
