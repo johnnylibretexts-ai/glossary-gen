@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from glossary_gen.ledger import Ledger, LedgerRecord
 
@@ -196,3 +196,29 @@ def test_served_by_model_defaults_to_empty_when_not_set(tmp_path):
     ledger = Ledger(path)
     reloaded = ledger.records()[0]
     assert reloaded.served_by_model == ""
+
+
+class _OtherRecord(BaseModel):
+    slug: str
+    prompt_version: str
+    model: str
+    status: str
+    n_proposed: int = 0
+
+
+def test_ledger_stores_a_custom_record_type(tmp_path):
+    path = tmp_path / "scan.jsonl"
+    ledger = Ledger(path, record_cls=_OtherRecord)
+    ledger.append(
+        _OtherRecord(slug="p-1", prompt_version="v1", model="m", status="ok", n_proposed=3)
+    )
+
+    reloaded = Ledger(path, record_cls=_OtherRecord)
+
+    assert reloaded.has("p-1", "v1", "m") is True
+    assert reloaded.records()[0].n_proposed == 3
+
+
+def test_ledger_defaults_to_the_generator_record_type(tmp_path):
+    ledger = Ledger(tmp_path / "run.jsonl")
+    assert ledger.records() == []

@@ -43,12 +43,18 @@ class Ledger:
     not silently treated as finished. A term that fails repeatedly can therefore
     accumulate several rows under the same key; that's intentional (it's a useful
     failure history) and `write_csv` already filters to `ok`, so no dedup is needed here.
+
+    The record type is a constructor parameter so a second producer (the scanner) can
+    reuse the resume and crash-tolerance behaviour with a page-shaped record. Any record
+    type must expose `slug`, `prompt_version`, `model`, and `status`, because those four
+    are what keying and completion are computed from.
     """
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, record_cls: type[BaseModel] = LedgerRecord) -> None:
         self._path = Path(path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._records: list[LedgerRecord] = []
+        self._record_cls = record_cls
+        self._records: list[BaseModel] = []
         self._ok_keys: set[tuple[str, str, str]] = set()
         self.skipped_lines = 0
         self._load()
@@ -64,7 +70,7 @@ class Ledger:
             if not line.strip():
                 continue
             try:
-                record = LedgerRecord.model_validate(json.loads(line))
+                record = self._record_cls.model_validate(json.loads(line))
             except (json.JSONDecodeError, ValidationError):
                 self.skipped_lines += 1
                 continue
@@ -79,12 +85,12 @@ class Ledger:
         """
         return self._key(slug, prompt_version, model) in self._ok_keys
 
-    def append(self, record: LedgerRecord) -> None:
+    def append(self, record: BaseModel) -> None:
         with self._path.open("a", encoding="utf-8") as handle:
             handle.write(record.model_dump_json() + "\n")
         self._records.append(record)
         if record.status == "ok":
             self._ok_keys.add(self._key(record.slug, record.prompt_version, record.model))
 
-    def records(self) -> list[LedgerRecord]:
+    def records(self) -> list[BaseModel]:
         return list(self._records)
