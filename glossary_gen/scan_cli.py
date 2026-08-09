@@ -132,20 +132,23 @@ def execute(
         tokens_out_spent = 0
 
     for page in pages:
-        # Checked at the very top of the iteration, before the resume check, so an
-        # already-over-budget resumed run aborts without even walking past already-done
-        # pages. `actual_cost` returns None for an unpriced model; that must not be
-        # treated as "over budget" (a None ceiling never trips).
+        slug = slugify(page.url)
+        if ledger.has(slug, prompt_version, client.model):
+            summary.skipped += 1
+            continue
+
+        # Checked after the resume check, not before: --budget-usd is a ceiling on SPEND,
+        # and a skipped page spends nothing. If the check ran first, a resumed run whose
+        # ledger already exceeds the ceiling could never finish — not even to skip past
+        # already-`ok` pages and let a human merge/emit what was already paid for. It would
+        # report `aborted` and exit non-zero despite doing (and needing to do) no work at
+        # all. `actual_cost` returns None for an unpriced model; that must not be treated
+        # as "over budget" (a None ceiling never trips).
         if budget_usd is not None:
             spent = actual_cost(client.model, tokens_in_spent, tokens_out_spent, prices)
             if spent is not None and spent > budget_usd:
                 summary.aborted = True
                 break
-
-        slug = slugify(page.url)
-        if ledger.has(slug, prompt_version, client.model):
-            summary.skipped += 1
-            continue
 
         base = {
             "slug": slug,

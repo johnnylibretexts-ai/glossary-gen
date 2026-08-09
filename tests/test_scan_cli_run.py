@@ -12,6 +12,17 @@ PAGE = Page(
         Block(kind="paragraph", text="Recursion is a technique where a function calls itself."),
     ),
 )
+# A distinct URL (and therefore a distinct ledger slug) from PAGE. A real book never
+# produces two pages with the same URL — reusing PAGE for a second slot in a list would
+# silently test "one page listed twice" instead of "two pages", which is a different
+# (and undefined) scenario for the resume-key logic.
+PAGE2 = Page(
+    url="https://eng.libretexts.org/b",
+    blocks=(
+        Block(kind="heading", text="Recursion"),
+        Block(kind="paragraph", text="Recursion is a technique where a function calls itself."),
+    ),
+)
 GOOD = (
     '{"terms": [{"term": "Recursion", "aliases": [], '
     '"evidence": "Recursion is a technique where a function calls itself.", '
@@ -94,14 +105,54 @@ def test_budget_ceiling_stops_the_run(tmp_path):
     # The client's model MUST be one that prices.json prices. `actual_cost` returns None
     # for an unpriced model, and the ceiling check short-circuits on None — so a fake
     # model name would make this test silently pass through the guard it means to prove.
+    # Two DISTINCT pages, not the same Page object twice: a repeated object slugifies to
+    # the same ledger key, so the second entry would be resumed as already-done instead
+    # of reaching the budget check at all.
     client = _FakeClient([GOOD, GOOD])
     client.model = "gemini-3.5-flash"
     summary = execute(
-        [PAGE, PAGE], client, _ledger(tmp_path), load_scan_prompt("v1"), "v1", budget_usd=0.0
+        [PAGE, PAGE2], client, _ledger(tmp_path), load_scan_prompt("v1"), "v1", budget_usd=0.0
     )
 
     assert summary.aborted is True
     assert summary.ok == 1  # first page ran, second was stopped by the ceiling
+
+
+def test_a_resumed_run_already_over_budget_still_finishes_already_done_pages(tmp_path):
+    """--budget-usd ceilings SPEND, not existence of prior spend. A page already `ok` in
+    the ledger costs nothing to skip, so a resumed run whose recorded spend already
+    exceeds the ceiling must still be able to walk past every already-done page (and
+    report skipped, not aborted) rather than refusing to finish at all. Pins the resume
+    check running BEFORE the budget check — reversing that order would make this abort
+    with zero work left to do, and zero pages already-priced-and-paid-for could ever be
+    merged and emitted again.
+    """
+    path = tmp_path / "scan.jsonl"
+    template = load_scan_prompt("v1")
+    priming_client = _FakeClient([GOOD, GOOD])
+    priming_client.model = "gemini-3.5-flash"
+    execute(
+        [PAGE, PAGE2],
+        priming_client,
+        Ledger(path, record_cls=ScanRecord),
+        template,
+        "v1",
+    )  # no budget_usd here: just get both pages recorded `ok` with real token counts
+
+    resumed_client = _FakeClient([])
+    resumed_client.model = "gemini-3.5-flash"
+    summary = execute(
+        [PAGE, PAGE2],
+        resumed_client,
+        Ledger(path, record_cls=ScanRecord),
+        template,
+        "v1",
+        budget_usd=0.0,  # already exceeded by the priming run's recorded spend
+    )
+
+    assert summary.skipped == 2
+    assert summary.aborted is False
+    assert resumed_client.calls == 0
 
 
 def test_estimate_scan_cost_returns_none_for_an_unpriced_model():
