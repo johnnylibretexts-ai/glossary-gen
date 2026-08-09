@@ -282,7 +282,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--ledger", type=Path, default=Path("out/run.jsonl"), help="run ledger path"
     )
     parser.add_argument("--prompt-version", default="v1", choices=prompt_versions())
-    parser.add_argument("--model", default="gemini-flash-3.6", help="Gemini model name")
+    parser.add_argument("--model", default="gemini-3.5-flash", help="Gemini model name")
     parser.add_argument("--library", help="overrides the input file's book block")
     parser.add_argument("--cover-id", help="overrides the input file's book block")
     parser.add_argument("--book-id", help="overrides the input file's book block")

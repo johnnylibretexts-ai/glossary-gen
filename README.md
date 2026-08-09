@@ -217,7 +217,7 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 | `--cache-dir` | `cache` | on-disk HTML page cache; reused across runs so pages already fetched are never re-fetched |
 | `--ledger` | `out/run.jsonl` | append-only run log; the resume/skip and cost-ceiling state live here. **Point every book at its own `--ledger` path** — see the prompt-iteration note above for why a shared/default path across books is safe for the CSV but wastes ledger disk space and history clarity |
 | `--prompt-version` | `v1` | filename stem under `prompts/`, e.g. `v2` for `prompts/v2.md` |
-| `--model` | `gemini-flash-3.6` | model name passed to the Gemini client only; the OpenAI-compatible fallback's model comes from `GLOSSARY_GEN_OPENAI_MODEL` |
+| `--model` | `gemini-3.5-flash` | model name passed to the Gemini client only; the OpenAI-compatible fallback's model comes from `GLOSSARY_GEN_OPENAI_MODEL` |
 | `--library`, `--cover-id`, `--book-id` | — | override the input file's `book` block; required (from one source or the other) when the input is CSV, which never carries a book block |
 | `--max-terms` | — | process at most N terms (smoke runs); must be a positive integer |
 | `--budget-usd` | — | pre-run estimate gate **and** mid-run abort ceiling, see Cost control below |
@@ -235,7 +235,8 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 ## Cost control
 
 Per-token prices live in `glossary_gen/prices.json`, keyed by model name. As of this
-writing it covers **exactly one model**, `gemini-flash-3.6`. Any other model — including
+writing it covers **exactly one model**, `gemini-3.5-flash`, and **that rate is an unverified
+placeholder** — check your provider's current pricing before relying on `--budget-usd`. Any other model — including
 the OpenAI-compatible fallback's default `llama3.1` — has no configured price.
 
 - With an unpriced model and no `--budget-usd`, the tool warns once to stderr and

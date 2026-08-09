@@ -1,3 +1,7 @@
 {
-  "gemini-flash-3.6": { "input_per_mtok": 0.30, "output_per_mtok": 2.50 }
+  "_comment": "USD per 1,000,000 tokens, keyed by model name. THESE RATES ARE PLACEHOLDERS AND ARE NOT VERIFIED \u2014 check your provider's current pricing page before relying on --budget-usd, because a wrong rate makes the ceiling wrong in whichever direction the error runs. A model with no entry here disables --budget-usd, and passing --budget-usd for an unpriced model refuses to start rather than running without a ceiling.",
+  "gemini-3.5-flash": {
+    "input_per_mtok": 0.3,
+    "output_per_mtok": 2.5
+  }
 }

@@ -172,8 +172,8 @@ def test_estimate_cost_returns_none_for_unpriced_model():
 
 def test_estimate_cost_scales_with_term_count():
     prices = load_prices()
-    one = estimate_cost("gemini-flash-3.6", 1, prices)
-    hundred = estimate_cost("gemini-flash-3.6", 100, prices)
+    one = estimate_cost("gemini-3.5-flash", 1, prices)
+    hundred = estimate_cost("gemini-3.5-flash", 100, prices)
     assert one is not None and hundred is not None
     assert hundred == pytest.approx(one * 100)
 
@@ -184,8 +184,8 @@ def test_actual_cost_returns_none_for_unpriced_model():
 
 def test_actual_cost_scales_with_real_token_counts():
     prices = load_prices()
-    small = actual_cost("gemini-flash-3.6", 100, 100, prices)
-    large = actual_cost("gemini-flash-3.6", 1_000, 1_000, prices)
+    small = actual_cost("gemini-3.5-flash", 100, 100, prices)
+    large = actual_cost("gemini-3.5-flash", 1_000, 1_000, prices)
     assert small is not None and large is not None
     assert large == pytest.approx(small * 10)
 
@@ -235,19 +235,19 @@ def test_budget_check_uses_actual_tokens_not_flat_estimate(tmp_path):
     def huge_result():
         return LLMResult(
             entry=GlossaryEntry(definition="d"),
-            model="gemini-flash-3.6",
+            model="gemini-3.5-flash",
             provider="stub",
             tokens_in=1_000_000,
             tokens_out=1_000_000,
         )
 
     client = StubClient([huge_result() for _ in range(5)])
-    client.model = "gemini-flash-3.6"  # a priced model
+    client.model = "gemini-3.5-flash"  # a priced model
 
     # The flat, pre-run-style estimate for all 5 terms is well under $1 — if the
     # mid-run check still used it (flat-per-term * successes-so-far), it would never
     # trip across this whole run. Only real per-call token counts can trip it this fast.
-    flat_five_term_estimate = estimate_cost("gemini-flash-3.6", 5, load_prices())
+    flat_five_term_estimate = estimate_cost("gemini-3.5-flash", 5, load_prices())
     assert flat_five_term_estimate < 1.0
 
     summary = run_execute(tmp_path, terms, routes, client, budget_usd=1.0)
@@ -339,7 +339,7 @@ def test_resumed_run_already_over_budget_aborts_without_calling_client(tmp_path)
             slug="already-done",
             term="Already Done",
             prompt_version="v1",
-            model="gemini-flash-3.6",
+            model="gemini-3.5-flash",
             generated_at="2026-08-01T00:00:00Z",
             status="ok",
             definition="d",
@@ -349,7 +349,7 @@ def test_resumed_run_already_over_budget_aborts_without_calling_client(tmp_path)
     )
 
     client = StubClient([])
-    client.model = "gemini-flash-3.6"  # a priced model
+    client.model = "gemini-3.5-flash"  # a priced model
     summary = run_execute(tmp_path, terms, routes, client, budget_usd=1.0)
 
     assert summary.aborted is True

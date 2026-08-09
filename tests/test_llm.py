@@ -154,7 +154,7 @@ def test_gemini_client_posts_and_parses():
 
     client = GeminiClient(
         api_key="test-key",
-        model="gemini-flash-3.6",
+        model="gemini-3.5-flash",
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
     result = client.complete("prompt")
