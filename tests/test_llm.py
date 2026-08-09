@@ -8,6 +8,8 @@ from glossary_gen.llm import (
     LLMTransportError,
     OpenAICompatClient,
     ProviderChain,
+    RawResult,
+    extract_json,
     parse_entry,
 )
 from glossary_gen.models import GlossaryEntry
@@ -196,3 +198,39 @@ def test_gemini_client_maps_non_json_200_to_structured_output_error():
     )
     with pytest.raises(LLMStructuredOutputError):
         client.complete("prompt")
+
+
+def test_extract_json_strips_a_code_fence():
+    assert extract_json('```json\n{"a": 1}\n```') == {"a": 1}
+
+
+def test_extract_json_finds_a_bare_object_in_prose():
+    assert extract_json('Sure!\n{"a": 1}\nHope that helps') == {"a": 1}
+
+
+def test_extract_json_rejects_a_reply_with_no_object():
+    with pytest.raises(LLMStructuredOutputError):
+        extract_json("no json here")
+
+
+def test_gemini_complete_raw_returns_text_and_usage(monkeypatch):
+    import httpx
+
+    from glossary_gen.llm import GeminiClient
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [{"content": {"parts": [{"text": '{"terms": []}'}]}}],
+                "usageMetadata": {"promptTokenCount": 11, "candidatesTokenCount": 3},
+            },
+        )
+
+    client = GeminiClient(api_key="k", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    raw = client.complete_raw("prompt")
+
+    assert isinstance(raw, RawResult)
+    assert raw.text == '{"terms": []}'
+    assert (raw.tokens_in, raw.tokens_out) == (11, 3)
+    assert raw.provider == "gemini"

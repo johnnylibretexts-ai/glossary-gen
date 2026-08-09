@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Sequence
-from typing import Protocol
+from typing import Any, Protocol
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -34,15 +34,32 @@ class LLMResult(BaseModel):
     tokens_out: int = 0
 
 
+class RawResult(BaseModel):
+    """An unparsed provider reply plus its accounting, before schema validation.
+
+    `complete()` is this plus a `GlossaryEntry` validation. The scanner needs the same
+    call with a different schema, so the transport half is exposed on its own rather
+    than making `LLMResult` generic over its payload.
+    """
+
+    text: str
+    model: str
+    provider: str
+    tokens_in: int = 0
+    tokens_out: int = 0
+
+
 class LLMClient(Protocol):
     name: str
     model: str
 
     def complete(self, prompt: str) -> LLMResult: ...
 
+    def complete_raw(self, prompt: str) -> RawResult: ...
 
-def parse_entry(raw: str) -> GlossaryEntry:
-    """Extract and validate a GlossaryEntry from a model's raw text reply."""
+
+def extract_json(raw: str) -> Any:
+    """Pull a JSON value out of a model reply that may be fenced or wrapped in prose."""
     candidate = raw.strip()
     fenced = _FENCE.search(candidate)
     if fenced:
@@ -52,9 +69,14 @@ def parse_entry(raw: str) -> GlossaryEntry:
         if obj:
             candidate = obj.group(0)
     try:
-        payload = json.loads(candidate)
+        return json.loads(candidate)
     except json.JSONDecodeError as exc:
         raise LLMStructuredOutputError(f"no JSON object in reply ({exc.msg})") from exc
+
+
+def parse_entry(raw: str) -> GlossaryEntry:
+    """Extract and validate a GlossaryEntry from a model's raw text reply."""
+    payload = extract_json(raw)
     try:
         return GlossaryEntry.model_validate(payload)
     except ValidationError as exc:
@@ -81,7 +103,7 @@ class OpenAICompatClient:
         self._api_key = api_key
         self._client = client or httpx.Client(timeout=120.0)
 
-    def complete(self, prompt: str) -> LLMResult:
+    def complete_raw(self, prompt: str) -> RawResult:
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
@@ -107,12 +129,22 @@ class OpenAICompatClient:
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMStructuredOutputError(f"{self.name}: unexpected response shape") from exc
         usage = payload.get("usage") or {}
-        return LLMResult(
-            entry=parse_entry(text),
+        return RawResult(
+            text=text,
             model=self.model,
             provider=self.name,
             tokens_in=int(usage.get("prompt_tokens", 0)),
             tokens_out=int(usage.get("completion_tokens", 0)),
+        )
+
+    def complete(self, prompt: str) -> LLMResult:
+        raw = self.complete_raw(prompt)
+        return LLMResult(
+            entry=parse_entry(raw.text),
+            model=raw.model,
+            provider=raw.provider,
+            tokens_in=raw.tokens_in,
+            tokens_out=raw.tokens_out,
         )
 
 
@@ -134,7 +166,7 @@ class GeminiClient:
         self._base_url = base_url.rstrip("/")
         self._client = client or httpx.Client(timeout=120.0)
 
-    def complete(self, prompt: str) -> LLMResult:
+    def complete_raw(self, prompt: str) -> RawResult:
         url = f"{self._base_url}/models/{self.model}:generateContent"
         body = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -157,12 +189,22 @@ class GeminiClient:
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMStructuredOutputError(f"{self.name}: unexpected response shape") from exc
         usage = payload.get("usageMetadata") or {}
-        return LLMResult(
-            entry=parse_entry(text),
+        return RawResult(
+            text=text,
             model=self.model,
             provider=self.name,
             tokens_in=int(usage.get("promptTokenCount", 0)),
             tokens_out=int(usage.get("candidatesTokenCount", 0)),
+        )
+
+    def complete(self, prompt: str) -> LLMResult:
+        raw = self.complete_raw(prompt)
+        return LLMResult(
+            entry=parse_entry(raw.text),
+            model=raw.model,
+            provider=raw.provider,
+            tokens_in=raw.tokens_in,
+            tokens_out=raw.tokens_out,
         )
 
 
@@ -200,6 +242,15 @@ class ProviderChain:
         for client in self._clients:
             try:
                 return client.complete(prompt)
+            except LLMTransportError as exc:
+                failures.append(f"{client.name}: {exc}")
+        raise LLMTransportError("all providers failed — " + "; ".join(failures))
+
+    def complete_raw(self, prompt: str) -> RawResult:
+        failures: list[str] = []
+        for client in self._clients:
+            try:
+                return client.complete_raw(prompt)
             except LLMTransportError as exc:
                 failures.append(f"{client.name}: {exc}")
         raise LLMTransportError("all providers failed — " + "; ".join(failures))
