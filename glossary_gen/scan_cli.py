@@ -95,7 +95,6 @@ EST_SCAN_TOKENS_OUT = 400
 @dataclass
 class ScanSummary:
     ok: int = 0
-    fetch_error: int = 0
     llm_error: int = 0
     skipped: int = 0
     unverified: int = 0
@@ -342,10 +341,17 @@ def run(argv: list[str] | None = None) -> int:
     if estimate is not None:
         print(f"estimated cost: ${estimate:.2f} for {len(pages)} pages")
         print("note: prices.json rates are UNVERIFIED placeholders — check your provider")
-    if not args.yes:
-        reply = input("proceed? [y/N] ").strip().lower()
-        if reply != "y":
-            return EXIT_RUN_ABORTED
+    # Mirrors cli.py's confirmation gate exactly, so the two entry points behave
+    # identically for unattended runs (cron, CI, nohup, a pipe): only prompt when
+    # stdin is a tty, or a non-interactive run without --yes would hit input() and
+    # die with an uncaught EOFError instead of a defined exit code.
+    if (
+        not args.yes
+        and sys.stdin.isatty()
+        and input("proceed? [y/N] ").strip().casefold() not in {"y", "yes"}
+    ):
+        print("aborted by user")
+        return EXIT_OK
 
     try:
         llm = build_client(args)

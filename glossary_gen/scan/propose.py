@@ -5,7 +5,13 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from glossary_gen.llm import LLMClient, LLMStructuredOutputError, RawResult, extract_json
+from glossary_gen.llm import (
+    _FENCE,
+    LLMClient,
+    LLMStructuredOutputError,
+    RawResult,
+    extract_json,
+)
 from glossary_gen.models import Page
 from glossary_gen.scan.candidates import page_text
 from glossary_gen.scan.models import PageCandidates
@@ -35,16 +41,14 @@ def build_scan_prompt(template: str, page: Page) -> str:
     return template.format(page_url=page.url, page_text=page_text(page))
 
 
-# Mirrors `llm.extract_json`'s own fence-stripping (kept local, not imported, since
-# `llm.py` is out of scope for this fix) so a bare JSON array can be recognised on the
-# reply's own text -- before `extract_json` gets a chance to mangle it. Its object-only
-# fallback regex (`\{.*\}`, greedy, DOTALL) matches from an array's first `{` to its
-# last `}`, silently discarding the enclosing `[`/`]` and handing back just the inner
-# object. By the time that has happened the array is gone, so this check must run first.
-_FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
-
-
 def _looks_like_bare_json_array(text: str) -> bool:
+    """Uses `llm._FENCE` (the same fence-stripping regex `extract_json` applies) so a
+    bare JSON array can be recognised on the reply's own text -- before `extract_json`
+    gets a chance to mangle it. Its object-only fallback regex (`\\{.*\\}`, greedy,
+    DOTALL) matches from an array's first `{` to its last `}`, silently discarding the
+    enclosing `[`/`]` and handing back just the inner object. By the time that has
+    happened the array is gone, so this check must run first.
+    """
     candidate = text.strip()
     fenced = _FENCE.search(candidate)
     if fenced:

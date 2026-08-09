@@ -97,8 +97,25 @@ hard ceiling.
 
 A replay-based recall eval harness exists under `tests/eval/` — it scores the
 candidate-selection and verification logic against fixed fixtures, offline, with no model
-call. It is a regression check on that logic, not a measurement of recall or cost against a
-live model on a real book; that has not been run yet.
+call. It has been measured against a live model on a real book: against Python Programming
+(OpenStax), `glossary-scan` found 11 of a 19-term reference index (recall 11/19 = 0.579).
+That measurement is pinned as a regression floor of 0.55 in `tests/eval/test_recall_openstax.py`,
+so a prompt or scoring change that drops recall below the measured baseline fails CI. Recall
+0.579 is measured on **one book against a partial reference set** — read it as a baseline to
+regress against, not as a validated recall rate for the tool in general.
+
+A separate, real, billed run — a 20-page bounded scan of the same book — produced 39 verified
+terms, and `glossary-gen` grounded all 39 of them (0 without excerpts, 0 page failures). Actual
+spend was $0.0135, against a $0.03 pre-flight estimate (`prices.json`'s rates are still the
+unverified placeholders noted below — the estimate and the actual both used them).
+
+**Known limitation:** the LLM layer has no retry/backoff for HTTP 429 (rate limiting) — unlike
+`PageCache`, which does retry 429 for page fetches. `--delay` paces page *fetches*, not model
+calls, so it does not help here. On a rate-limited (e.g. free-tier) key, a long unattended run
+can trip the consecutive-failure breaker and stop early; this was observed in practice as a scan
+halting after 7 pages. The tool's behavior under 429 is correct as far as it goes (the failure is
+recorded with 0 tokens billed, and the breaker stops the run rather than burning the budget) — but
+completing a full book on a rate-limited key currently requires re-running to resume past the gap.
 
 ### glossary-scan options
 

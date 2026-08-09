@@ -44,8 +44,14 @@ CUE_BONUS = 0.10
 MULTIPAGE_BONUS = 0.05
 
 
-def _needle_pattern(candidate: Candidate) -> re.Pattern[str]:
+def _needle_pattern(candidate: Candidate) -> re.Pattern[str] | None:
     needles = [n for n in (candidate.term, *candidate.aliases) if n.strip()]
+    if not needles:
+        # No usable needles. Do NOT fall through to `re.compile(r"\b(|)\b")` here:
+        # an empty alternation degenerates to `\b()\b`, which matches at essentially
+        # every word boundary, so `has_heading_match` would return True for any
+        # heading-bearing page instead of False.
+        return None
     alternatives = "|".join(re.escape(n) for n in needles)
     return re.compile(rf"\b({alternatives})\b", re.IGNORECASE)
 
@@ -58,6 +64,8 @@ def has_heading_match(candidate: Candidate, page: Page) -> bool:
     excluded upstream and cannot inflate this signal.
     """
     pattern = _needle_pattern(candidate)
+    if pattern is None:
+        return False
     return any(block.kind == "heading" and pattern.search(block.text) for block in page.blocks)
 
 

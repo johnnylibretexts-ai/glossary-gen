@@ -4,6 +4,7 @@ from glossary_gen.scan.candidates import (
     HEADING_BONUS,
     MIN_EVIDENCE_CHARS,
     MULTIPAGE_BONUS,
+    has_heading_match,
     merge,
     score_on_page,
     verify,
@@ -86,6 +87,22 @@ def test_score_adds_a_bonus_for_definitional_phrasing():
 def test_score_is_clamped_to_one():
     candidate = Candidate(term="Recursion", evidence="Recursion is the idea", confidence=1.0)
     assert score_on_page(candidate, PAGE) == 1.0
+
+
+def test_has_heading_match_is_false_when_term_and_aliases_are_all_blank():
+    # Candidate validation now rejects a whitespace-only term, so build one that
+    # bypasses validation to prove the `has_heading_match` guard itself holds:
+    # without it, an empty needle list degenerates to `\b()\b`, which matches at
+    # essentially every word boundary and would spuriously return True here.
+    candidate = Candidate.model_construct(
+        term=" ", aliases=["  ", ""], evidence="Recursion is a technique", confidence=0.9
+    )
+    assert has_heading_match(candidate, PAGE) is False
+
+
+def test_has_heading_match_is_true_for_a_normal_term():
+    candidate = Candidate(term="Recursion", evidence="calls itself", confidence=0.5)
+    assert has_heading_match(candidate, PAGE) is True
 
 
 def _scored(term, page_url, score, aliases=None):
