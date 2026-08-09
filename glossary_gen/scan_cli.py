@@ -14,6 +14,7 @@ from glossary_gen.cli import (
     EXIT_INPUT_ERROR,
     EXIT_OK,
     EXIT_RUN_ABORTED,
+    _positive_int,
     build_http_client,
 )
 from glossary_gen.fetch import FetchError, PageCache
@@ -36,7 +37,6 @@ _PAGEINDEX = re.compile(r"\\\(.*?\\\)")
 @dataclass
 class PreviewReport:
     pages: int = 0
-    fetch_errors: list[str] = field(default_factory=list)
     candidates: list[str] = field(default_factory=list)
 
 
@@ -84,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.0,
         help="omit terms scoring below this (default 0.0: emit everything, trim by hand)",
     )
-    parser.add_argument("--limit", type=int, help="scan at most N pages (smoke runs)")
+    parser.add_argument("--limit", type=_positive_int, help="scan at most N pages (smoke runs)")
     parser.add_argument(
         "--delay", type=float, default=0.3, help="seconds between real page fetches"
     )
@@ -115,6 +115,15 @@ def run(argv: list[str] | None = None) -> int:
     pages = collect_pages(urls, cache, failed)
 
     if args.dry_run:
+        if not pages:
+            if failed:
+                print(
+                    f"error: every page failed to fetch ({len(failed)} failed, 0 succeeded)",
+                    file=sys.stderr,
+                )
+            else:
+                print("error: the table of contents produced no content pages", file=sys.stderr)
+            return EXIT_RUN_ABORTED
         report = structural_preview(pages)
         print(f"book:       {book.title} ({book.library}/{book.cover_id})")
         print(f"pages:      {report.pages} fetched, {len(failed)} failed")
@@ -129,3 +138,7 @@ def run(argv: list[str] | None = None) -> int:
 
     print("error: a full run is not implemented yet; use --dry-run", file=sys.stderr)
     return EXIT_RUN_ABORTED
+
+
+if __name__ == "__main__":  # `python -m glossary_gen.scan_cli`
+    raise SystemExit(run())

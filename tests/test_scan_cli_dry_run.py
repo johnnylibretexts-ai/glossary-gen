@@ -1,5 +1,43 @@
+import httpx
+import pytest
+
+from glossary_gen import scan_cli
 from glossary_gen.models import Block, Page
+from glossary_gen.scan.toc import API
 from glossary_gen.scan_cli import build_parser, structural_preview
+
+BOOK = "https://eng.libretexts.org/Bookshelves/CS/Sample"
+
+TOC_WITH_PAGES = {
+    "toc": {
+        "structured": {
+            "title": "Sample Book",
+            "url": BOOK,
+            "@id": "1",
+            "subdomain": "eng",
+            "subpages": [
+                {"title": "1: Intro", "url": f"{BOOK}/01"},
+                {"title": "2: More", "url": f"{BOOK}/02"},
+            ],
+        }
+    }
+}
+
+TOC_NO_PAGES = {
+    "toc": {
+        "structured": {
+            "title": "Empty Book",
+            "@id": "2",
+            "subdomain": "eng",
+            "subpages": [],
+        }
+    }
+}
+
+
+def _mock_client(handler):
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
 
 PAGES = [
     Page(
@@ -33,3 +71,48 @@ def test_parser_requires_a_book_url():
     assert args.book == "https://eng.libretexts.org/x"
     assert args.min_score == 0.0
     assert args.dry_run is False
+
+
+def test_limit_rejects_zero():
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["--book", BOOK, "--limit", "0"])
+
+
+def test_limit_rejects_negative():
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["--book", BOOK, "--limit", "-1"])
+
+
+def test_dry_run_aborts_when_every_page_fails(tmp_path, monkeypatch, capsys):
+    def handler(request):
+        if str(request.url).startswith(API):
+            return httpx.Response(200, json=TOC_WITH_PAGES)
+        return httpx.Response(404)
+
+    monkeypatch.setattr(scan_cli, "build_http_client", lambda: _mock_client(handler))
+
+    exit_code = scan_cli.run(
+        ["--book", BOOK, "--dry-run", "--delay", "0", "--cache-dir", str(tmp_path / "cache")]
+    )
+
+    assert exit_code == scan_cli.EXIT_RUN_ABORTED
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "every page failed to fetch" in captured.err
+    assert "2 failed" in captured.err
+
+
+def test_dry_run_aborts_when_toc_has_no_content_pages(tmp_path, monkeypatch, capsys):
+    def handler(request):
+        return httpx.Response(200, json=TOC_NO_PAGES)
+
+    monkeypatch.setattr(scan_cli, "build_http_client", lambda: _mock_client(handler))
+
+    exit_code = scan_cli.run(
+        ["--book", BOOK, "--dry-run", "--delay", "0", "--cache-dir", str(tmp_path / "cache")]
+    )
+
+    assert exit_code == scan_cli.EXIT_RUN_ABORTED
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "no content pages" in captured.err
