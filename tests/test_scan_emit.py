@@ -76,7 +76,7 @@ def test_emit_error_message_names_threshold_and_pre_filter_count():
 
 
 def test_empty_terms_list_raises_emit_error():
-    with pytest.raises(EmitError, match=r"min_score=0\.5 filtered out all 0 terms"):
+    with pytest.raises(EmitError, match=r"the scan produced no terms"):
         index_payload(BOOK, [], min_score=0.5)
 
 

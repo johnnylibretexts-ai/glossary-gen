@@ -12,8 +12,6 @@ from glossary_gen.scan.models import ScoredTerm
 class EmitError(Exception):
     """The scan produced nothing worth writing."""
 
-    pass
-
 
 def index_payload(book: Book, terms: Sequence[ScoredTerm], *, min_score: float) -> dict[str, Any]:
     """Build exactly what `glossary_gen.input.load_input` accepts — and nothing more.
@@ -24,6 +22,8 @@ def index_payload(book: Book, terms: Sequence[ScoredTerm], *, min_score: float) 
 
     Raises EmitError if no terms meet the min_score threshold or if the input list is empty.
     """
+    if not terms:
+        raise EmitError("the scan produced no terms; nothing to write")
     kept = [term for term in terms if term.score >= min_score]
     if not kept:
         raise EmitError(
