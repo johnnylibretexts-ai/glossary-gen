@@ -14,7 +14,7 @@ BOOK = Book(
 
 
 PROMPT_VERSION = "v1"
-MODEL = "gemini-flash-3.6"
+MODEL = "gemini-3.5-flash"
 
 
 def make_record(
@@ -180,7 +180,7 @@ def test_csv_scopes_to_the_run_model(tmp_path):
     """Same failure mode as prompt_version, but for --model."""
     path = tmp_path / "out.csv"
     records = [
-        make_record("recursion", model="gemini-flash-3.6", definition="gemini definition"),
+        make_record("recursion", model="gemini-3.5-flash", definition="gemini definition"),
         make_record("recursion", model="llama3.1", definition="llama definition"),
     ]
     written = write(path, records, model="llama3.1", slugs={"recursion"})

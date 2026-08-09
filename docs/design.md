@@ -58,7 +58,7 @@ built** before this project, which is precisely what this spec covers.
 
 - Scraping the book index (step 1 — upstream). This tool consumes an index; it does not build one.
 - Any live Conductor integration (step 3 — Conductor side). The deliverable is a file.
-- Rendering glossary pages. The `mirror/` prototype did this and the architecture moved on.
+- Rendering glossary pages. The earlier prototype did this and the architecture moved on.
 - Judging definition quality automatically. Every row ships as `needs-review`.
 
 ---
@@ -68,11 +68,11 @@ built** before this project, which is precisely what this spec covers.
 | # | Decision | Rationale |
 |---|---|---|
 | D1 | **CLI emitting a CSV file** | Matches the handoff that was described; runs today with zero dependency on steps 1 or 3; reviewable as an email attachment |
-| D2 | **Standalone repo**, not inside `assessment-ai` | Keeps an offline tool out of a deployed service under a qualification regime; shareable with the wider team, same precedent as `adapt-jingo`. Cost accepted: no reuse of `assessment-ai/app/llm.py` or `content.py` |
+| D2 | **Standalone repo**, not folded into an existing service | Keeps an offline batch tool out of a deployed service that is under a release-qualification process; shareable on its own terms. Cost accepted: no reuse of that service's existing LLM-provider and content-fetching modules |
 | D3 | **Core columns + `x_`-prefixed extensions** | Core maps exactly to `AddGlossaryParams`; the prefix makes "ignorable" mechanical. Since step 3 does not exist, we propose the schema rather than conform to one |
 | D4 | **Excerpt windows around term occurrences** | Step 2 is defined as "AI reviews *the pages*" — grounding is what makes it this book's glossary. Keeps per-term cost flat instead of scaling with chapter length |
-| D5 | **Gemini-first, self-hosted fallback** | Matches what is running today (Gemini Flash 3.6, personal account). The provider abstraction plus a working fallback satisfies the open-source rule; a public release must document the key requirement |
-| D6 | **Provenance columns, `needs-review` default** | Consistent with how this project already labels AI output (BUILD-08's 380 drafts are explicitly AI-generated and unreviewed) |
+| D5 | **Gemini-first, self-hosted fallback** | Gemini is the convenient default; the provider abstraction plus a working self-hosted fallback keeps open-weight models first-class. A public release must document the API-key requirement. **Verify any model id against the provider's live model list — a plausible-looking name that does not exist fails every call with a 404, and mocked tests cannot catch it.** |
+| D6 | **Provenance columns, `needs-review` default** | Consistent with how AI output is labelled elsewhere in this programme: explicitly AI-generated and explicitly unreviewed |
 | D7 | **Cached + resumable pipeline** | Prompt iteration is certain. Ledger keyed by `(slug, prompt_version, model)` means a re-run with an unchanged prompt is free and a tweaked prompt re-pays only for affected terms |
 
 Batching multiple terms per LLM call was considered and deferred (YAGNI). It is a real cost lever
@@ -139,7 +139,7 @@ also accepted, since that is likelier what a co-author export produces.
 One record per attempt, keyed by `(slug, prompt_version, model)`:
 
 ```json
-{"slug":"recursion","term":"Recursion","prompt_version":"v1","model":"gemini-flash-3.6",
+{"slug":"recursion","term":"Recursion","prompt_version":"v1","model":"gemini-3.5-flash",
  "provider":"gemini","generated_at":"2026-08-07T00:00:00Z","status":"ok",
  "definition":"...","x_category":"...","x_context":"...","x_example":"...","x_related":["..."],
  "pages":["..."],"source_pages":["..."],"excerpt_chars":1840,
@@ -165,8 +165,8 @@ Notes:
 - `library` / `coverID` / `bookId` come from CLI flags and repeat on every row. Redundant, but it
   keeps the file self-contained with no sidecar to lose in an email attachment.
 - **`addedBy` is deliberately absent.** The importer must set it from the authenticated user. A CSV
-  asserting its own authorship is the fail-open shape that
-  `assessment-ai/docs/adr/0001-forward-auth-identity-binding.md` exists to prevent.
+  asserting its own authorship is a fail-open identity — a system accepting a supplied identity as
+  though it were authenticated. Bind authorship to the authenticated session instead.
 - **`pages` and `x_source_pages` are distinct on purpose.** `pages` is where the term is *used*
   (Conductor's field, from the index input). `x_source_pages` is which pages actually yielded an
   excerpt. Divergence indicates either a bad index mapping or a term listed but never discussed —
@@ -275,7 +275,7 @@ met it: *a test that has only ever run locally has not been tested.*
 
 ## 10. Open questions
 
-1. **Repo licence and visibility.** `adapt-jingo` is public MIT. If `glossary-gen` follows, the
+1. **Repo licence and visibility.** If this ships publicly under MIT, the
    README must state plainly that the default path requires a Google API key (D5), because a
    LibreTexts-facing tool that hard-requires a proprietary API is in tension with the open-source
    rule. The self-hosted fallback is the mitigation and should be documented as a first-class path.
@@ -289,10 +289,8 @@ met it: *a test that has only ever run locally has not been tested.*
 - Original project brief, 2026-07-24
 - `libretexts/conductor` PR #833 — `server/api/services/glossary-service.ts`,
   `server/models/glossary.ts`, `server/models/glossaryusage.ts` (read via `git show origin/master:`)
-- `mirror/` prototype: `glossary_demo.py`, `glossary_openstax_python.json`, commits
-  `836339b`…`4484531`
-- `assessment-ai/app/llm.py` — provider-chain design reference (not imported; see D2)
-- `assessment-ai/docs/adr/0001-forward-auth-identity-binding.md` — the `addedBy` rationale
+- The earlier hand-authored glossary prototype (superseded; see §1)
+- An existing internal service's LLM provider-chain — design reference only, not imported (see D2)
 
 ---
 

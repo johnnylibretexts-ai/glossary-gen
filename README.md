@@ -72,7 +72,7 @@ your own.
 
 **1. Install.** No API key needed yet.
 
-    git clone https://github.com/LibreTexts/glossary-gen
+    git clone https://github.com/johnnylibretexts/glossary-gen
     cd glossary-gen
     pip install .
 

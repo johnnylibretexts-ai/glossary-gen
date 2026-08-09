@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from glossary_gen.ledger import Ledger, LedgerRecord
 
 
-def make_record(slug="recursion", prompt_version="v1", model="gemini-flash-3.6", status="ok"):
+def make_record(slug="recursion", prompt_version="v1", model="gemini-3.5-flash", status="ok"):
     return LedgerRecord(
         slug=slug,
         term="Recursion",
@@ -25,31 +25,31 @@ def make_record(slug="recursion", prompt_version="v1", model="gemini-flash-3.6",
 def test_append_then_has_is_true(tmp_path):
     ledger = Ledger(tmp_path / "run.jsonl")
     ledger.append(make_record())
-    assert ledger.has("recursion", "v1", "gemini-flash-3.6")
+    assert ledger.has("recursion", "v1", "gemini-3.5-flash")
 
 
 def test_has_is_false_for_unknown_key(tmp_path):
     ledger = Ledger(tmp_path / "run.jsonl")
     ledger.append(make_record())
-    assert not ledger.has("other", "v1", "gemini-flash-3.6")
+    assert not ledger.has("other", "v1", "gemini-3.5-flash")
 
 
 def test_changing_prompt_version_invalidates(tmp_path):
     ledger = Ledger(tmp_path / "run.jsonl")
     ledger.append(make_record(prompt_version="v1"))
-    assert not ledger.has("recursion", "v2", "gemini-flash-3.6")
+    assert not ledger.has("recursion", "v2", "gemini-3.5-flash")
 
 
 def test_changing_model_invalidates(tmp_path):
     ledger = Ledger(tmp_path / "run.jsonl")
-    ledger.append(make_record(model="gemini-flash-3.6"))
+    ledger.append(make_record(model="gemini-3.5-flash"))
     assert not ledger.has("recursion", "v1", "llama3.1")
 
 
 def test_reopening_reloads_from_disk(tmp_path):
     path = tmp_path / "run.jsonl"
     Ledger(path).append(make_record())
-    assert Ledger(path).has("recursion", "v1", "gemini-flash-3.6")
+    assert Ledger(path).has("recursion", "v1", "gemini-3.5-flash")
 
 
 def test_truncated_final_line_is_skipped_not_fatal(tmp_path):
@@ -86,7 +86,7 @@ def test_invalid_status_rejected_at_construction():
             slug="test",
             term="Test",
             prompt_version="v1",
-            model="gemini-flash-3.6",
+            model="gemini-3.5-flash",
             provider="gemini",
             generated_at="2026-08-07T00:00:00Z",
             status="bogus",
@@ -109,7 +109,7 @@ def test_invalid_status_skipped_on_reload(tmp_path):
                     "slug": "bad-status",
                     "term": "Bad",
                     "prompt_version": "v1",
-                    "model": "gemini-flash-3.6",
+                    "model": "gemini-3.5-flash",
                     "provider": "gemini",
                     "generated_at": "2026-08-07T00:00:00Z",
                     "status": "invalid_status",
@@ -142,21 +142,21 @@ def test_llm_error_record_does_not_count_as_done(tmp_path):
     """A failed attempt is history, not completion — it must be retried, not skipped."""
     ledger = Ledger(tmp_path / "run.jsonl")
     ledger.append(make_record(status="llm_error"))
-    assert not ledger.has("recursion", "v1", "gemini-flash-3.6")
+    assert not ledger.has("recursion", "v1", "gemini-3.5-flash")
 
 
 def test_fetch_error_and_no_excerpt_records_do_not_count_as_done(tmp_path):
     ledger = Ledger(tmp_path / "run.jsonl")
     ledger.append(make_record(slug="a", status="fetch_error"))
     ledger.append(make_record(slug="b", status="no_excerpt"))
-    assert not ledger.has("a", "v1", "gemini-flash-3.6")
-    assert not ledger.has("b", "v1", "gemini-flash-3.6")
+    assert not ledger.has("a", "v1", "gemini-3.5-flash")
+    assert not ledger.has("b", "v1", "gemini-3.5-flash")
 
 
 def test_ok_record_counts_as_done(tmp_path):
     ledger = Ledger(tmp_path / "run.jsonl")
     ledger.append(make_record(status="ok"))
-    assert ledger.has("recursion", "v1", "gemini-flash-3.6")
+    assert ledger.has("recursion", "v1", "gemini-3.5-flash")
 
 
 def test_failed_then_ok_record_counts_as_done(tmp_path):
@@ -166,7 +166,7 @@ def test_failed_then_ok_record_counts_as_done(tmp_path):
     ledger = Ledger(tmp_path / "run.jsonl")
     ledger.append(make_record(status="llm_error"))
     ledger.append(make_record(status="ok"))
-    assert ledger.has("recursion", "v1", "gemini-flash-3.6")
+    assert ledger.has("recursion", "v1", "gemini-3.5-flash")
     assert len(ledger.records()) == 2  # both rows kept — no dedup
 
 
@@ -180,7 +180,7 @@ def test_served_by_model_defaults_to_empty_when_not_set(tmp_path):
                     "slug": "old-record",
                     "term": "Old",
                     "prompt_version": "v1",
-                    "model": "gemini-flash-3.6",
+                    "model": "gemini-3.5-flash",
                     "provider": "gemini",
                     "generated_at": "2026-08-07T00:00:00Z",
                     "status": "ok",
