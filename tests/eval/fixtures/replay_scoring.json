@@ -1,0 +1,28 @@
+{
+  "expected_slugs": ["algorithm"],
+  "pages": [
+    {
+      "url": "https://eng.libretexts.org/page1",
+      "blocks": [
+        {"kind": "heading", "text": "Algorithm"},
+        {"kind": "paragraph", "text": "An algorithm is a step-by-step procedure for solving a problem."}
+      ],
+      "reply": {
+        "terms": [
+          {"term": "Algorithm", "aliases": [], "evidence": "An algorithm is a step-by-step procedure for solving a problem.", "confidence": 0.8}
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/page2",
+      "blocks": [
+        {"kind": "paragraph", "text": "The method is algorithm in nature."}
+      ],
+      "reply": {
+        "terms": [
+          {"term": "algorithm", "aliases": [], "evidence": "The method is algorithm in nature.", "confidence": 0.6}
+        ]
+      }
+    }
+  ]
+}
