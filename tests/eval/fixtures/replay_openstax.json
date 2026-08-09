@@ -1,0 +1,3133 @@
+{
+  "expected_slugs": [
+    "abstraction",
+    "algorithm",
+    "argument",
+    "base-case",
+    "boolean",
+    "class",
+    "dataframe",
+    "dictionary",
+    "exception",
+    "function",
+    "inheritance",
+    "instance",
+    "list",
+    "list-comprehension",
+    "method",
+    "parameter",
+    "recursion",
+    "scope",
+    "variable"
+  ],
+  "pages": [
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/01%3A_Statements/1.03%3A_Variables",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Assignment statement"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Variables allow programs to refer to values using names rather than memory locations. Ex: age refers to a person's age, and birth refers to a person's date of birth."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A statement can set a variable to a value using the assignment operator ( = ). Note that this is different from the equal sign of mathematics. Ex: age = 6 or birth = \"May 15\" . The left side of the assignment statement is a variable, and the right side is the value the variable is assigned."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which line of code correctly retrieves the value of the variable, city , after the following assignment?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. This would produce the output string, \"The city where you live is Chicago\" ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which program stores and retrieves a variable correctly?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. These two lines of code would produce the output string, \"Total = 6\" ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is the assignment operator?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The single = character is the assignment operator."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is a valid assignment?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. An assignment statement has the variable name on the left side and the value on the right side of the assignment statement."
+        },
+        {
+          "kind": "heading",
+          "text": "Variable naming rules"
+        },
+        {
+          "kind": "paragraph",
+          "text": "A variable name can consist of letters, digits, and underscores and be of any length. The name cannot start with a digit. Ex: 101class is invalid. Also, letter case matters. Ex: Total is different from total . Python's style guide recommends writing variable names in snake case , which is all lowercase with underscores in between each word, such as first_name or total_price ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A name should be short and descriptive, so words are preferred over single characters in programs for readability. Ex: A variable named count indicates the variable's purpose better than a variable named c ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Python has reserved words, known as keywords , which have special functions and cannot be used as names for variables (or other objects)."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which can be used as a variable name?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. median is a descriptive name for a variable that stores a median value."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Why is the name, 2nd_input , not a valid variable name?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. A variable name can contain, but not start with, a digit."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which would be a good name for a variable storing a zip code?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The name clearly indicates the value being stored is a zip code."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given the variable name, DogBreed , which improvement conforms to Python's style guide?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. Snake case separates each word with an underscore and uses only lowercase letters."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a Python computer program that:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "team1 = \"Liverpool\" score1 = 4 team2 = \"Chelsea\" score2 = 3"
+        },
+        {
+          "kind": "paragraph",
+          "text": "print(team1, \"versus\", team2) print(\"Final score:\", score1, \"to\", score2)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 1.3: Variables is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Variable",
+            "aliases": [
+              "Variables",
+              "variable"
+            ],
+            "evidence": "Variables allow programs to refer to values using names rather than memory locations.",
+            "confidence": 0.9
+          },
+          {
+            "term": "Assignment statement",
+            "aliases": [
+              "assignment statement"
+            ],
+            "evidence": "An assignment statement has the variable name on the left side and the value on the right side of the assignment statement.",
+            "confidence": 0.9
+          },
+          {
+            "term": "Assignment operator",
+            "aliases": [
+              "assignment operator"
+            ],
+            "evidence": "The single = character is the assignment operator.",
+            "confidence": 0.9
+          },
+          {
+            "term": "Snake case",
+            "aliases": [
+              "snake case",
+              "Snake case"
+            ],
+            "evidence": "Snake case separates each word with an underscore and uses only lowercase letters.",
+            "confidence": 0.9
+          },
+          {
+            "term": "Keyword",
+            "aliases": [
+              "keywords"
+            ],
+            "evidence": "Python has reserved words, known as keywords , which have special functions and cannot be used as names for variables (or other objects).",
+            "confidence": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/03%3A_Objects/3.04%3A_List_Basics",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Lists"
+        },
+        {
+          "kind": "paragraph",
+          "text": "A list object can be used to bundle elements together in Python. A list is defined by using square brackets [] with comma separated values within the square brackets. Ex: list_1 = [ 1 , 2 , 4 ] ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Empty lists can be defined in two ways:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Lists can be made of elements of any type. Lists can contain integers, strings, floats, or any other type. Lists can also contain a combination of types. Ex: [ 2 , \"Hello\" , 2.5 ] is a valid list."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Python lists allow programmers to change the contents of the list in various ways."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is the correct way to make a list of the numbers 3, 4, and 5?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. A list of numbers can be set up using an assignment operator."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which of the following is not a valid way to specify a list in Python?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. Individual elements in a list must be separated by a comma. Python does not understand what is meant by 2 3 ."
+        },
+        {
+          "kind": "heading",
+          "text": "Using indexes"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Individual list elements can be accessed directly using an index. Indexes begin at 0 and end at one less than the length of the sequence. Ex: For a sequence of 50 elements, the first position is 0, and the last position is 49."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The index number is put in square brackets [] and attached to the end of the name of the list to access the required element. Ex: new_list[ 3 ] accesses the 4th element in new_list . An expression that evaluates to an integer number can also be used as an index. Similar to strings, negative indexing can also be used to address individual elements. Ex: Index -1 refers to the last element and -2 the second-to-last element."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The len () function, when called on a list, returns the length of the list."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The following code demonstrates the use of list indexes and the len () function. Line 6 shows the use of the len () function to get the length of the list. Line 10 shows how to access an element using an index. Line 14 shows how to modify a list element using an index."
+        },
+        {
+          "kind": "paragraph",
+          "text": "1"
+        },
+        {
+          "kind": "paragraph",
+          "text": "2"
+        },
+        {
+          "kind": "paragraph",
+          "text": "3"
+        },
+        {
+          "kind": "paragraph",
+          "text": "4"
+        },
+        {
+          "kind": "paragraph",
+          "text": "5"
+        },
+        {
+          "kind": "paragraph",
+          "text": "6"
+        },
+        {
+          "kind": "paragraph",
+          "text": "7"
+        },
+        {
+          "kind": "paragraph",
+          "text": "8"
+        },
+        {
+          "kind": "paragraph",
+          "text": "9"
+        },
+        {
+          "kind": "paragraph",
+          "text": "10"
+        },
+        {
+          "kind": "paragraph",
+          "text": "11"
+        },
+        {
+          "kind": "paragraph",
+          "text": "12"
+        },
+        {
+          "kind": "paragraph",
+          "text": "13"
+        },
+        {
+          "kind": "paragraph",
+          "text": "14"
+        },
+        {
+          "kind": "paragraph",
+          "text": "15"
+        },
+        {
+          "kind": "paragraph",
+          "text": "16"
+        },
+        {
+          "kind": "paragraph",
+          "text": "17"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The above code's output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is the correct way to access the 17th element in a list called cardList ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. Since indexes start at 0, the required number is one less than the position being accessed."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the correct way to modify the element \"Tom\" to \"Tim\" in the following list?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The index -1 always refers to the last element of a list. The expression len (name_list)- 1 , which evaluates to 3 and refers to the last element in a list of 4 elements, can also be used in place of -1 here."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a program to complete the following:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Create the list from the given elements num_list = [2, 23, 39, 6, -5]"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Change the third element to 35 num_list[2] = 35"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Print the resultant list print(num_list)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Print the length of the list print(len(num_list))"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 3.4: List Basics is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "List",
+            "aliases": [
+              "Lists",
+              "list object",
+              "list"
+            ],
+            "evidence": "A list object can be used to bundle elements together in Python.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Index",
+            "aliases": [
+              "index",
+              "Indexes",
+              "indexes"
+            ],
+            "evidence": "Individual list elements can be accessed directly using an index.",
+            "confidence": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/04%3A__Decisions/4.01%3A_Boolean_Values",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "bool data type"
+        },
+        {
+          "kind": "paragraph",
+          "text": "People often ask binary questions such as yes/no or true/false questions. Ex: Do you like pineapple on pizza? Ex: True or false: I like pineapple on pizza. The response is a Boolean value, meaning the value is either true or false. The bool data type, standing for Boolean, represents a binary value of either true or false. true and false are keywords, and capitalization is required."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following code:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the data type of is_fruit ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. \"True\" uses quotation marks, so the value is a string."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following code:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the data type of is_vegetable ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. is_vegetable is an integer and can be used in arithmetic operations."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following code:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the data type of is_dessert ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. A variable assigned with either True or False is a Boolean variable."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following code:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "How many values can a Boolean variable represent?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. A Boolean variable represents the value True or False ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following code:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is a valid value for a Boolean variable?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. True and False are the only two values for a Boolean variable."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following code:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Suppose the following is added to the code above:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Assigning a bool with an int results in implicit type conversion. The type conversion can cause issues later in the code if the programmer assumes is_dessert is still a Boolean."
+        },
+        {
+          "kind": "heading",
+          "text": "Type conversion with bool()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Deciding whether a value is true or false is helpful when writing programs/statements based on decisions. Converting data types to Booleans can seem unintuitive at first. Ex: Is \"ice cream\" True? But the conversion is actually simple."
+        },
+        {
+          "kind": "paragraph",
+          "text": "bool() converts a value to a Boolean value, True or False ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "bool ( 0.000 )"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Any numeric type representing 0 converts to False . Non-zero numbers convert to True ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "bool (- 1 )"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. A negative number is non-zero and converts to True ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "bool ( \"\" )"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The empty string is the only string that converts to False ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "bool ( \"0\" )"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. \"0\" is a non-empty string and is converted to True ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given input False , what is bool ( input ()) ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The input is read in as a string, so bool ( \"False\" ) is True ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given is_on = True , what is the value of each expression?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "float (is_on)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. True converted to a float is 1.0 . False converted to a float is 0.0 ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given is_on = True , what is the value of each expression?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "str (is_on)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. True converted to a string is \"True\" . False converted to a string is \"False\" ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given is_on = True , what is the value of each expression?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "int (is_on)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. When a Boolean is converted to a numeric type, True is converted to 1 , and False is converted to 0 ."
+        },
+        {
+          "kind": "heading",
+          "text": "Comparison operators"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Programmers often have to answer questions like \"Is the current user the admin?\" A programmer may want to compare a string variable, user, to the string, \"admin\". Comparison operators are used to compare values, and the result is either true or false. Ex: is_admin = (user == \"admin\" ) . user is compared with \"admin\" using the == operator, which tests for equality. The Boolean variable, is_admin , is assigned with the Boolean result."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The 6 comparison operators:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "For each new variable, what is the value of compare_result ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. 14 is greater than 13, so 14 is not less than or equal to 13."
+        },
+        {
+          "kind": "paragraph",
+          "text": "For each new variable, what is the value of compare_result ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. 0 is less than 0.4, so 0 is not equal to 0.4."
+        },
+        {
+          "kind": "paragraph",
+          "text": "For each new variable, what is the value of compare_result ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. 4 is equal to 4.0, so 4 is not less than 4.0."
+        },
+        {
+          "kind": "paragraph",
+          "text": "For each new variable, what is the value of compare_result ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. Numeric types cannot be compared to strings using the comparison operators: >, <, >=, <=. Using == or != will produce a Boolean."
+        },
+        {
+          "kind": "paragraph",
+          "text": "For each new variable, what is the value of compare_result ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Strings are compared by comparing each character's Unicode values. Letters have ascending Unicode values in alphabetical order (and are case sensitive). \"c\" and \"c\" are equal, so \"i\" is compared to \"o\" . \"i\" is not equal to \"o\" so False is produced, though cilantro and coriander come from the same plant."
+        },
+        {
+          "kind": "paragraph",
+          "text": "For each new variable, what is the value of compare_result ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Letters have ascending Unicode values in alphabetical order (and are case sensitive). \"d\" is greater than, not less than, \"c\" , so False is produced."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A common mistake is using = for comparison instead of ==. Ex: is_zero = num= 0 will always assign is_zero and num with 0 , regardless of num's original value. The = operator performs assignment and will modify the variable. The == operator performs comparison, does not modify the variable, and produces True or False ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "\"It's Friday, I'm in love\" \u2014from \"Friday I'm in Love,\" a song released by the Cure in 1992."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a program that reads in the day of the week. Assign the Boolean variable, in_love , with the result of whether the day is Friday or not."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Friday"
+        },
+        {
+          "kind": "paragraph",
+          "text": "day = input()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "in_love = (day == \"Friday\") print(\"It's\", day, \"I'm in love?\", in_love)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a program that reads in an integer and prints whether the integer is even or not. Remember, a number is even if the number is divisible by 2. To test this use number % 2 == 0 . Ex: If the input is 6 , the output is \"6 is even: True\" ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "6"
+        },
+        {
+          "kind": "paragraph",
+          "text": "num = int(input())"
+        },
+        {
+          "kind": "paragraph",
+          "text": "is_even = (num % 2 == 0) print(num, \"is even:\", is_even)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 4.1: Boolean Values is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Bool data type",
+            "aliases": [
+              "bool data type",
+              "Boolean"
+            ],
+            "evidence": "The bool data type, standing for Boolean, represents a binary value of either true or false.",
+            "confidence": 0.95
+          },
+          {
+            "term": "Boolean value",
+            "aliases": [
+              "Boolean value"
+            ],
+            "evidence": "The response is a Boolean value, meaning the value is either true or false.",
+            "confidence": 0.9
+          },
+          {
+            "term": "Boolean variable",
+            "aliases": [
+              "Boolean variable"
+            ],
+            "evidence": "A variable assigned with either True or False is a Boolean variable.",
+            "confidence": 0.9
+          },
+          {
+            "term": "Comparison operator",
+            "aliases": [
+              "Comparison operators"
+            ],
+            "evidence": "Comparison operators are used to compare values, and the result is either true or false.",
+            "confidence": 0.95
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/06%3A_Functions/6.01%3A_Defining_Functions",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Calling a function"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Throughout the book, functions have been called to perform tasks. Ex: print() prints values, and sqrt() calculates the square root. A function is a named, reusable block of code that performs a task when called."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which line has a function call?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "1"
+        },
+        {
+          "kind": "paragraph",
+          "text": "2"
+        },
+        {
+          "kind": "paragraph",
+          "text": "3"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The print() function is called to output the variable, offset_num ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "How many times is print() called?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Lines 1, 4, and 5 each call print() once. Lines 2 and 3 call a different function, input () ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "How many function calls are there?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Line 1 is a comment that is not executed. Lines 2 and 3 each call float () and input () . Line 3 calls print() for a total of five function calls."
+        },
+        {
+          "kind": "heading",
+          "text": "Defining a function"
+        },
+        {
+          "kind": "paragraph",
+          "text": "A function is defined using the def keyword. The first line contains def followed by the function name (in snake case), parentheses (with any parameters\u2014discussed later), and a colon. The indented body begins with a documentation string describing the function's task and contains the function statements. A function must be defined before the function is called."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What's wrong with the first line of the function definition?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The corrected line is def water_plant (): ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The main program outputs \"User info:\" and then calls print_phone_num() , which outputs the phone number."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which statement calls a function named print_pc_specs() ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. A function call includes the function name and parentheses."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is an appropriate name for a function that calculates a user's taxes?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. calc_tax is concise, in snake case, and indicates the function's task."
+        },
+        {
+          "kind": "heading",
+          "text": "Benefits of functions"
+        },
+        {
+          "kind": "paragraph",
+          "text": "A function promotes modularity by putting code statements related to a single task in a separate group. The body of a function can be executed repeatedly with multiple function calls, so a function promotes reusability. Modular, reusable code is easier to modify and is shareable among programmers to avoid reinventing the wheel."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the code above. If the points were changed from floats to integers, how many statements would need to be changed in the original and revised programs respectively?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. Each calculation uses four statements to read in the x,y values of a pair of points. The original program performs three calculations by repeating code for a total of 12 input statements. The revised program performs three calculations by executing the four input statements multiple times with function calls."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the code above. How many times can calc_distance() be called?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The benefits of a function's reusability is highlighted by many function calls that drastically reduce the amount of cluttered, redundant code. Calling calc_distance() 10 times is equivalent to 60 statements in the original program."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a function, concessions() , that prints the food and drink options at a cinema."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def concessions(): print(\"Food/Drink Options:\") print(\"Popcorn: $8-10\") print(\"Candy: $3-5\") print(\"Soft drink: $5-7\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "print(\"Welcome to the cinema.\") concessions()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a function, terms() , that asks the user to accept the terms and conditions, reads in Y/N , and outputs a response. In the main program, read in the number of users and call terms() for each user."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given inputs 1 and \"Y\" , the output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given inputs 2 , \"N\" , and \"Y\" , the output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "3 Y Y N"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def terms(): print(\"Do you accept the terms and conditions?\") response = input() if response == \"Y\": print(\"Thank you for accepting.\") else: print(\"Have a good day.\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "count = int(input()) for i in range(0, count): terms()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 6.1: Defining Functions is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Function",
+            "aliases": [
+              "functions"
+            ],
+            "evidence": "A function is a named, reusable block of code that performs a task when called.",
+            "confidence": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/06%3A_Functions/6.03%3A_Variable_Scope",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Global scope"
+        },
+        {
+          "kind": "paragraph",
+          "text": "A variable's scope is the part of a program where the variable can be accessed. A variable created outside of a function has global scope and can be accessed anywhere in the program. A Python program begins in global scope, and the global scope lasts for the entire program execution."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which variables are global?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. Both num and num_sq are created outside of functions and are global variables."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which variables have global scope?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. num is created outside of a function and is global. num_sq is created in print_square() and is not global."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which functions can access num ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. num is global and can be accessed anywhere in the program, including both print_double() and print_square() ."
+        },
+        {
+          "kind": "heading",
+          "text": "Local scope"
+        },
+        {
+          "kind": "paragraph",
+          "text": "A variable created within a function has local scope and only exists within the function. A local variable cannot be accessed outside of the function in which the variable was created. After a function finishes executing, the function's local variables no longer exist."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which variables are local?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. out_str is the only variable declared in print_time() and is a local variable."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which variables are local?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. out_str is accessed in print_greeting() but created in statements outside of print_greeting() ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which functions directly access out_str ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. print_time() creates out_str as a local variable. out_str is only in scope in print_time() and cannot be accessed elsewhere."
+        },
+        {
+          "kind": "heading",
+          "text": "Using local and global variables together"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Python allows global and local variables to have the same name, which can lead to unexpected program behavior. A function treats a variable edited within the function as a local variable unless told otherwise. To edit a global variable inside a function, the variable must be declared with the global keyword."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following variations on the example program with the input 9 . What is the output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The global variable hour is not edited in update_hour() . tmp is the local variable edited. tmp is discarded after update_hour() finishes."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following variations on the example program with the input 9 . What is the output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. new_hour is a local variable that the print statement tries to access after update_hour() finishes. new_hour is out of scope, so an error is produced."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following variations on the example program with the input 9 . What is the output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The global keyword can be used to create a global variable from within a function. new_hour has global scope and can be accessed outside update_hour() ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A programmer might ask, \"Why not just make all variables global variables to avoid access errors?\" Making every variable global can make a program messy. Ex: A programmer debugging a large program discovers a variable has the wrong value. If the whole program can modify the variable, then the bug could be anywhere in the large program. Limiting a variable's scope to only what's necessary and restricting global variable use make a program easier to debug, maintain, and update."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a program that reads in a selected game mode and calls one of two functions to launch the game. If the input is \"br\" , call battle_royale() . Otherwise, call practice() ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "battle_royale() :"
+        },
+        {
+          "kind": "paragraph",
+          "text": "practice() :"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Note: find_teammates() is provided and does not need to be edited."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given input:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given input:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "br 1"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def find_teammates(num): print(\"Finding\", num, \"players...\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def battle_royale(): nplayers = int(input()) rand_players = 3 - nplayers find_teammates(rand_players) print(\"Match starting...\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def practice(): game_map = input() print(\"Launching practice on\", game_map)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "game_mode = input() if game_mode == \"br\": battle_royale() else: practice()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 6.3: Variable Scope is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Variable scope",
+            "aliases": [
+              "scope"
+            ],
+            "evidence": "A variable's scope is the part of a program where the variable can be accessed.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Global scope",
+            "aliases": [
+              "global scope"
+            ],
+            "evidence": "A variable created outside of a function has global scope and can be accessed anywhere in the program.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Local scope",
+            "aliases": [
+              "local scope"
+            ],
+            "evidence": "A variable created within a function has local scope and only exists within the function.",
+            "confidence": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/06%3A_Functions/6.06%3A_Keyword_Arguments",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Keyword arguments"
+        },
+        {
+          "kind": "paragraph",
+          "text": "So far, functions have been called using positional arguments , which are arguments that are assigned to parameters in order. Python also allows keyword arguments , which are arguments that use parameter names to assign values rather than order. When mixing positional and keyword arguments, positional arguments must come first in the correct order, before any keyword arguments."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following function:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is the positional argument in greeting(count= 1 , name= \"Ash\" , msg= \"Hiya\" ) ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "d. The function call uses all keyword arguments to assign values to the named parameters."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the output of greeting(count= 2 , name= \"Ash\" , msg= \"Hiya\" ) ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. \"Hiya\" is the value of msg and \"Ash\" is the value of name in the function."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is the positional argument in greeting( \"Welcome\" , count= 1 , name= \"Anita\" ) ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. \"Welcome\" is unnamed and assigned correctly to count. Positional arguments must come before keyword arguments."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which function call would produce an error?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The positional arguments, \"Hi\" and \"Bea\" , follow the keyword argument count= 1 , which produces an error."
+        },
+        {
+          "kind": "heading",
+          "text": "Default parameter values"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Functions can define default parameter values to use if a positional or keyword argument is not provided for the parameter. Ex: def season ( m, d, hemi= \"N\" ): defines a default value of \"N\" for the hemi parameter. Note: Default parameter values are only defined once to be used by the function, so mutable objects (such as lists) should not be used as default values."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The physics example below calculates weight as a force in newtons given mass in kilograms and acceleration in \\(\\text{m}/\\text{ s}^ 2\\) . Gravity on Earth is 9.8 m s 2 m s 2 , and gravity on Mars is 3.7 \\(\\text{m}/\\text{ s}^ 2\\) ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following updated version of greeting() :"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which parameters have default values?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. name 's default value is \"Friend\" , and count 's default value is 1 . msg does not have default value."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which function call is correct?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. msg is a required argument assigned with \"Greetings\" . name and count use the default values. \"Greetings Friend\" is printed."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the output of greeting(count= 0 , msg= \"Hello\" ) ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. msg= \"Hello\" , name= \"Friend\" , and count= 0 , so the call is valid. The function executes but doesn't enter the for loop because count= 0 ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The PEP 8 style guide recommends no spaces around = when indicating keyword arguments and default parameter values."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a function, donate() , that lets an online viewer send a donation to a streamer. donate() has three parameters:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write function calls that use the default values along with positional and keyword arguments."
+        },
+        {
+          "kind": "paragraph",
+          "text": "def donate(amount=5, name=\"Anonymous\", msg=\"\"): print(name, \"donated\", amount, \"credits:\", msg)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "donate() donate(msg=\"great stream\", name=\"Tim\") donate(10, \"user123\", \"good luck\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 6.6: Keyword Arguments is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Positional argument",
+            "aliases": [
+              "positional arguments"
+            ],
+            "evidence": "So far, functions have been called using positional arguments , which are arguments that are assigned to parameters in order.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Keyword argument",
+            "aliases": [
+              "keyword arguments"
+            ],
+            "evidence": "Python also allows keyword arguments , which are arguments that use parameter names to assign values rather than order.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Default parameter value",
+            "aliases": [
+              "default parameter values",
+              "Default parameter values"
+            ],
+            "evidence": "Functions can define default parameter values to use if a positional or keyword argument is not provided for the parameter.",
+            "confidence": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/09%3A_Lists/9.05%3A_List_Comprehensions",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "List comprehensions"
+        },
+        {
+          "kind": "paragraph",
+          "text": "A list comprehension is a Python statement to compactly create a new list using a pattern."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The general form of a list comprehension statement is shown below."
+        },
+        {
+          "kind": "paragraph",
+          "text": "list_name = [expression for loop_variable in iterable]"
+        },
+        {
+          "kind": "paragraph",
+          "text": "list_name refers to the name of a new list, which can be anything, and the for is the for loop keyword. An expression defines what will become part of the new list. loop_variable is an iterator, and iterable is an object that can be iterated, such as a list or string."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A list comprehension shown below in the second code has the same effect as the regular for loop shown in the first code. The resultant list is [ 0 , 1 , 4 , 9 , 16 , 25 , 36 , 49 , 64 , 81 ] in both cases."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Creating a list of squares using a for loop."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Creating a list of squares using the list comprehension."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The expression i*i is applied for each value of the loop_variable i ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A list comprehension can be used to create a list based on another list. In line 6, the for loop is written on the list poem_lines ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "1"
+        },
+        {
+          "kind": "paragraph",
+          "text": "2"
+        },
+        {
+          "kind": "paragraph",
+          "text": "3"
+        },
+        {
+          "kind": "paragraph",
+          "text": "4"
+        },
+        {
+          "kind": "paragraph",
+          "text": "5"
+        },
+        {
+          "kind": "paragraph",
+          "text": "6"
+        },
+        {
+          "kind": "paragraph",
+          "text": "7"
+        },
+        {
+          "kind": "paragraph",
+          "text": "8"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The above code's output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The component of a list comprehension defining an element of the new list is the _____."
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The expression tells Python what element to put in the new list."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What would be the contents of b_list after executing the code below?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. i+ 2 results in adding 2 to each element of a_list to generate b_list ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What does new_list contain after executing the statement below?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The for loop starts at 1 and steps by three, so it begins at 1 and ends at 13. Dividing using the // operator results in dropping the part after the decimal."
+        },
+        {
+          "kind": "heading",
+          "text": "Filtering using list comprehensions"
+        },
+        {
+          "kind": "paragraph",
+          "text": "List comprehensions can be used to filter items from a given list. A condition is added to the list comprehension."
+        },
+        {
+          "kind": "paragraph",
+          "text": "list_name = [expression for loop_variable in container if condition]"
+        },
+        {
+          "kind": "paragraph",
+          "text": "In a filter list comprehension, an element is added into list_name only if the condition is met."
+        },
+        {
+          "kind": "paragraph",
+          "text": "For each code using list comprehension, select the correct resultant list in new_list ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The list comprehension filters for negative numbers in my_list ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The list comprehension selects vowels from the given string."
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The for loop ranges from 0 through 20, stepping by two, but each iterated element is even, so nothing is added to new_list ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a program that creates a list of only five-letter words from the given list and prints the new list."
+        },
+        {
+          "kind": "paragraph",
+          "text": "# A list word_list = [\"notebook\", \"capsule\", \"ruler\", \"divider\", \"compass\", \"chart\"]"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# List comprehension to select only 5 letter words words = [w for w in word_list if len(w) == 5]"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Print the new list print(words)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a program that selects words that begin with an \"A\" in the given list. Make sure the new list is then sorted in dictionary order. Finally, print the new sorted list."
+        },
+        {
+          "kind": "paragraph",
+          "text": "# A list of book titles book_list = [\"Pachinko\", \"A Hitchhiker's Guide to the Galaxy\", \"Moby Dick\", \"Beloved\", \"A Farewell to Arms\", \"Anna Karenina\", \"The Golden Notebook\"]"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# A list comprehension to select titles starting with an 'A' a_list = [e for e in book_list if e[0] == 'A']"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Sort a_list a_list.sort()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Print a_list print(a_list)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 9.5: List Comprehensions is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "List comprehension",
+            "aliases": [
+              "list comprehension",
+              "list comprehensions",
+              "List comprehension",
+              "List comprehensions"
+            ],
+            "evidence": "A list comprehension is a Python statement to compactly create a new list using a pattern.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Iterable",
+            "aliases": [
+              "iterable"
+            ],
+            "evidence": "iterable is an object that can be iterated, such as a list or string.",
+            "confidence": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/10%3A_Dictionaries/10.01%3A_Dictionary_Basics",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Dictionaries"
+        },
+        {
+          "kind": "paragraph",
+          "text": "A dictionary in Python is a container object including key-value pairs. An example of a key-value item is a word in an English dictionary with its corresponding definition."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given the dictionary object days = { \"Sunday\" : 1 , \"Monday\" : 2 , \"Tuesday\" : 3 } , what are the keys in the days dictionary object?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The first item in each key-value pair is the key. Hence \"Sunday\", \"Monday\", \"Tuesday\" are key items."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What are the values in the days dictionary object?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The second item in each key-value pair is the value. Hence 1, 2, 3 are value items."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the value associated with key \"Sunday\" ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Based on the days dictionary object, the value assigned to \"Sunday\" is 1 ."
+        },
+        {
+          "kind": "heading",
+          "text": "Dictionary type and properties"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The dict type implements a dictionary in Python. Since a dictionary object is used to look up values using keys, a dictionary object cannot hold duplicate key values."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given the dictionary object encoding = { \"a\" : 97 , \"b\" : 98 , \"A\" : 65 , \"B\" : 66 } , answer the following questions."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given the dictionary object encoding = { \"a\" : 97 , \"b\" : 98 , \"A\" : 65 , \"B\" : 66 } , answer the following questions."
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The type of a dictionary object is dict ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The encoding dictionary contains duplicate keys since it has both \"a\" and \"A\" as keys."
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. A dictionary cannot have duplicate keys, and \"a\" and \"A\" are two different keys because \"a\" and \"A\" are different characters."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A dictionary can have duplicate values."
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. A dictionary can have duplicate values, but not duplicate keys."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given the variables in the code below, examine the variables' types."
+        },
+        {
+          "kind": "paragraph",
+          "text": "var_1 = [\"a1\", \"b2\", \"c3\"]"
+        },
+        {
+          "kind": "paragraph",
+          "text": "var_2 = {\"a\": 1, \"b\": 2, \"c\": 3}"
+        },
+        {
+          "kind": "paragraph",
+          "text": "print(type(var_1))"
+        },
+        {
+          "kind": "paragraph",
+          "text": "print(type(var_2))"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 10.1: Dictionary Basics is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Dictionary",
+            "aliases": [
+              "Dictionaries",
+              "dictionary"
+            ],
+            "evidence": "A dictionary in Python is a container object including key-value pairs.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Key",
+            "aliases": [
+              "key",
+              "keys"
+            ],
+            "evidence": "The first item in each key-value pair is the key.",
+            "confidence": 0.9
+          },
+          {
+            "term": "Value",
+            "aliases": [
+              "value",
+              "values"
+            ],
+            "evidence": "The second item in each key-value pair is the value.",
+            "confidence": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/11%3A_Classes/11.01%3A_Object-Oriented_Programming_Basics",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Grouping into objects"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Object-oriented programming (OOP) is a style of programming that groups related fields, or data members, and procedures into objects. Real-world entities are modeled as individual objects that interact with each other. Ex: A social media account can follow other accounts, and accounts can send messages to each other. An account can be modeled as an object in a program."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the example above. Which is a field in Ellis's 12/18/23 post?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Ellis's username represents the post creator."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What does an object typically model in object-oriented programming?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. An object models a real-world entity with fields and procedures."
+        },
+        {
+          "kind": "heading",
+          "text": "Encapsulation"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Encapsulation is a key concept in OOP that involves wrapping data and procedures that operate on that data into a single unit. Access to the unit's data is restricted to prevent other units from directly modifying the data. Ex: A ticket website manages all transactions for a concert, keeping track of tickets sold and tickets still available to avoid accidental overbooking."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the example above. Suppose the venue has to be changed due to inclement weather. How should a programmer change the website object to allow changes to the Venue field?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. A procedure, such as Change venue , can make changes to the field and protect the field from inappropriate access."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is a benefit of encapsulation when developing complex programs?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Limiting data access prevents accidental changes and makes relationships between objects clearer."
+        },
+        {
+          "kind": "heading",
+          "text": "Abstraction"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Abstraction is a key concept in OOP in which a unit's inner workings are hidden from users and other units that don't need to know the inner workings. Ex: A driver doesn't usually need to know their car engine's exact, numerical temperature. So the car has a gauge to display whether the engine temperature is within an appropriate range."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the car example in the paragraph above. Suppose the designer decided to remove the engine temperature indicator. Would this be a good use of abstraction?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Correct abstraction makes only necessary information visible. An overheated engine can cause irreparable damage, so an indicator is necessary for the driver."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is a benefit of abstraction?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. Showing only the necessary information reduces clutter and improves the overall experience."
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 11.1: Object-Oriented Programming Basics is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Object-oriented programming",
+            "aliases": [
+              "OOP"
+            ],
+            "evidence": "Object-oriented programming (OOP) is a style of programming that groups related fields, or data members, and procedures into objects.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Encapsulation",
+            "aliases": [],
+            "evidence": "Encapsulation is a key concept in OOP that involves wrapping data and procedures that operate on that data into a single unit.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Abstraction",
+            "aliases": [],
+            "evidence": "Abstraction is a key concept in OOP in which a unit's inner workings are hidden from users and other units that don't need to know the inner workings.",
+            "confidence": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/11%3A_Classes/11.02%3A_Classes_and_Instances",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Classes and instances"
+        },
+        {
+          "kind": "paragraph",
+          "text": "In the previous section, a real-world entity, like a person's social media profile, was modeled as a single object. How could a programmer develop a software system that manages millions of profiles? A blueprint that defines the fields and procedures of a profile would be crucial."
+        },
+        {
+          "kind": "paragraph",
+          "text": "In a Python program, a class defines a type of object with attributes (fields) and methods (procedures). A class is a blueprint for creating objects. Individual objects created of the class type are called instances ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the example below:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the name of the class?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. Cat follows the class keyword at the top of the class definition and is the name of the class."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which of the following is an instance of the Cat class?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. pet_1 is an instance of the Cat class created by calling Cat() . The other instance is pet_2 ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which of the following is an attribute?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. breed is an instance attribute defined in __init__() . The other instance attributes are name and age ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Suppose the programmer wanted to change the class to represent a pet cat. Which is the appropriate name that follows PEP 8 recommendations?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. CapWords style, with all words capitalized and no spaces between words, is recommended for class names. \"Pet\" and \"cat\" are separate words, so each is capitalized and one directly follows the other."
+        },
+        {
+          "kind": "heading",
+          "text": "Creating instances with __init__()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "___init___() is a special method that is called every time a new instance of a class is created. self refers to the instance of a class and is used in class methods to access the specific instance that called the method. __init__() uses self to define and initialize the instance's attributes."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the example below:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "1"
+        },
+        {
+          "kind": "paragraph",
+          "text": "2"
+        },
+        {
+          "kind": "paragraph",
+          "text": "3"
+        },
+        {
+          "kind": "paragraph",
+          "text": "4"
+        },
+        {
+          "kind": "paragraph",
+          "text": "5"
+        },
+        {
+          "kind": "paragraph",
+          "text": "6"
+        },
+        {
+          "kind": "paragraph",
+          "text": "7"
+        },
+        {
+          "kind": "paragraph",
+          "text": "8"
+        },
+        {
+          "kind": "paragraph",
+          "text": "9"
+        },
+        {
+          "kind": "paragraph",
+          "text": "10"
+        },
+        {
+          "kind": "paragraph",
+          "text": "11"
+        },
+        {
+          "kind": "paragraph",
+          "text": "12"
+        },
+        {
+          "kind": "paragraph",
+          "text": "13"
+        },
+        {
+          "kind": "paragraph",
+          "text": "14"
+        },
+        {
+          "kind": "paragraph",
+          "text": "15"
+        },
+        {
+          "kind": "paragraph",
+          "text": "How many times is __init__() called?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Two instances, room_1 and room_3 , are created by calling Rectangle() , which calls the constructor __init__() ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "When line 11 executes, execution flow moves to line 5. What does self represent on line 5?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. room_1 is the instance that called the method area() , so self represents the specific instance."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which line initializes the instance attribute length?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. Line 3 is in __init__() , which initializes length and the other instance attributes for each new instance."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Suppose line 2 is changed to def __init__ (): . What would room_1 's attributes be initialized to?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. __init__() has one required parameter, conventionally called self , which allows the constructor to access the instance."
+        },
+        {
+          "kind": "heading",
+          "text": "Instance attributes vs. class attributes"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The attributes shown so far have been instance attributes. An instance attribute is a variable that is unique to each instance of a class and is accessed using the format instance_name.attribute_name . Another type of attribute, a class attribute , belongs to the class and is shared by all class instances. Class attributes are accessed using the format class_name.attribute_name ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the example above."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is an instance attribute?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. order_id is an instance attribute defined in __init__() . The other instance attribute is cup_size ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Suppose the line order_1.cup_size = 8 is added before order_3.print_order() . What is the new output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Changing order_1.cup_size does not affect order_3.cup_size. order_1.cup_size changes to 8 and order_3.cup_size is still 16 ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Suppose the line CoffeeOrder.loc = 'Caffeine Cafe' is added before order_3.print_order() . What is the new output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. order_1 , order_2 , and order_3 all share the class attribute CoffeeOrder.loc . Changing loc affects all instances, so Caffeine Cafe is printed as the location."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Suppose the line self.cls_id = 5 is added to the end of __init__() 's definition. What is the new output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Trying to access a class attribute using an instance is unsafe. In __init__() , trying to access the class attribute creates a new instance attribute called cls_id . Though possible, programmers should avoid using the same name for class attributes and instance attributes to avoid confusion."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a class, FlightTicket , as described below. Default values follow the attributes. Then create a flight ticket and assign each instance attribute with values read from input."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Instance attributes:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Class attributes:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Method:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given input:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "2121 KEF D22B 11:45 12B Jules Laurent"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class FlightTicket: # Class attributes airline = 'Oceanic Airlines' airline_code = 'OA' def __init__(self): # Instance attributes flight_num = 1 airport = 'JFK' gate = 'T1-1' time = '8:00' seat = '1A' passenger = 'unknown'"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def print_info(self): print('Passenger', self.passenger, 'departs on flight #', self.flight_num, 'at', self.time, 'from', self.airport, self.gate, 'in seat', self.seat)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Create ticket ticket_1 = FlightTicket() # Assign instance attributes with input values ticket_1.flight_num = int(input()) ticket_1.airport = input() ticket_1.gate = input() ticket_1.time = input() ticket_1.seat = input() ticket_1.passenger = input() ticket_1.print_info()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a class, Book , as described below. Then create two instances and assign each instance attribute with values read from input."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Instance attributes:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Class attribute:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Method:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given input:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Lord of the Bracelets Blake R. R. Brown 1999 423 A Match of Thrones Terry R. R. Thomas 2020 761"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Book: # Class attribute imprint = 'Fantasy Tomes'"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def __init__(self): # Instance attributes self.title = '' self.author = '' self.year = 0 self.pages = 0"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def print_info(self): print(self.title, 'by', self.author, 'published by', self.imprint, 'in', self.year, 'with', self.pages, 'pages')"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Create book_1 and read in new values book_1 = Book() book_1.title = input() book_1.author = input() book_1.year = int(input()) book_1.pages = int(input()) book_1.print_info()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Create book_2 and read in new values book_2 = Book() book_2.title = input() book_2.author = input() book_2.year = int(input()) book_2.pages = int(input()) book_2.print_info()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 11.2: Classes and Instances is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Class",
+            "aliases": [
+              "class",
+              "classes"
+            ],
+            "evidence": "In a Python program, a class defines a type of object with attributes (fields) and methods (procedures).",
+            "confidence": 1.0
+          },
+          {
+            "term": "Instance",
+            "aliases": [
+              "instances",
+              "instance"
+            ],
+            "evidence": "Individual objects created of the class type are called instances .",
+            "confidence": 1.0
+          },
+          {
+            "term": "Self",
+            "aliases": [
+              "self"
+            ],
+            "evidence": "self refers to the instance of a class and is used in class methods to access the specific instance that called the method.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Instance attribute",
+            "aliases": [
+              "instance attribute",
+              "instance attributes"
+            ],
+            "evidence": "An instance attribute is a variable that is unique to each instance of a class and is accessed using the format instance_name.attribute_name .",
+            "confidence": 1.0
+          },
+          {
+            "term": "Class attribute",
+            "aliases": [
+              "class attribute",
+              "class attributes"
+            ],
+            "evidence": "Another type of attribute, a class attribute , belongs to the class and is shared by all class instances.",
+            "confidence": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/12%3A_Recursion/12.01%3A_Recursion_Basics",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Recursion"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Recursion is a problem solving technique that uses the solution to a simpler version of the problem to solve the bigger problem. In turn, the same technique can be applied to the simpler version."
+        },
+        {
+          "kind": "paragraph",
+          "text": "How is the problem of moving two rings solved using recursion?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The move of the smaller ring, which is a smaller problem, is done twice on the way to solving for the two rings overall. The task of moving all three rings is broken down into smaller tasks of moving one ring at a time."
+        },
+        {
+          "kind": "paragraph",
+          "text": "How is the problem of moving three rings solved using recursion?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The two-ring solution from question 1 is used in the solution for three rings."
+        },
+        {
+          "kind": "paragraph",
+          "text": "How many times is the two-ring solution used with three rings?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Once to move two rings to the middle tower following the rules, then to move two rings to the target tower."
+        },
+        {
+          "kind": "heading",
+          "text": "Recursion to find a complete solution"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The recursion process continues until the problem is small enough, at which point the solution is known or can easily be found. The larger solution can then be built systematically by successively building ever larger solutions until the complete problem is solved."
+        },
+        {
+          "kind": "paragraph",
+          "text": "How many total steps does it take to solve two rings?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The small ring is moved to the middle tower. The bigger ring is moved to the target tower. Then, the small ring is moved from the middle to the target."
+        },
+        {
+          "kind": "paragraph",
+          "text": "How many total steps does it take to solve three rings?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. To solve, the two-ring solution is used twice, and there is one extra step to move the biggest ring from the source to the target. Each solution of two rings requires three steps each. So 3 + 1 + 3 = 7 steps total."
+        },
+        {
+          "kind": "paragraph",
+          "text": "How many total steps does it take to solve four rings?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The four-ring problem uses the three-ring solution twice. The three smaller rings are moved to the middle tower, taking seven steps as in question 2. One step is needed to move the biggest ring from the source to the target. It takes seven more steps move three smaller rings from the middle to the target. The total is 7 + 1 + 7 = 15 steps."
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 12.1: Recursion Basics is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Recursion",
+            "aliases": [
+              "recursion"
+            ],
+            "evidence": "Recursion is a problem solving technique that uses the solution to a simpler version of the problem to solve the bigger problem.",
+            "confidence": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/12%3A_Recursion/12.02%3A_Simple_Math_Recursion",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Calculating a factorial"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The factorial of a positive integer is defined as the product of the integer and the positive integers less than the integer."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Ex: 5 ! = 5 * 4 * 3 * 2 * 1"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Written as a general equation for a positive integer n: n! = n * (n - 1 ) * (n - 2 ) * . . . * 1"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The above formula for the factorial of n results in a recursive formula: n! = n * (n - 1 )!"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Thus, the factorial of n depends upon the value of the factorial at n - 1 . The factorial of n can be found by repeating the factorial of n - 1 until (n - 1 )! = 1 ! (we know that 1 ! = 1 ). This result can be used to build the overall solution as seen in the animation below."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Can the following algorithm be written recursively? The summation of 1 + 2 + 3 + . . . + (n - 1 ) + n where n is a positive integer."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The summation can be calculated using recursion because there is a regular pattern and the summation to n depends on the summation to n - 1 ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Can the following algorithm be written recursively? Listing the odd numbers greater than 0 and less than a given number n ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Each number in the sequence can be found by adding 2 to the previous number, with the solution at 1 being 1 ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Can the following algorithm be written recursively? Listing the primary numbers (prime numbers) greater than 3."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A prime number does not depend on a smaller prime number; thus, no recursion can be found to generate new prime numbers based on an existing list of prime numbers."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Can the following algorithm be written recursively? Listing the Fibonacci sequence of numbers."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A given number in the Fibonacci sequence is found by summing the previous two numbers in the sequence, so the Fibonacci sequence can be found recursively."
+        },
+        {
+          "kind": "heading",
+          "text": "Defining a recursive function"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Recursive algorithms are written in Python as functions. In a recursive function different actions are performed according to the input parameter value. A critical part of a recursive function is that the function must call itself."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A value for which the recursion applies is called the recursive case . In the recursive case, the function calls itself with a smaller portion of the input parameter. Ex: In the recursive function factorial() , the initial parameter is an integer n . In the function's recursive case, the argument passed to factorial() is n - 1 , which is smaller than n ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A value of n for which the solution is known is called the base case . The base case stops the recursion. A recursive algorithm must include a base case; otherwise, the algorithm may result in an infinite computation."
+        },
+        {
+          "kind": "paragraph",
+          "text": "To calculate a factorial, a recursive function, factorial() is defined with an integer input parameter, n . When n > 1 , the recursive case applies. The factorial() calls itself with a smaller argument, n - 1 . When n == 1 , the solution is known because 1 ! is 1 ; therefore, n == 1 is a base case."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Note: 0 ! is defined to be 1 ; therefore, n == 0 is a second base case for factorial() . When n < 1 , an error is returned."
+        },
+        {
+          "kind": "paragraph",
+          "text": "For the questions below, the function rec_fact() is another recursive function that calculates a factorial. What is the result of each definition of rec_fact() if n = 17 is the initial input parameter?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. There is a missing base case, so there is no place for the recursion to end."
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. This definition of rec_fact() uses a base case of n == 0 , which works because, just like 1 ! , 0 ! = 1 . However, the base case of n == 0 returns n , which at this stage is 0 , and therefore zeroes out the rest of the computation."
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The recursive function begins returning correctly at the base case of n == 0 . 0 ! = 1 ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The base case of n == 1 is not used in the function. When n is 0 , the overall multiplication becomes 0 . The recursion begins returning once the n < 0 base case is reached, initially returning - 1 . But the previous recursive call would return 0 , thereby zeroing out all computations and leaving an overall result of 0 ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a program that uses a recursive function to calculate the summation of numbers from 0 to a user specified positive integer n ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "5"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Define the recursive function to calculate the summation def rec_sum(n): if n < 0: print(\"The summation is not defined for negative integers.\") return -1 elif n == 0: # Base case return 0 else: return n + rec_sum(n-1)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Take the input from the user n = int(input())"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Call the recursive function print(rec_sum(n))"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a program that computes the sum of the digits of a positive integer using recursion."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Ex: The sum of the digits of 6721 is 16."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Hint: There are 10 base cases, which can be checked easily with the right condition."
+        },
+        {
+          "kind": "paragraph",
+          "text": "6721"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Define the recursive function to calculate the summation def digit_sum(n): if n < 0: print(\"The summation is not defined for negative integers.\") return -1 elif n < 10: # Base case for single digit numbers return n else: return n%10 + digit_sum(n//10) # Take the input from the user n = int(input())"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Call the recursive function print(digit_sum(n))"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 12.2: Simple Math Recursion is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Factorial",
+            "aliases": [
+              "factorial"
+            ],
+            "evidence": "The factorial of a positive integer is defined as the product of the integer and the positive integers less than the integer.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Recursive case",
+            "aliases": [
+              "recursive case"
+            ],
+            "evidence": "A value for which the recursion applies is called the recursive case .",
+            "confidence": 1.0
+          },
+          {
+            "term": "Base case",
+            "aliases": [
+              "base case"
+            ],
+            "evidence": "A value of n for which the solution is known is called the base case .",
+            "confidence": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/13%3A_Inheritance/13.01%3A_Inheritance_Basics",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "is-a vs has-a relationships"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Classes are related to each other. An is-a relationship exists between a subclass and a superclass. Ex: A daffodil is a plant. A Daffodil class inherits from a superclass, Plant ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Is-a relationships can be confused with has-a relationships. A has-a relationship exists between a class that contains another class. Ex: An employee has a company-issued laptop. Note: The laptop is not an employee."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the relationship between a Doughnut class and a Pastry class?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. A doughnut is a type of pastry, so Doughnut inherits from Pastry ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What is the relationship between a Kitchen class and a Freezer class?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. A kitchen has a freezer, so a Kitchen class would contain a Freezer instance. A has-a relationship is also called a composition."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A goalkeeper is a player. Goalkeeper is a ______class. Player is a ______class."
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The Goalkeeper class inherits from the Player class."
+        },
+        {
+          "kind": "heading",
+          "text": "Inheritance in Python"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Inheritance uses an is-a relationship to inherit a class from a superclass. The subclass inherits all the superclass's attributes and methods, and extends the superclass's functionality."
+        },
+        {
+          "kind": "paragraph",
+          "text": "In Python, a subclass is created by including the superclass name in parentheses at the top of the subclass's definition:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "How is a Daisy class that inherits from the Plant class defined?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The subclass name is followed by the superclass name in parentheses."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Suppose a CarryOn class is inherited from a Luggage class. How is a CarryOn instance created?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. Deriving CarryOn from Luggage is specified in CarryOn ' s class definition. Ex: class CarryOn ( Luggage ): . Instances of a subclass, like CarryOn , are created like other classes and do not require the base class name."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given the following SuperClass and SubClass , which of the following can an instance of SubClass access?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. A SubClass instance has access to func_1() , inherited from SuperClass , as well as to func_2() , a SubClass method."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given the following SuperClass and SubClass , which of the following can an instance of SuperClass access?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. A SuperClass instance has access to SuperClass ' s func_1() but doesn't have access to anything in SubClass , including func_2() ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Python documentation for inheritance uses multiple terms to refer to the class that is inherited from and the class that inherits. This book uses superclass/subclass throughout for consistency."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given the Employee class, create a Developer class that inherits from Employee . The Developer class has one method, update_codebase() , which prints \"Employee has updated the codebase\" . Then, use the Developer instance, python_dev , to call print_company() and update_codebase() ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Employee(): def print_company(self): print(\"Employee works at Stark Industries\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Developer(Employee): def update_codebase(self): print(\"Employee has updated the codebase\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "python_dev = Developer() python_dev.print_company() python_dev.update_codebase()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Define three classes: Polygon , Rectangle , and Square :"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Create an instance of each class. Then, for each instance, call all the methods the instance has access to."
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Polygon(): def p_disp(self): print(\"object is a Polygon\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Rectangle(Polygon): def r_disp(self): print(\"object is a Rectangle\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Square(Rectangle): def s_disp(self): print(\"object is a Square\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "poly = Polygon() rect = Rectangle() sq = Square()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "poly.p_disp()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "rect.r_disp() rect.p_disp()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "sq.s_disp() sq.r_disp() sq.p_disp()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 13.1: Inheritance Basics is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Is-a relationship",
+            "aliases": [
+              "is-a relationship",
+              "is-a relationships"
+            ],
+            "evidence": "An is-a relationship exists between a subclass and a superclass.",
+            "confidence": 0.9
+          },
+          {
+            "term": "Has-a relationship",
+            "aliases": [
+              "has-a relationship",
+              "has-a relationships"
+            ],
+            "evidence": "A has-a relationship exists between a class that contains another class.",
+            "confidence": 0.9
+          },
+          {
+            "term": "Composition",
+            "aliases": [
+              "composition"
+            ],
+            "evidence": "A has-a relationship is also called a composition.",
+            "confidence": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/13%3A_Inheritance/13.03%3A_Methods",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Overriding methods"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Sometimes a programmer wants to change the functions a subclass inherits. Mint is a subclass that has the same functionality as Plant , except for one function. A subclass can override a superclass method by defining a method with the same name as the superclass method."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Suppose a programmer inherits the ContractTax class from class Tax and wants to override Tax ' s calc_tax() . What should the programmer do?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Overriding involves defining a subclass method that has the same name as the superclass method."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is the error in the program that attempts to override calc_tax() for ContractTaxDE ?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The self parameter is missing from the overridden method's definition."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The following program doesn't override calc_tax() . Why?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The class definition doesn't indicate inheritance. The definition should be class ContractTax(Tax): ."
+        },
+        {
+          "kind": "heading",
+          "text": "super()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "super () is a special method that provides a temporary superclass object instance for a subclass to use. super () is commonly used to call superclass methods from a subclass. super () is commonly used in a subclass's __init__() to assign inherited instance attributes. Ex: super ().__init__() ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the following program."
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Polygon :"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def __init__ ( self, num_sides= 3 ):"
+        },
+        {
+          "kind": "paragraph",
+          "text": "self.num_sides = num_sides"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Rectangle ( Polygon ):"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def __init__ ( self, ln= 1 , wd= 1 ):"
+        },
+        {
+          "kind": "paragraph",
+          "text": "super ().__init__( 4 )"
+        },
+        {
+          "kind": "paragraph",
+          "text": "self.length = ln"
+        },
+        {
+          "kind": "paragraph",
+          "text": "self.width = wd"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Square ( Rectangle ):"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def __init__ ( self, side= 1 ):"
+        },
+        {
+          "kind": "paragraph",
+          "text": "super ().__init__(side, side)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "self.side = side"
+        },
+        {
+          "kind": "paragraph",
+          "text": "sq_1 = Square( 5 )"
+        },
+        {
+          "kind": "paragraph",
+          "text": "print(sq_1.num_sides)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Line 16 executes and Square 's __init__() is called on line 12. Line 13 executes and the superclass's __init__() is called. Which line does control flow move to next?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Square 's superclass is Rectangle . Rectangle 's __init__() is called on line 6."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The next line executes. Which line does control flow move to next?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. super() . __init__(4) calls the __init__() of Rectangle' s superclass, Polygon . Control moves to line 3, and num_sides is initialized with 4 ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The method call returns. Lines 8 and 9 execute to initialize length and width, and Rectangle' s __init__() returns. Which line does control flow move to next?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The instance attribute side is initialized with 5 ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Square ' s __init__() returns and control flow moves to line 17. What is the output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. Rectangle ' s __init__() always calls Polygon ' s __init__() with num_sides= 4 ."
+        },
+        {
+          "kind": "heading",
+          "text": "Polymorphism"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Polymorphism is the concept of having many forms. In programming, a single name can be used for multiple functionalities. Within inheritance, polymorphism is the basis of method overriding, as multiple methods have the same name."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The name display() maps to multiple methods. The class type of the calling object determines which display() method is executed."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The code's output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Polymorphism can also be used with methods of unrelated classes. The class type of the calling object determines the method executed."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Tax and ContractTax are unrelated classes that each define calc_tax() . calc_tax() isn't overridden as ContractTax isn't inherited from Tax ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The code's output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Polymorphism allows methods to be called with different parameter types. Many built-in operators and functions have this utility."
+        },
+        {
+          "kind": "paragraph",
+          "text": "len () can be called with multiple types, including lists and strings."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The code's output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Consider the example. What is the output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. Polymorphism allows print_type() to be overridden in subclasses of Polygon ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which is an example of polymorphism for the multiplication operator?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The * operator can be used with integer operands as well as strings and other types."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given the Pet class, create a Bird class inherited from Pet and a Finch class inherited from Bird . Override the display() method in Bird and Finch such that the program output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Pet(): def display(self): print(\"Clinic patient: Pet\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Bird(Pet): def display(self): print(\"Pet type: Bird\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Finch(Bird): def display(self): print(\"Bird type: Finch\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "bird_1 = Bird() bird_1.display() finch_1 = Finch() finch_1.display()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Given the Employee class, create a Developer class inherited from Employee with methods __init__() and print_info() such that:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "__init__()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "print_info()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Employee(): count = 0 def __init__(self): Employee.count += 1 self.e_id = Employee.count self.hire_year = 2023"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def print_info(self): print(\"Employee\", self.e_id, \"was hired in\", self.hire_year)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "class Developer(Employee): def __init__(self, lang_xp): super().__init__() self.lang_xp = lang_xp"
+        },
+        {
+          "kind": "paragraph",
+          "text": "def print_info(self): super().print_info() print(\"Language(s):\", self.lang_xp)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "python_dev = Developer([\"Python\"]) python_dev.print_info()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 13.3: Methods is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Method overriding",
+            "aliases": [
+              "override",
+              "Overriding",
+              "overridden",
+              "method overriding"
+            ],
+            "evidence": "Overriding involves defining a subclass method that has the same name as the superclass method.",
+            "confidence": 1.0
+          },
+          {
+            "term": "super()",
+            "aliases": [
+              "super ()"
+            ],
+            "evidence": "super () is a special method that provides a temporary superclass object instance for a subclass to use.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Polymorphism",
+            "aliases": [
+              "polymorphism"
+            ],
+            "evidence": "Polymorphism is the concept of having many forms.",
+            "confidence": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/14%3A_Files/14.04%3A_Handling_Exceptions",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Runtime errors"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Various errors may occur when reading a file:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "When an error occurs, the program terminates with an error message."
+        },
+        {
+          "kind": "heading",
+          "text": "Typo in a file"
+        },
+        {
+          "kind": "paragraph",
+          "text": "A file named food_order.txt has the following contents:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The following program expects each line of the file to begin with an integer:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Unfortunately, the line \"soft drinks\" does not begin with an integer. As a result, the program terminates and displays an error message:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "What error might occur in each situation?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The line \"soft drinks\" is changed to \"3-4 soft drinks\" ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The string \"3-4\" is not an integer, so the int () function raises a ValueError like before."
+        },
+        {
+          "kind": "paragraph",
+          "text": "for line in open ( \"food_order.text\" ):"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. The filename should end with .txt , not .text ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. If the line has no spaces, then len (parts) will be only 1 , and parts[ 1 ] will be out of range."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The Built-in Exceptions page of the Python Standard Library explains the meaning of each exception."
+        },
+        {
+          "kind": "heading",
+          "text": "Try and except"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Programs can be designed to handle exceptions, rather than terminate. A try statement runs code that might raise an exception. An except clause runs code in response to the exception."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The following program, named try_open.py , asks the user for a filename and counts the number of lines in the file."
+        },
+        {
+          "kind": "paragraph",
+          "text": "When running this program with the input try_open.py , the name of the program file, the output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "If the filename does not exist, a FileNotFoundError is raised on line 3. The program then jumps to the except clause on line 7 and continues to run. The resulting output is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "For each code snippet, what is the output?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The int () function raises a ValueError when trying to convert \"one\" to an integer, so the program jumps to the except clause."
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The program crashes and displays this error because the except clause does not handle ValueError ."
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. If an except clause does not specify a specific error type, then any error type is handled."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Analysis programs often need to find numbers in large bodies of text. How can a program tell if a string like \"123.45\" represents a number? One approach is to use exceptions:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Implement the get_type() function using this approach. The provided main block calls get_type() for each word in a file. get_type() should return either \"int\" , \"float\" , or \"str\" , based on the word. The output for the provided data.txt is:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Hello 100 times! 3.14159 is pi."
+        },
+        {
+          "kind": "paragraph",
+          "text": "def get_type(word): try: int(word) return \"int\" except ValueError: try: float(word) return \"float\" except ValueError: return \"str\""
+        },
+        {
+          "kind": "paragraph",
+          "text": "if __name__ == \"__main__\": for line in open(\"data.txt\"): for word in line.split(): print(get_type(word), word, sep=\": \")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Write a program that prompts the user to input a word and a filename. The program should print each line of the file that contains the word. Here is an example run of the program (user input in bold):"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This example uses a file named countries.csv based on the alphabetical list of countries from Worldometer. Each line of the file includes a country's name, population, land area, and population density, separated by commas."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The user might incorrectly type the filename (Ex: countries.txt instead of countries.csv ). Your program should output an error message if the file is not found, and keep prompting the user to input a filename until the file is found:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Hint: Try to open the file specified by the user. A FileNotFoundError is raised if the filename is invalid."
+        },
+        {
+          "kind": "paragraph",
+          "text": "United countries countries.txt countries.csv"
+        },
+        {
+          "kind": "paragraph",
+          "text": "word = input(\"Enter a word: \")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Step 1: Prompt for a filename until the file is found. while True: name = input(\"Enter a filename: \") try: file = open(name) break except FileNotFoundError: print(\"File not found:\", name)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "# Step 2: Look for the word on each line of the file. for line in file: if word in line: print(line, end=\"\")"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 14.4: Handling Exceptions is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Try statement",
+            "aliases": [
+              "try statement"
+            ],
+            "evidence": "A try statement runs code that might raise an exception.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Except clause",
+            "aliases": [
+              "except clause"
+            ],
+            "evidence": "An except clause runs code in response to the exception.",
+            "confidence": 1.0
+          }
+        ]
+      }
+    },
+    {
+      "url": "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)/15%3A_Data_Science/15.03%3A_Pandas",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "By the end of this section you should be able to"
+        },
+        {
+          "kind": "heading",
+          "text": "Pandas library"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Pandas is an open-source Python library used for data cleaning, processing, and analysis. Pandas provides data structures and data analysis tools to analyze structured data efficiently. The name \"Pandas\" is derived from the term \"panel data,\" which refers to multidimensional structured datasets. Key features of Pandas include:"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The conventional alias for importing Pandas is pd . In other words, Pandas is imported as import pandas as pd . Examples of DataFrame and Series objects are shown below."
+        },
+        {
+          "kind": "heading",
+          "text": "Data input and output"
+        },
+        {
+          "kind": "paragraph",
+          "text": "A DataFrame can be created from a dictionary, list, NumPy array, or a CSV file. Column names and column data types can be specified at the time of DataFrame instantiation."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The pd.DataFrame() function takes in a dictionary and converts it into a DataFrame. Dictionary keys will be column labels and values are stored in respective columns."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The pd.DataFrame() function takes in a list containing the records in different rows of a DataFrame, along with a list of column labels, and creates a DataFrame with the given rows and column labels."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A NumPy array, along with column labels, are passed to the pd.DataFrame() function to create a DataFrame object."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The pd.read_csv() function reads a CSV file into a DataFrame and organizes the content in a tabular format."
+        },
+        {
+          "kind": "paragraph",
+          "text": "The pd.read_excel() function reads an Excel file into a DataFrame and organizes the content in a tabular format."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which of the following is a Pandas data structure?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. Series is a Pandas data structure representing one-dimensional labeled data."
+        },
+        {
+          "kind": "paragraph",
+          "text": "A DataFrame object can be considered as a collection of Series objects."
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. A DataFrame object can be considered a collection of one-dimensional labeled objects represented by Series objects."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What are the benefits of Pandas over NumPy?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "b. The Pandas DataFrame can store columns of varying data types, while NumPy only supports numeric data types."
+        },
+        {
+          "kind": "heading",
+          "text": "Pandas for data manipulation and analysis"
+        },
+        {
+          "kind": "paragraph",
+          "text": "The Pandas library provides functions and techniques to explore, manipulate, and gain insights from the data. Key DataFrame functions that analyze this code are described in the following table."
+        },
+        {
+          "kind": "paragraph",
+          "text": "head(n)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Returns the first n rows. If a value is not passed, the first 5 rows will be shown."
+        },
+        {
+          "kind": "paragraph",
+          "text": "tail(n)"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Returns the last n rows. If a value is not passed, the last 5 rows will be shown."
+        },
+        {
+          "kind": "paragraph",
+          "text": "info()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "describe()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "value_counts()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "unique()"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which of the following returns the top five rows of a DataFrame?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The function head() returns a DataFrame's top rows. If an argument is not specified, the default number of returned rows is five."
+        },
+        {
+          "kind": "paragraph",
+          "text": "What does the unique() function do in a DataFrame when applied to a column?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "c. The unique() function when applied to a column returns the unique values (rows) in the given column."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Which function generates statistical information of columns with numerical data types?"
+        },
+        {
+          "kind": "paragraph",
+          "text": "a. When the function describe() is applied to a DataFrame, summary statistics of numerical columns will be generated."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Please refer to the Pandas user guide for more information about the Pandas library."
+        },
+        {
+          "kind": "heading",
+          "text": "Programming practice with Google"
+        },
+        {
+          "kind": "paragraph",
+          "text": "Use the Google Colaboratory document below to practice Pandas functionalities to extract insights from a dataset."
+        },
+        {
+          "kind": "paragraph",
+          "text": "Google Colaboratory document"
+        },
+        {
+          "kind": "paragraph",
+          "text": "This page titled 15.3: Pandas is shared under a CC BY 4.0 license and was authored, remixed, and/or curated by OpenStax via source content that was edited to the style and standards of the LibreTexts platform."
+        }
+      ],
+      "reply": {
+        "terms": [
+          {
+            "term": "Pandas",
+            "aliases": [
+              "Pandas"
+            ],
+            "evidence": "Pandas is an open-source Python library used for data cleaning, processing, and analysis.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Series",
+            "aliases": [
+              "Series"
+            ],
+            "evidence": "Series is a Pandas data structure representing one-dimensional labeled data.",
+            "confidence": 1.0
+          },
+          {
+            "term": "DataFrame",
+            "aliases": [
+              "DataFrame",
+              "DataFrame object"
+            ],
+            "evidence": "A DataFrame object can be considered a collection of one-dimensional labeled objects represented by Series objects.",
+            "confidence": 1.0
+          },
+          {
+            "term": "Panel data",
+            "aliases": [
+              "panel data"
+            ],
+            "evidence": "The name \"Pandas\" is derived from the term \"panel data,\" which refers to multidimensional structured datasets.",
+            "confidence": 0.8
+          }
+        ]
+      }
+    }
+  ]
+}
