@@ -117,6 +117,68 @@ halting after 7 pages. The tool's behavior under 429 is correct as far as it goe
 recorded with 0 tokens billed, and the breaker stops the run rather than burning the budget) — but
 completing a full book on a rate-limited key currently requires re-running to resume past the gap.
 
+### How glossary-scan works
+
+    TOC ──▶ fetch pages ──▶ extract article ──▶ per-page model call ──▶ verify ──▶ score ──▶ merge ──▶ emit
+             (cached)        (chrome stripped)         │                  └─ pure, free ─────────────┘
+                                                       └── consults ledger ──┘
+
+Only the model call costs money. Verification, scoring, merging and writing are pure functions
+over data — which is why the eval harness under `tests/eval/` can replay a recorded scan through
+all of them offline, with no key and no spend.
+
+**It reads the article, not the page.** A LibreTexts page as served carries the site's chrome —
+the reader's display-settings menu, navigation, footer. On one measured page that was 54% of the
+text and 8 of its 11 headings ("Search", "Text Color", "Margin Size", "Recommended articles", …).
+The scanner narrows each page to its `.mt-content-container` element before parsing, which is the
+platform-wide MindTouch/CXone article wrapper rather than anything book- or publisher-specific. If
+a page lacks that container the whole document is used, so an unfamiliar template degrades to
+noisier input rather than to nothing. Pages whose article is genuinely empty — front and back
+matter like Index, Table of Contents and Licensing — are recorded as scanned with zero terms and
+never sent to a model at all.
+
+**The evidence quote is a gate, not a hint.** Every candidate must arrive with a span the model
+copied verbatim from the page, and that span is then looked for in the page text — whitespace- and
+case-insensitively, since the HTML has already been reflowed, and subject to a 20-character floor
+so a two-word fragment can't satisfy it. A candidate whose quote isn't found is discarded outright.
+This is the anti-hallucination mechanism: a model that invents a term invents its evidence too, and
+invented evidence doesn't appear on the page. It is never softened into a score penalty.
+
+**Scoring corroborates; it doesn't decide.** A surviving candidate starts at the model's own
+confidence and gains a fixed bonus for each independent signal from the page: `+0.15` if the term
+or one of its aliases appears in a heading, `+0.10` if its evidence matches the same
+`is a`/`is called`/`refers to` regex `excerpt.py` uses to rank grounding paragraphs, and `+0.05` if
+the term turned up on more than one page. The result is clamped to `1.0`. Reusing `excerpt.py`'s
+regex is deliberate: agreement between what the scanner rates highly and what the generator can
+later ground a definition in predicts whether a term will survive step 2 at all. The weights are
+fixed rather than fitted — nineteen labelled reference terms cannot support fitting four
+parameters, so the eval harness reports what they buy instead of tuning them.
+
+**Merging is where the index contract is honoured.** The same term proposed on several pages
+collapses into one row: pages and aliases are unioned, the highest-scoring surface form becomes the
+`term`, and every other observed spelling is preserved as an alias so nothing seen is lost.
+Deduplicating by slug is mandatory, not tidiness — `input.py` rejects an index containing two terms
+with the same slug, so an unmerged index would be refused by the very tool it is built for.
+Singular and plural are deliberately *not* unified: "Dictionary" and "Dictionaries" slug
+differently and both survive, because any string rule aggressive enough to merge them also merges
+genuinely distinct terms. Near-duplicates are left for the human doing the review.
+
+| Module | Responsibility |
+|---|---|
+| `scan/toc.py` | table-of-contents walk and book metadata, via the public `getTOC` endpoint |
+| `scan/content.py` | narrowing a fetched page to its article content |
+| `scan/propose.py` | the scan prompt and one model call per page |
+| `scan/candidates.py` | `verify` / `score_on_page` / `merge` — pure, no I/O, no LLM |
+| `scan/emit.py` | writing the index and the score sidecar |
+| `scan/evaluate.py` | the offline replay harness behind `tests/eval/` |
+| `scan_cli.py` | argument parsing, cost control, the orchestration loop |
+
+The boundaries from [How it works](#how-it-works) still hold, and the scanner is on the far side of
+one of them: `input.py` remains the only file that knows the index format. The scanner conforms to
+that format rather than extending it, which is why scores live in the `--report` sidecar instead of
+in the index. `fetch.py`, `ledger.py` and `llm.py` are shared with `glossary-gen` — the scanner
+adds a page-shaped ledger record and a second entry point, not a second copy of the machinery.
+
 ### glossary-scan options
 
 | Flag | Default | Meaning |
