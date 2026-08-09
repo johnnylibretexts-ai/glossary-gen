@@ -22,12 +22,13 @@ from glossary_gen.cli import (
     build_http_client,
     load_prices,
 )
-from glossary_gen.fetch import FetchError, PageCache
+from glossary_gen.fetch import FetchError, PageCache, parse_page
 from glossary_gen.input import InputError
 from glossary_gen.ledger import Ledger
 from glossary_gen.llm import LLMClient, LLMError
 from glossary_gen.models import Page, slugify
 from glossary_gen.scan.candidates import merge, score_on_page, verify
+from glossary_gen.scan.content import extract_content
 from glossary_gen.scan.emit import EmitError, index_payload, report_payload, write_json
 from glossary_gen.scan.models import ScanRecord, ScoredCandidate
 from glossary_gen.scan.propose import load_scan_prompt, propose_terms, scan_prompt_versions
@@ -66,12 +67,21 @@ def structural_preview(pages: Sequence[Page]) -> PreviewReport:
 
 
 def collect_pages(urls: Sequence[str], cache: PageCache, failed: list[str]) -> list[Page]:
+    """Fetch each page's HTML, narrow it to article content, then parse.
+
+    Unlike `cli.py`'s `collect_pages`, this one does not use `cache.get()` directly:
+    the scanner must not see the rendered page's chrome (nav, display-settings menu,
+    footer), so it fetches raw HTML via `cache.get_html()`, strips everything outside
+    `.mt-content-container` with `extract_content()`, and only then calls `parse_page`.
+    """
     pages: list[Page] = []
     for url in urls:
         try:
-            pages.append(cache.get(url))
+            html = cache.get_html(url)
         except FetchError as exc:
             failed.append(f"{url}: {exc}")
+            continue
+        pages.append(parse_page(url, extract_content(html)))
     return pages
 
 

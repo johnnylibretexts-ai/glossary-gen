@@ -141,16 +141,24 @@ class PageCache:
                 return _decode(url, body)
         raise FetchError(f"{url}: redirect chain exceeded {MAX_REDIRECTS} hops")
 
-    def get(self, url: str) -> Page:
+    def get_html(self, url: str) -> str:
+        """Return the page's raw HTML, via the same cache file, `is_allowed_url` guard,
+        download path, and politeness delay as `get()`. Additive: callers that need the
+        untouched document (e.g. the scan CLI, which narrows it to article content before
+        parsing) use this instead of `get()`, which remains the single source of truth
+        for "download or read cache" so there is one download/caching path, not two.
+        """
         if not is_allowed_url(url):
             raise FetchError(f"{url}: not an allowed source URL (https on *.libretexts.org only)")
         cached = self._path_for(url)
         if cached.exists():
             try:
-                html = cached.read_text(encoding="utf-8", errors="replace")
+                return cached.read_text(encoding="utf-8", errors="replace")
             except (UnicodeDecodeError, LookupError) as exc:
                 raise FetchError(f"{url}: could not decode cached file ({exc})") from exc
-            return parse_page(url, html)
         body = self._download(url)
         cached.write_text(body, encoding="utf-8")
-        return parse_page(url, body)
+        return body
+
+    def get(self, url: str) -> Page:
+        return parse_page(url, self.get_html(url))

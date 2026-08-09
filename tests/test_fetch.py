@@ -233,6 +233,36 @@ def test_parse_page_only_ever_emits_heading_or_paragraph_kinds():
     assert not any("list item" in b.text for b in page.blocks)
 
 
+def test_get_html_returns_raw_html_and_get_still_returns_the_same_page(tmp_path):
+    """`get_html` is additive: it must not change what `get()` returns."""
+    cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(200, text=HTML)))
+
+    html = cache.get_html("https://eng.libretexts.org/a")
+    page = cache.get("https://eng.libretexts.org/a")
+
+    assert html == HTML
+    assert page.blocks == parse_page("https://eng.libretexts.org/a", HTML).blocks
+
+
+def test_get_html_and_get_share_one_cache_file(tmp_path):
+    """A `get_html` followed by a `get` for the same URL must not hit the network again —
+    proof the two methods share a single cache file, not two independent caches.
+    """
+    calls = []
+
+    def handler(request):
+        calls.append(request.url)
+        return httpx.Response(200, text=HTML)
+
+    cache = PageCache(tmp_path, make_client(handler))
+    html = cache.get_html("https://eng.libretexts.org/a")
+    page = cache.get("https://eng.libretexts.org/a")
+
+    assert len(calls) == 1
+    assert html == HTML
+    assert page.blocks == parse_page("https://eng.libretexts.org/a", HTML).blocks
+
+
 def test_get_raises_on_persistent_transport_error(tmp_path):
     """Transport errors that persist after all retries raise FetchError."""
     calls = []
