@@ -35,6 +35,18 @@ NO_CONTAINER_HTML = """
 </body></html>
 """
 
+# Models a real contentless page (e.g. "Index", "Table of Contents", "Detailed
+# Licensing"): the container is PRESENT but holds only scripts/divs/a footer, so its
+# decoded contents carry no heading/paragraph text. Surrounded by chrome, same as a
+# real rendered page, to prove the empty result does not fall back to it.
+EMPTY_CONTAINER_HTML = """
+<html><body>
+<nav><h2>Search</h2></nav>
+<div class="mt-content-container"><script>track();</script><div></div></div>
+<footer><h3>Recommended articles</h3></footer>
+</body></html>
+"""
+
 
 def test_extract_content_narrows_to_the_content_container():
     narrowed = extract_content(CHROME_AND_ARTICLE_HTML)
@@ -53,6 +65,20 @@ def test_extract_content_falls_back_to_original_html_when_selector_absent():
     an empty page.
     """
     assert extract_content(NO_CONTAINER_HTML) == NO_CONTAINER_HTML
+
+
+def test_extract_content_does_not_fall_back_when_container_is_present_but_empty():
+    """A present-but-empty `.mt-content-container` (a genuinely contentless page like
+    Index/ToC/Detailed Licensing) must yield an empty-of-text result, NOT fall back to
+    the surrounding document — that would re-introduce chrome on exactly the pages that
+    have no article to protect. See scan/content.py's module-level measurement.
+    """
+    narrowed = extract_content(EMPTY_CONTAINER_HTML)
+    page = parse_page("https://eng.libretexts.org/index", narrowed)
+
+    assert page.blocks == ()
+    assert "Search" not in narrowed
+    assert "Recommended articles" not in narrowed
 
 
 def test_end_to_end_page_contains_article_headings_not_chrome_headings():

@@ -100,6 +100,11 @@ class ScanSummary:
     skipped: int = 0
     unverified: int = 0
     aborted: bool = False
+    # Pages whose extracted content had zero blocks (genuinely contentless front/back
+    # matter — Index, Table of Contents, Detailed Licensing — see the measurement in
+    # scan/content.py). These are recorded `ok` but never sent to the model, so they are
+    # a subset of `ok`, not an addition to it.
+    empty_pages: int = 0
     candidates: list[ScoredCandidate] = field(default_factory=list)
 
 
@@ -168,6 +173,18 @@ def execute(
             "provider": getattr(client, "name", ""),
             "generated_at": _now(),
         }
+
+        # A page whose extracted content has zero blocks (Index, Table of Contents,
+        # Detailed Licensing — see scan/content.py) is genuinely contentless: there is
+        # nothing for a model to find, so asking anyway is a real paid call that always
+        # returns nothing. Skip it before spending, and record it `ok` (not a new status)
+        # for the same resume reason as a term-free-but-nonempty page: `Ledger.has()`
+        # only counts `ok`, so anything else would re-pay for it on every resumed run.
+        if not page.blocks:
+            ledger.append(ScanRecord(**base, status="ok", n_proposed=0, n_verified=0))
+            summary.ok += 1
+            summary.empty_pages += 1
+            continue
 
         try:
             candidates, raw = propose_terms(client, template, page)
@@ -355,7 +372,8 @@ def run(argv: list[str] | None = None) -> int:
 
     print(
         f"pages ok={summary.ok} skipped={summary.skipped} "
-        f"fetch_error={len(failed)} llm_error={summary.llm_error}"
+        f"fetch_error={len(failed)} llm_error={summary.llm_error} "
+        f"empty={summary.empty_pages}"
     )
     print(f"candidates: {len(summary.candidates)} verified, {summary.unverified} rejected")
 

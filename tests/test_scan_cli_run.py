@@ -23,6 +23,11 @@ PAGE2 = Page(
         Block(kind="paragraph", text="Recursion is a technique where a function calls itself."),
     ),
 )
+# A genuinely contentless page (e.g. "Index", "Table of Contents", "Detailed
+# Licensing" — see the 136-page measurement in scan/content.py): its container held
+# only scripts/divs/a footer, so extract_content -> parse_page yields zero blocks.
+EMPTY_PAGE = Page(url="https://eng.libretexts.org/index", blocks=())
+
 GOOD = (
     '{"terms": [{"term": "Recursion", "aliases": [], '
     '"evidence": "Recursion is a technique where a function calls itself.", '
@@ -119,6 +124,40 @@ def test_a_term_free_page_is_not_rescanned_on_resume(tmp_path):
 
     assert client.calls == 0
     assert summary.skipped == 1
+
+
+def test_a_page_with_no_blocks_is_skipped_without_calling_the_client(tmp_path):
+    """A contentless page (Index, ToC, Detailed Licensing) must not cost a paid call —
+    it is skipped before `propose_terms` is ever reached.
+    """
+    ledger = _ledger(tmp_path)
+    client = _FakeClient([])
+    summary = execute([EMPTY_PAGE], client, ledger, load_scan_prompt("v1"), "v1")
+
+    assert client.calls == 0
+    assert summary.ok == 1
+    assert summary.empty_pages == 1
+    record = ledger.records()[0]
+    assert record.status == "ok"
+    assert record.n_proposed == 0
+    assert record.n_verified == 0
+    assert record.tokens_in == 0
+    assert record.tokens_out == 0
+
+
+def test_a_resumed_run_does_not_recheck_an_empty_page(tmp_path):
+    path = tmp_path / "scan.jsonl"
+    template = load_scan_prompt("v1")
+    execute([EMPTY_PAGE], _FakeClient([]), Ledger(path, record_cls=ScanRecord), template, "v1")
+
+    resumed_client = _FakeClient([])
+    summary = execute(
+        [EMPTY_PAGE], resumed_client, Ledger(path, record_cls=ScanRecord), template, "v1"
+    )
+
+    assert resumed_client.calls == 0
+    assert summary.skipped == 1
+    assert summary.empty_pages == 0  # this run skipped via resume, not the empty-page path
 
 
 def test_budget_ceiling_stops_the_run(tmp_path):
