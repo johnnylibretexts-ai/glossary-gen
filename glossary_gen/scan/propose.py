@@ -85,11 +85,24 @@ def propose_terms(
 ) -> tuple[PageCandidates, RawResult]:
     """Ask one page's worth of candidates. Transport errors propagate so ProviderChain,
     not this function, decides about fallback — matching `generate.generate_entry`.
+
+    Every attempt that gets far enough to receive a `RawResult` — even one that fails
+    schema validation and gets retried — is real billed spend. Providers generally bill
+    input tokens even for a malformed reply, so those tokens are accumulated across all
+    attempts and attached to the final `LLMStructuredOutputError` as `tokens_in`/
+    `tokens_out`, letting the caller charge a failed page's real cost against the budget
+    ceiling instead of losing it when the exception discards the `RawResult`s. A
+    transport error (raised by `complete_raw` itself, before any `RawResult` exists) has
+    nothing to attach — 0 is correct there, not a gap.
     """
     prompt = build_scan_prompt(template, page)
     last: LLMStructuredOutputError | None = None
+    tokens_in = 0
+    tokens_out = 0
     for _ in range(retries + 1):
         raw = client.complete_raw(prompt)
+        tokens_in += raw.tokens_in
+        tokens_out += raw.tokens_out
         try:
             if _looks_like_bare_json_array(raw.text):
                 raise LLMStructuredOutputError(
@@ -103,4 +116,6 @@ def propose_terms(
             last = LLMStructuredOutputError(
                 f"reply failed schema validation: {exc.error_count()} error(s)"
             )
+    last.tokens_in = tokens_in  # type: ignore[union-attr]
+    last.tokens_out = tokens_out  # type: ignore[union-attr]
     raise last  # type: ignore[misc]

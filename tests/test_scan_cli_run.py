@@ -1,5 +1,5 @@
 from glossary_gen.ledger import Ledger
-from glossary_gen.llm import RawResult
+from glossary_gen.llm import LLMTransportError, RawResult
 from glossary_gen.models import Block, Page
 from glossary_gen.scan.models import ScanRecord
 from glossary_gen.scan.propose import load_scan_prompt
@@ -33,6 +33,10 @@ HALLUCINATED = (
     '"evidence": "A monad is a monoid in the category of endofunctors.", '
     '"confidence": 0.9}]}'
 )
+# A well-formed JSON object missing the required "terms" key. `propose_terms` retries
+# this (default retries=2, so 3 attempts total) and then raises LLMStructuredOutputError
+# — the failure path whose billed tokens must not vanish.
+BAD = '{"no_terms_key": true}'
 
 
 class _FakeClient:
@@ -52,6 +56,22 @@ class _FakeClient:
             tokens_in=100,
             tokens_out=20,
         )
+
+
+class _TransportFailClient:
+    """Every call raises LLMTransportError before any RawResult exists — there is
+    nothing to bill, so 0 tokens is the correct outcome here, not a gap in the fix.
+    """
+
+    name = "fake-transport"
+    model = "fake-model"
+
+    def __init__(self):
+        self.calls = 0
+
+    def complete_raw(self, prompt):
+        self.calls += 1
+        raise LLMTransportError("boom")
 
 
 def _ledger(tmp_path):
@@ -153,6 +173,91 @@ def test_a_resumed_run_already_over_budget_still_finishes_already_done_pages(tmp
     assert summary.skipped == 2
     assert summary.aborted is False
     assert resumed_client.calls == 0
+
+
+def test_a_page_that_fails_every_attempt_records_its_real_token_cost(tmp_path):
+    """Spend from FAILED calls must not be invisible. Three attempts (the default retry
+    budget) at 100 tokens_in / 20 tokens_out each must total 300/60 on the llm_error
+    ledger row, not 0 — providers generally bill input tokens even for a malformed
+    reply, and a call that got far enough to receive a reply is real spend.
+    """
+    ledger = _ledger(tmp_path)
+    client = _FakeClient([BAD, BAD, BAD])
+    summary = execute([PAGE], client, ledger, load_scan_prompt("v1"), "v1")
+
+    assert summary.llm_error == 1
+    assert client.calls == 3
+    record = ledger.records()[0]
+    assert record.status == "llm_error"
+    assert record.tokens_in == 300
+    assert record.tokens_out == 60
+
+
+def test_budget_ceiling_trips_on_a_run_of_only_failures(tmp_path):
+    """THE DEFECT THIS FIX CLOSES: without accumulating tokens from failed attempts, a
+    run that never succeeds reports $0 tracked spend and can never trip --budget-usd,
+    however many billed retries it burns through. This test fails against the
+    pre-fix code (aborted stays False, both pages exhaust every retry, llm_error == 2).
+    """
+    client = _FakeClient([BAD, BAD, BAD, BAD, BAD, BAD])
+    client.model = "gemini-3.5-flash"
+    # First page's 3 failed attempts cost (300*0.3 + 60*2.5) / 1e6 = $0.00024 — comfortably
+    # over this ceiling, so the second page must never be attempted.
+    summary = execute(
+        [PAGE, PAGE2],
+        client,
+        _ledger(tmp_path),
+        load_scan_prompt("v1"),
+        "v1",
+        budget_usd=0.0001,
+    )
+
+    assert summary.aborted is True
+    assert summary.llm_error == 1
+    assert client.calls == 3
+
+
+def test_a_resumed_run_seeds_spend_from_llm_error_rows_too(tmp_path):
+    """The budget seed on resume sums every ledger record's tokens, not just `ok` ones
+    (`Ledger.records()` returns all statuses) — but that only carries real spend if the
+    llm_error row itself was written with non-zero tokens. Pins both halves together.
+    """
+    path = tmp_path / "scan.jsonl"
+    template = load_scan_prompt("v1")
+    priming_client = _FakeClient([BAD, BAD, BAD])
+    priming_client.model = "gemini-3.5-flash"
+    execute([PAGE], priming_client, Ledger(path, record_cls=ScanRecord), template, "v1")
+    # Ledger now holds one llm_error row worth 300 tokens_in / 60 tokens_out, no ok rows.
+
+    resumed_client = _FakeClient([])
+    resumed_client.model = "gemini-3.5-flash"
+    summary = execute(
+        [PAGE2],
+        resumed_client,
+        Ledger(path, record_cls=ScanRecord),
+        template,
+        "v1",
+        budget_usd=0.0001,  # already exceeded by the priming run's llm_error spend
+    )
+
+    assert summary.aborted is True
+    assert resumed_client.calls == 0
+
+
+def test_a_transport_error_records_zero_tokens_without_crashing(tmp_path):
+    """A transport error is raised by complete_raw itself, before any RawResult exists
+    — there is nothing to bill. `getattr(exc, "tokens_in", 0)` must not crash on an
+    LLMTransportError, which never gets propose_terms's tokens_in/tokens_out attached.
+    """
+    ledger = _ledger(tmp_path)
+    client = _TransportFailClient()
+    summary = execute([PAGE], client, ledger, load_scan_prompt("v1"), "v1")
+
+    assert summary.llm_error == 1
+    assert client.calls == 1  # LLMTransportError is not retried inside propose_terms
+    record = ledger.records()[0]
+    assert record.tokens_in == 0
+    assert record.tokens_out == 0
 
 
 def test_estimate_scan_cost_returns_none_for_an_unpriced_model():

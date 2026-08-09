@@ -162,7 +162,28 @@ def execute(
         try:
             candidates, raw = propose_terms(client, template, page)
         except LLMError as exc:
-            ledger.append(ScanRecord(**base, status="llm_error", error=str(exc)))
+            # A failed page still cost real, billed tokens — every attempt that reached
+            # `complete_raw` was a real provider call, even though it ended in a schema
+            # error and got retried. `propose_terms` attaches the accumulated total to
+            # `LLMStructuredOutputError`; a bare `LLMTransportError` never gets that far
+            # (raised by `complete_raw` itself, before any reply exists), so `getattr`
+            # with a 0 default is correct there, not a workaround. Both the running
+            # counters (ceiling correctness within THIS run) and the ledger row (ceiling
+            # correctness across a RESUMED run, whose seeding sums every record's
+            # tokens_in/tokens_out) must see this spend, or --budget-usd is blind to it.
+            failed_tokens_in = getattr(exc, "tokens_in", 0)
+            failed_tokens_out = getattr(exc, "tokens_out", 0)
+            tokens_in_spent += failed_tokens_in
+            tokens_out_spent += failed_tokens_out
+            ledger.append(
+                ScanRecord(
+                    **base,
+                    status="llm_error",
+                    error=str(exc),
+                    tokens_in=failed_tokens_in,
+                    tokens_out=failed_tokens_out,
+                )
+            )
             summary.llm_error += 1
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:

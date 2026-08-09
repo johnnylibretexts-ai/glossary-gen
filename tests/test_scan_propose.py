@@ -82,6 +82,21 @@ def test_propose_terms_gives_up_after_the_retry_budget():
         propose_terms(client, load_scan_prompt("v1"), PAGE)
 
 
+def test_propose_terms_attaches_accumulated_tokens_to_the_raised_exception():
+    # Every attempt reached `complete_raw` and got a real, billed reply back before
+    # failing schema validation — that's real spend that must not vanish just because
+    # the call ultimately raised. _FakeClient bills tokens_in=7/tokens_out=2 per call;
+    # three attempts (the default retry budget) must sum to 21/6, not 0.
+    client = _FakeClient(["nope", "still nope", "nope again"])
+
+    with pytest.raises(LLMStructuredOutputError) as excinfo:
+        propose_terms(client, load_scan_prompt("v1"), PAGE)
+
+    assert len(client.prompts) == 3
+    assert excinfo.value.tokens_in == 21
+    assert excinfo.value.tokens_out == 6
+
+
 def test_propose_terms_rejects_a_bare_json_array():
     # extract_json's greedy `{.*}` fallback would strip the brackets off this and hand
     # PageCandidates just the inner object, which validates as a silently empty result.
