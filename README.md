@@ -18,7 +18,7 @@ License: [MIT](LICENSE).
 
 | Step | What it does | Owner |
 |---|---|---|
-| 1 | Produce the index — keywords/phrases **with the pages each appears on** | upstream |
+| 1 | Produce the index — keywords/phrases **with the pages each appears on** | `glossary-scan` (this package) |
 | 2 | **This tool.** AI reads those pages and writes a definition per term | — |
 | 3 | Import the CSV into Conductor, where terms are centralised | Conductor side |
 
@@ -26,6 +26,97 @@ Steps 1 and 3 are deliberately out of scope. This tool consumes an index and emi
 it does not build an index and it does not talk to Conductor. The two contracts it does own
 are the [input format](#input-format) and the [output columns](#output-columns) — those are
 the integration surface, and both are specified below.
+
+## Building an index (glossary-scan)
+
+`glossary-scan` produces step 1's input: point it at a LibreTexts book and it writes an index
+in exactly the format documented under [Input format](#input-format), ready to feed straight
+into `glossary-gen`.
+
+It walks the book's table of contents, and for each page asks a model one question — *what
+terms does this page define?* — requiring a verbatim quote from that page as evidence for
+every candidate it proposes. Only candidates whose quote actually checks out against the page
+survive; what's left is then scored, so you get a ranked, reviewable list rather than a flat
+dump of headings.
+
+**Free preview first.** `--dry-run` walks the book and lists heading-derived "structural
+candidates" — no model call, no key, no cost:
+
+    glossary-scan --book "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)" --dry-run
+
+Real output against that book:
+
+    book:       Python Programming (OpenStax) (eng/117469)
+    pages:      136 fetched, 0 failed
+    candidates: 275 structural (headings, boilerplate removed)
+      - Computer programs
+      - The Python language
+      - Basic output
+      ...
+    This is a free preview. Structural candidates are NOT the scanner's output —
+    a real run reads each page with a model and scores what it finds.
+
+Structural candidates are headings with the obvious OpenStax boilerplate (Summary, Key Terms,
+Exercises, …) filtered out — good for confirming the TOC resolves and sizing the book before
+spending anything. They are **not** what the scanner produces. A real run reads every page
+with a model and scores what it actually finds defined there.
+
+**A real run**, capped for a first smoke test and with a spend ceiling:
+
+    export GLOSSARY_GEN_GEMINI_API_KEY=...
+    glossary-scan --book "https://eng.libretexts.org/Bookshelves/Computer_Science/Programming_Languages/Python_Programming_(OpenStax)" \
+      --limit 20 --budget-usd 2.00 --out out/index.json --report out/index-report.json
+
+Every term this writes is an **unreviewed candidate** — the same `x_status = needs-review`
+posture stated elsewhere in this README, just one step earlier in the pipeline: nothing here
+has been read by a human. `--min-score` defaults to `0.0`, so by default *everything* verified
+is emitted and a human trims the list before it becomes `glossary-gen`'s input. The scores
+themselves do not go into the index: `input.py` is the only file that owns the index schema,
+so the scanner doesn't get to add a field to it. They go to the `--report` sidecar instead —
+one row per term with its score, source pages, and evidence quote, for whoever does the
+trimming.
+
+Cost guards, in the order they apply:
+
+- `--dry-run` is free — no key needed, no model called.
+- `--budget-usd` aborts the run once spend crosses the ceiling. As with `glossary-gen`'s
+  ledger, the running total is seeded from every `tokens_in`/`tokens_out` already recorded in
+  the `--ledger` file, so the ceiling bounds **total spend across resumes**, not spend per
+  invocation.
+- `--ledger` is a resumable, append-only JSONL log keyed on the page. A re-run against the same
+  ledger skips any page already recorded `ok`, so an interrupted or aborted scan picks back up
+  instead of re-paying for pages it already scanned.
+- `--delay` (default `0.3`s) is politeness between real page fetches — spacing out requests to
+  LibreTexts' servers, not a rate-limit workaround.
+
+⚠️ **`glossary_gen/prices.json`'s rates are unverified placeholders** — the same file and the
+same caveat as the rest of this README: it covers exactly one model, `gemini-3.5-flash`, and
+that rate has not been checked against current provider pricing. `--budget-usd` is only as
+accurate as those numbers; check your provider's current pricing before relying on it as a
+hard ceiling.
+
+A replay-based recall eval harness exists under `tests/eval/` — it scores the
+candidate-selection and verification logic against fixed fixtures, offline, with no model
+call. It is a regression check on that logic, not a measurement of recall or cost against a
+live model on a real book; that has not been run yet.
+
+### glossary-scan options
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--book` (required) | — | book root URL on `*.libretexts.org` |
+| `--out` | `out/index.json` | index path, written in the [input format](#input-format) |
+| `--report` | `out/index-report.json` | score sidecar path |
+| `--cache-dir` | `cache` | page cache dir — same on-disk cache file and format as `glossary-gen`'s `--cache-dir` |
+| `--ledger` | `out/scan.jsonl` | ledger path; resume/skip and cost-ceiling state live here |
+| `--prompt-version` | `v1` | scan prompt version |
+| `--model` | `gemini-3.5-flash` | Gemini model name |
+| `--min-score` | `0.0` | omit terms scoring below this (default: emit everything, trim by hand) |
+| `--limit` | — | scan at most N pages (smoke runs) |
+| `--delay` | `0.3` | seconds between real page fetches |
+| `--budget-usd` | — | abort if spend exceeds this |
+| `--yes` | off | skip the cost confirmation prompt |
+| `--dry-run` | off | walk the book and report structural candidates; call no model, spend nothing |
 
 ## Install
 
