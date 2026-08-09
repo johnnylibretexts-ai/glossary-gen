@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import time
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
@@ -73,17 +74,27 @@ class PageCache:
     """Fetch pages once, then serve them from an on-disk HTML cache."""
 
     def __init__(
-        self, cache_dir: Path, client: httpx.Client, *, max_bytes: int = 2_000_000
+        self,
+        cache_dir: Path,
+        client: httpx.Client,
+        *,
+        max_bytes: int = 2_000_000,
+        delay: float = 0.0,
     ) -> None:
         self._cache_dir = Path(cache_dir)
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._client = client
         self._max_bytes = max_bytes
+        self._delay = delay
 
     def _path_for(self, url: str) -> Path:
         return self._cache_dir / f"{hashlib.sha256(url.encode('utf-8')).hexdigest()}.html"
 
     def _download(self, url: str) -> str:
+        # Politeness, on cache misses only: a book scan is 130+ requests against a public
+        # API we do not own. Cache hits must stay free, so this belongs here and not in `get`.
+        if self._delay:
+            time.sleep(self._delay)
         last_status: int | None = None
         for attempt in range(MAX_ATTEMPTS):
             try:
