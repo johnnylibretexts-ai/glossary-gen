@@ -35,12 +35,27 @@ def test_scored_term_slug_is_derived_from_the_term():
 
 def test_scan_record_exposes_the_four_fields_the_ledger_keys_on():
     record = ScanRecord(
-        slug="p-1",
+        subject="p-1",
         page_url="https://x",
         prompt_version="v1",
         model="m",
         generated_at="2026-08-08T00:00:00Z",
         status="ok",
     )
-    for field in ("slug", "prompt_version", "model", "status"):
+    for field in ("subject", "prompt_version", "model", "status"):
         assert hasattr(record, field)
+
+
+def test_scan_record_written_before_the_subject_rename_still_loads():
+    """Scan ledgers predate the rename too, and re-paying for one is a whole book of calls."""
+    record = ScanRecord.model_validate(
+        {
+            "slug": "p-1",
+            "page_url": "https://x",
+            "prompt_version": "v1",
+            "model": "m",
+            "generated_at": "2026-08-08T00:00:00Z",
+            "status": "ok",
+        }
+    )
+    assert record.subject == "p-1"

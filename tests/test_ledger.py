@@ -6,9 +6,9 @@ from pydantic import BaseModel, ValidationError
 from glossary_gen.ledger import Ledger, LedgerRecord
 
 
-def make_record(slug="recursion", prompt_version="v1", model="gemini-3.5-flash", status="ok"):
+def make_record(subject="recursion", prompt_version="v1", model="gemini-3.5-flash", status="ok"):
     return LedgerRecord(
-        slug=slug,
+        subject=subject,
         term="Recursion",
         prompt_version=prompt_version,
         model=model,
@@ -56,7 +56,7 @@ def test_truncated_final_line_is_skipped_not_fatal(tmp_path):
     path = tmp_path / "run.jsonl"
     Ledger(path).append(make_record())
     with path.open("a", encoding="utf-8") as handle:
-        handle.write('{"slug": "half-writ')
+        handle.write('{"subject": "half-writ')
 
     ledger = Ledger(path)
 
@@ -66,9 +66,9 @@ def test_truncated_final_line_is_skipped_not_fatal(tmp_path):
 
 def test_records_preserves_append_order(tmp_path):
     ledger = Ledger(tmp_path / "run.jsonl")
-    ledger.append(make_record(slug="a"))
-    ledger.append(make_record(slug="b"))
-    assert [r.slug for r in ledger.records()] == ["a", "b"]
+    ledger.append(make_record(subject="a"))
+    ledger.append(make_record(subject="b"))
+    assert [r.subject for r in ledger.records()] == ["a", "b"]
 
 
 def test_error_status_round_trips(tmp_path):
@@ -83,7 +83,7 @@ def test_error_status_round_trips(tmp_path):
 def test_invalid_status_rejected_at_construction():
     with pytest.raises(ValidationError):
         LedgerRecord(
-            slug="test",
+            subject="test",
             term="Test",
             prompt_version="v1",
             model="gemini-3.5-flash",
@@ -106,7 +106,7 @@ def test_invalid_status_skipped_on_reload(tmp_path):
         handle.write(
             json.dumps(
                 {
-                    "slug": "bad-status",
+                    "subject": "bad-status",
                     "term": "Bad",
                     "prompt_version": "v1",
                     "model": "gemini-3.5-flash",
@@ -126,7 +126,7 @@ def test_invalid_status_skipped_on_reload(tmp_path):
 
     assert ledger.skipped_lines == 1
     assert len(ledger.records()) == 1
-    assert ledger.records()[0].slug == "recursion"
+    assert ledger.records()[0].subject == "recursion"
 
 
 def test_served_by_model_round_trips(tmp_path):
@@ -147,8 +147,8 @@ def test_llm_error_record_does_not_count_as_done(tmp_path):
 
 def test_fetch_error_and_no_excerpt_records_do_not_count_as_done(tmp_path):
     ledger = Ledger(tmp_path / "run.jsonl")
-    ledger.append(make_record(slug="a", status="fetch_error"))
-    ledger.append(make_record(slug="b", status="no_excerpt"))
+    ledger.append(make_record(subject="a", status="fetch_error"))
+    ledger.append(make_record(subject="b", status="no_excerpt"))
     assert not ledger.has("a", "v1", "gemini-3.5-flash")
     assert not ledger.has("b", "v1", "gemini-3.5-flash")
 
@@ -177,7 +177,7 @@ def test_served_by_model_defaults_to_empty_when_not_set(tmp_path):
         handle.write(
             json.dumps(
                 {
-                    "slug": "old-record",
+                    "subject": "old-record",
                     "term": "Old",
                     "prompt_version": "v1",
                     "model": "gemini-3.5-flash",
@@ -198,8 +198,49 @@ def test_served_by_model_defaults_to_empty_when_not_set(tmp_path):
     assert reloaded.served_by_model == ""
 
 
+def test_ledger_written_before_the_subject_rename_still_counts_as_done(tmp_path):
+    """A row keyed `slug` predates the rename to `subject` and must still resume.
+
+    If the old name stopped validating, every such row would be counted as an unreadable
+    line — which `Ledger` treats as not-done — and a resumed run would pay to generate
+    every term in the book again.
+    """
+    path = tmp_path / "run.jsonl"
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "slug": "recursion",
+                    "term": "Recursion",
+                    "prompt_version": "v1",
+                    "model": "gemini-3.5-flash",
+                    "provider": "gemini",
+                    "generated_at": "2026-08-07T00:00:00Z",
+                    "status": "ok",
+                    "definition": "A function calling itself.",
+                }
+            )
+            + "\n"
+        )
+
+    ledger = Ledger(path)
+
+    assert ledger.skipped_lines == 0
+    assert ledger.records()[0].subject == "recursion"
+    assert ledger.has("recursion", "v1", "gemini-3.5-flash")
+
+
+def test_appended_records_are_written_under_the_new_name(tmp_path):
+    """Reading `slug` is a concession to old files; writing it is not."""
+    path = tmp_path / "run.jsonl"
+    Ledger(path).append(make_record())
+    written = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    assert written["subject"] == "recursion"
+    assert "slug" not in written
+
+
 class _OtherRecord(BaseModel):
-    slug: str
+    subject: str
     prompt_version: str
     model: str
     status: str
@@ -210,7 +251,7 @@ def test_ledger_stores_a_custom_record_type(tmp_path):
     path = tmp_path / "scan.jsonl"
     ledger = Ledger(path, record_cls=_OtherRecord)
     ledger.append(
-        _OtherRecord(slug="p-1", prompt_version="v1", model="m", status="ok", n_proposed=3)
+        _OtherRecord(subject="p-1", prompt_version="v1", model="m", status="ok", n_proposed=3)
     )
 
     reloaded = Ledger(path, record_cls=_OtherRecord)

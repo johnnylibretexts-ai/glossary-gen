@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field
 
+from glossary_gen.ledger import SUBJECT_ALIAS
 from glossary_gen.models import slugify
 
 ScanStatus = Literal["ok", "fetch_error", "llm_error"]
@@ -60,13 +61,16 @@ class ScoredTerm(BaseModel):
 class ScanRecord(BaseModel):
     """One ledger row per page.
 
-    `slug` (not `page_slug`) because `Ledger` keys on `record.slug`. A page that defines
-    no terms is `ok` with `n_proposed = 0`, never a distinct status — `Ledger.has()` counts
-    only `ok` as done, so a separate status would re-issue a paid call for every term-free
-    page on every resumed run, forever.
+    The subject here is the page (`slugify(page_url)`); in `LedgerRecord` it is the term.
+    Both producers key on the same field because `Ledger` is generic over whatever one
+    paid call is made about.
+
+    A page that defines no terms is `ok` with `n_proposed = 0`, never a distinct status —
+    `Ledger.has()` counts only `ok` as done, so a separate status would re-issue a paid
+    call for every term-free page on every resumed run, forever.
     """
 
-    slug: str
+    subject: str = Field(validation_alias=SUBJECT_ALIAS)
     page_url: str
     prompt_version: str
     model: str

@@ -18,14 +18,14 @@ MODEL = "gemini-3.5-flash"
 
 
 def make_record(
-    slug="recursion",
+    subject="recursion",
     status="ok",
     definition="A function calling itself.",
     prompt_version=PROMPT_VERSION,
     model=MODEL,
 ):
     return LedgerRecord(
-        slug=slug,
+        subject=subject,
         term="Recursion",
         prompt_version=prompt_version,
         model=model,
@@ -54,7 +54,7 @@ def write(path, records, book=BOOK, *, prompt_version=PROMPT_VERSION, model=MODE
     tests don't have to restate the scoping args they aren't exercising.
     """
     if slugs is None:
-        slugs = {r.slug for r in records}
+        slugs = {r.subject for r in records}
     return write_csv(path, records, book, prompt_version=prompt_version, model=model, slugs=slugs)
 
 

@@ -336,7 +336,7 @@ def test_resumed_run_already_over_budget_aborts_without_calling_client(tmp_path)
     prior_ledger = Ledger(ledger_path)
     prior_ledger.append(
         LedgerRecord(
-            slug="already-done",
+            subject="already-done",
             term="Already Done",
             prompt_version="v1",
             model="gemini-3.5-flash",

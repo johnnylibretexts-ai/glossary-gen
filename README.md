@@ -373,8 +373,9 @@ or two models, run each to a different `--out` path.
 
 **Give every book its own `--ledger` path.** Pointing `--ledger` at a file that already
 holds another book's terms keeps that book's rows out of this CSV — *unless the two books
-share a term*. The ledger key is `(slug, prompt_version, model)` and carries no book
-identity, so for a slug present in both books the lookup counts it as already done, skips
+share a term*. The ledger key is `(subject, prompt_version, model)` — where the subject is
+the term's slug — and carries no book identity, so for a slug present in both books the
+lookup counts it as already done, skips
 regeneration, and the CSV emits the first book's definition stamped with this book's
 `library` / `coverID` / `bookId`. A separate ledger per book avoids this entirely.
 

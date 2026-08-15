@@ -12,7 +12,7 @@ PAGE = Page(
         Block(kind="paragraph", text="Recursion is a technique where a function calls itself."),
     ),
 )
-# A distinct URL (and therefore a distinct ledger slug) from PAGE. A real book never
+# A distinct URL (and therefore a distinct ledger subject) from PAGE. A real book never
 # produces two pages with the same URL — reusing PAGE for a second slot in a list would
 # silently test "one page listed twice" instead of "two pages", which is a different
 # (and undefined) scenario for the resume-key logic.

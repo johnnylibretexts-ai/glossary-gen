@@ -4,13 +4,18 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import AliasChoices, BaseModel, Field, ValidationError
 
 Status = Literal["ok", "no_excerpt", "fetch_error", "llm_error"]
 
+# Ledgers written before `slug` was renamed to `subject` are still read. Dropping the old
+# name would fail validation on every existing row, and an unreadable row is counted as
+# not-done — silently re-paying for work already finished. New rows are written `subject`.
+SUBJECT_ALIAS = AliasChoices("subject", "slug")
+
 
 class LedgerRecord(BaseModel):
-    slug: str
+    subject: str = Field(validation_alias=SUBJECT_ALIAS)
     term: str
     prompt_version: str
     model: str
@@ -33,7 +38,11 @@ class LedgerRecord(BaseModel):
 
 
 class Ledger:
-    """Append-only JSONL run log, keyed by (slug, prompt_version, model).
+    """Append-only JSONL run log, keyed by (subject, prompt_version, model).
+
+    A *subject* is the thing one paid model call is made about: a term when generating
+    definitions, a page when scanning for them. It is named for the role, not for either
+    producer's own vocabulary, because both key on the same field.
 
     A partially written final line is skipped rather than fatal, so a crash mid-append
     costs one term instead of the run.
@@ -46,7 +55,7 @@ class Ledger:
 
     The record type is a constructor parameter so a second producer (the scanner) can
     reuse the resume and crash-tolerance behaviour with a page-shaped record. Any record
-    type must expose `slug`, `prompt_version`, `model`, and `status`, because those four
+    type must expose `subject`, `prompt_version`, `model`, and `status`, because those four
     are what keying and completion are computed from.
     """
 
@@ -60,8 +69,8 @@ class Ledger:
         self._load()
 
     @staticmethod
-    def _key(slug: str, prompt_version: str, model: str) -> tuple[str, str, str]:
-        return (slug, prompt_version, model)
+    def _key(subject: str, prompt_version: str, model: str) -> tuple[str, str, str]:
+        return (subject, prompt_version, model)
 
     def _load(self) -> None:
         if not self._path.exists():
@@ -76,21 +85,21 @@ class Ledger:
                 continue
             self._records.append(record)
             if record.status == "ok":
-                self._ok_keys.add(self._key(record.slug, record.prompt_version, record.model))
+                self._ok_keys.add(self._key(record.subject, record.prompt_version, record.model))
 
-    def has(self, slug: str, prompt_version: str, model: str) -> bool:
+    def has(self, subject: str, prompt_version: str, model: str) -> bool:
         """True only when a successful ('ok') record already exists for this key.
 
         A failed attempt does not count as done: it must be retried, not skipped.
         """
-        return self._key(slug, prompt_version, model) in self._ok_keys
+        return self._key(subject, prompt_version, model) in self._ok_keys
 
     def append(self, record: BaseModel) -> None:
         with self._path.open("a", encoding="utf-8") as handle:
             handle.write(record.model_dump_json() + "\n")
         self._records.append(record)
         if record.status == "ok":
-            self._ok_keys.add(self._key(record.slug, record.prompt_version, record.model))
+            self._ok_keys.add(self._key(record.subject, record.prompt_version, record.model))
 
     def records(self) -> list[BaseModel]:
         return list(self._records)

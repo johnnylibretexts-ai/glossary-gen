@@ -158,7 +158,7 @@ def execute(
         failed_pages: list[str] = []
         pages = collect_pages(term, cache, failed_pages)
         base = {
-            "slug": term.slug,
+            "subject": term.slug,
             "term": term.term,
             "prompt_version": prompt_version,
             "model": client.model,

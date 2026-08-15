@@ -146,8 +146,8 @@ def execute(
         tokens_out_spent = 0
 
     for page in pages:
-        slug = slugify(page.url)
-        if ledger.has(slug, prompt_version, client.model):
+        subject = slugify(page.url)
+        if ledger.has(subject, prompt_version, client.model):
             summary.skipped += 1
             continue
 
@@ -165,7 +165,7 @@ def execute(
                 break
 
         base = {
-            "slug": slug,
+            "subject": subject,
             "page_url": page.url,
             "prompt_version": prompt_version,
             "model": client.model,

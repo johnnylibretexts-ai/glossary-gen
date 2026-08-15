@@ -106,7 +106,7 @@ def write_csv(
     run's CSV when it is `ok` AND matches this run's declared `prompt_version` and
     `model` (the chain's DECLARED primary — see `ledger.py`, not `served_by_model`,
     since filtering on the serving model would drop fallback-served rows) AND its
-    slug is one of this run's terms.
+    subject is one of this run's terms.
     """
     slug_set = set(slugs)
     usable = [
@@ -115,7 +115,7 @@ def write_csv(
         if record.status == "ok"
         and record.prompt_version == prompt_version
         and record.model == model
-        and record.slug in slug_set
+        and record.subject in slug_set
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:

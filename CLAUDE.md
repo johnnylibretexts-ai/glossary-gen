@@ -19,5 +19,4 @@ The five canonical roles, unchanged (`needs-triage`, `needs-info`, `ready-for-ag
 ### Domain docs
 
 Single-context — root `CONTEXT.md` is the project glossary and is the authority on domain
-wording. `docs/adr/` does not exist yet; `/domain-modeling` creates it lazily. See
-`docs/agents/domain.md`.
+wording; `docs/adr/` records decisions not to re-litigate. See `docs/agents/domain.md`.
