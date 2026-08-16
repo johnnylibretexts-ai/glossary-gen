@@ -4,6 +4,7 @@ import pytest
 from glossary_gen.cli import (
     RunSummary,
     actual_cost,
+    build_client,
     build_parser,
     estimate_cost,
     execute,
@@ -507,3 +508,26 @@ def test_resumed_run_already_over_budget_aborts_without_calling_client(tmp_path)
     assert summary.aborted is True
     assert summary.ok == 0
     assert client.calls == 0
+
+
+def test_build_client_preserves_the_ledger_keys(monkeypatch):
+    """Wrapping must not change `name`/`model` — they key every existing ledger."""
+    monkeypatch.setenv("GLOSSARY_GEN_GEMINI_API_KEY", "test-key")
+    monkeypatch.delenv("GLOSSARY_GEN_OPENAI_BASE_URL", raising=False)
+    args = build_parser().parse_args(["--input", "index.json"])
+    client = build_client(args)
+    assert client.name == "gemini"
+    assert client.model == "gemini-3.5-flash"
+
+
+def test_build_client_wraps_every_provider_in_the_retry_policy(monkeypatch):
+    """Pins the wiring itself: an unwrapped provider silently never backs off.
+
+    Reaches into the chain because there is no public way to observe composition, and
+    the alternative is that the one line carrying this whole change has no test.
+    """
+    monkeypatch.setenv("GLOSSARY_GEN_GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("GLOSSARY_GEN_OPENAI_BASE_URL", "http://localhost:11434/v1")
+    args = build_parser().parse_args(["--input", "index.json"])
+    chain = build_client(args)
+    assert [type(c).__name__ for c in chain._clients] == ["RetryingClient", "RetryingClient"]

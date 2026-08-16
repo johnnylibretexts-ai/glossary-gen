@@ -22,6 +22,7 @@ from glossary_gen.llm import (
     LLMError,
     OpenAICompatClient,
     ProviderChain,
+    RetryingClient,
 )
 from glossary_gen.models import Book, Page, Term
 
@@ -103,7 +104,10 @@ def build_client(args: argparse.Namespace) -> LLMClient:
             "no provider configured: set GLOSSARY_GEN_GEMINI_API_KEY "
             "or GLOSSARY_GEN_OPENAI_BASE_URL"
         )
-    return ProviderChain(clients)
+    # Wrapped here, once, so a provider added later gets the retry policy by being listed
+    # above and never has to implement it. `RetryingClient` forwards `name`/`model`, so the
+    # chain's ledger keys are exactly what they were before it existed. See ADR-0003.
+    return ProviderChain([RetryingClient(client) for client in clients])
 
 
 def execute(

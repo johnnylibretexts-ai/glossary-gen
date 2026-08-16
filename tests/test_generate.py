@@ -3,9 +3,11 @@ import pytest
 from glossary_gen.generate import build_prompt, generate_entry, load_prompt, prompt_versions
 from glossary_gen.llm import (
     LLMResult,
+    LLMRetryableError,
     LLMStructuredOutputError,
     LLMTransportError,
     RawResult,
+    RetryingClient,
     parse_entry,
 )
 from glossary_gen.models import Excerpt, GlossaryEntry, Term
@@ -30,6 +32,10 @@ class ScriptedClient:
         outcome = self._outcomes.pop(0)
         if isinstance(outcome, Exception):
             raise outcome
+        if isinstance(outcome, RawResult):
+            # A reply that arrived and was billed, whatever its text says. The only way to
+            # script "the provider charged us for prose", which an exception cannot express.
+            return outcome
         # A non-exception outcome stands for a provider reply that parses cleanly, so
         # render the scripted entry back out as the JSON a provider would have sent.
         return RawResult(
@@ -225,3 +231,40 @@ def test_generate_entry_rejects_empty_excerpts():
     with pytest.raises(ValueError, match="no excerpts"):
         generate_entry(client, load_prompt("v1"), TERM, [])
     assert client.prompts == []
+
+
+def test_a_rate_limited_provider_is_waited_out_and_a_bad_reply_is_not():
+    """The two retry loops compose without either learning about the other. ADR-0003.
+
+    One term, three requests: refused (the transport waits), malformed (generate_entry
+    retries immediately), then good. Exactly one wait, and every billed request charged.
+    """
+    waits = []
+    inner = ScriptedClient(
+        [
+            LLMRetryableError("scripted: HTTP 429", status_code=429, retry_after=4.0),
+            RawResult(
+                text="I'm afraid I can't do that.",
+                model="test-model",
+                provider="scripted",
+                tokens_in=3,
+                tokens_out=1,
+            ),
+            LLMResult(
+                entry=GlossaryEntry(definition="A function calling itself."),
+                model="test-model",
+                provider="scripted",
+                tokens_in=10,
+                tokens_out=5,
+            ),
+        ]
+    )
+    client = RetryingClient(inner, sleep=waits.append, report=lambda message: None)
+
+    result = generate_entry(client, "{term} {aliases} {excerpts}", TERM, EXCERPTS)
+
+    assert result.entry.definition == "A function calling itself."
+    assert waits == [4.0]
+    # The refused request was never billed; the prose reply was. Both billed attempts are
+    # charged, or a resumed run reseeds its ceiling from an understated ledger row.
+    assert (result.tokens_in, result.tokens_out) == (13, 6)
