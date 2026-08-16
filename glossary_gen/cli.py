@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 from collections.abc import Sequence
@@ -26,11 +25,19 @@ from glossary_gen.llm import (
 )
 from glossary_gen.models import Book, Page, Term
 
+from glossary_gen.run import (
+    Attempt,
+    ModelCall,
+    # Moved to `run`, which is what prices real spend, and re-exported here because callers
+    # import it from this module. Moving a name is not a reason to break them.
+    actual_cost,  # noqa: F401
+    execute_run,
+    load_prices,
+)
+
 EXIT_OK = 0
 EXIT_INPUT_ERROR = 2
 EXIT_RUN_ABORTED = 3
-
-PRICES_PATH = Path(__file__).parent / "prices.json"
 
 # Rough per-term shape used only for the pre-run estimate.
 EST_TOKENS_IN = 1200
@@ -58,12 +65,6 @@ class RunSummary:
     aborted: bool = False
 
 
-def load_prices(path: Path = PRICES_PATH) -> dict[str, dict[str, float]]:
-    if not path.is_file():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
 def estimate_cost(model: str, term_count: int, prices: dict[str, dict[str, float]]) -> float | None:
     """USD estimate from the flat per-term guess, or None when the model has no configured
     price. For the pre-run gate only, where no actuals exist yet — see `actual_cost` for
@@ -76,16 +77,6 @@ def estimate_cost(model: str, term_count: int, prices: dict[str, dict[str, float
         EST_TOKENS_IN * entry["input_per_mtok"] + EST_TOKENS_OUT * entry["output_per_mtok"]
     ) / 1_000_000
     return per_term * term_count
-
-
-def actual_cost(
-    model: str, tokens_in: int, tokens_out: int, prices: dict[str, dict[str, float]]
-) -> float | None:
-    """USD cost of tokens already spent, or None when the model has no configured price."""
-    entry = prices.get(model)
-    if not entry:
-        return None
-    return (tokens_in * entry["input_per_mtok"] + tokens_out * entry["output_per_mtok"]) / 1_000_000
 
 
 def _now() -> str:
@@ -126,35 +117,14 @@ def execute(
     max_consecutive_failures: int = 5,
     budget_usd: float | None = None,
 ) -> RunSummary:
-    """Generate one entry per term, recording every outcome in the ledger."""
+    """Generate one entry per term, recording every outcome in the ledger.
+
+    An adapter over `execute_run`: everything about spend, resumption and stopping lives
+    there, and everything about what a term's row contains lives here.
+    """
     summary = RunSummary()
-    consecutive_failures = 0
-    # Loaded once, not per term: prices.json doesn't change mid-run.
-    prices = load_prices()
-    # Seeded from the ledger, not zero: --budget-usd is a ceiling on TOTAL spend across
-    # resumes of this ledger file, not per-invocation. Without this, a resumed run's
-    # counters restart at zero and the ceiling can be crossed once per resume.
-    if budget_usd is not None:
-        tokens_in_spent = sum(r.tokens_in for r in ledger.records())
-        tokens_out_spent = sum(r.tokens_out for r in ledger.records())
-    else:
-        tokens_in_spent = 0
-        tokens_out_spent = 0
 
-    for term in terms:
-        if ledger.has(term.slug, prompt_version, client.model):
-            summary.skipped += 1
-            continue
-
-        if budget_usd is not None:
-            spent_so_far = actual_cost(client.model, tokens_in_spent, tokens_out_spent, prices)
-            if spent_so_far is not None and spent_so_far > budget_usd:
-                # Already over budget before doing any work this term — e.g. a resumed
-                # run whose prior spend alone exceeds the ceiling. Abort without
-                # spending anything further (no fetch, no LLM call).
-                summary.aborted = True
-                break
-
+    def attempt(term: Term) -> Attempt:
         failed_pages: list[str] = []
         pages = collect_pages(term, cache, failed_pages)
         base = {
@@ -167,61 +137,49 @@ def execute(
             "pages": list(term.pages),
         }
 
+        # Unfetchable pages and pages with no usable excerpt both end the term before any
+        # model is asked about it. They cost nothing, and they say nothing about whether the
+        # provider is healthy, so `NOT_MADE` leaves the failure counter exactly as it was.
         if not pages:
-            ledger.append(LedgerRecord(**base, status="fetch_error", error="; ".join(failed_pages)))
             summary.fetch_error += 1
-            continue
+            return Attempt(
+                record=LedgerRecord(**base, status="fetch_error", error="; ".join(failed_pages)),
+                model_call=ModelCall.NOT_MADE,
+            )
 
         excerpts = excerpts_for_term(pages, term)
         if not excerpts:
-            ledger.append(LedgerRecord(**base, status="no_excerpt"))
             summary.no_excerpt += 1
-            continue
+            return Attempt(
+                record=LedgerRecord(**base, status="no_excerpt"),
+                model_call=ModelCall.NOT_MADE,
+            )
 
         try:
             result = generate_entry(client, template, term, excerpts)
         except LLMError as exc:  # base class of LLMTransportError and LLMStructuredOutputError
             # A failed term still cost real, billed tokens: every attempt that reached a
-            # reply was a paid call, even though it ended in a schema error and got
-            # retried. `generate_entry` attaches the accumulated total to
-            # `LLMStructuredOutputError`. A bare `LLMTransportError` never gets that far
-            # (raised before any reply exists), so `getattr` with a 0 default is correct
-            # there, not a workaround. Both the running counters (ceiling correctness
-            # within THIS run) and the ledger row (ceiling correctness across a RESUMED
-            # run, whose seeding sums every record) must see this spend, or --budget-usd
-            # is blind to it.
-            failed_tokens_in = getattr(exc, "tokens_in", 0)
-            failed_tokens_out = getattr(exc, "tokens_out", 0)
-            tokens_in_spent += failed_tokens_in
-            tokens_out_spent += failed_tokens_out
-            ledger.append(
-                LedgerRecord(
+            # reply was a paid call, even though it ended in a schema error and got retried.
+            # `generate_entry` attaches the accumulated total to `LLMStructuredOutputError`.
+            # A bare `LLMTransportError` never gets that far (raised before any reply
+            # exists), so `getattr` with a 0 default is correct there, not a workaround.
+            # The counts go on the record because that is what the run charges.
+            summary.llm_error += 1
+            return Attempt(
+                record=LedgerRecord(
                     **base,
                     status="llm_error",
                     error=str(exc),
-                    tokens_in=failed_tokens_in,
-                    tokens_out=failed_tokens_out,
-                )
+                    tokens_in=getattr(exc, "tokens_in", 0),
+                    tokens_out=getattr(exc, "tokens_out", 0),
+                ),
+                model_call=ModelCall.FAILED,
             )
-            summary.llm_error += 1
-            consecutive_failures += 1
-            if consecutive_failures >= max_consecutive_failures:
-                summary.aborted = True
-                break
-            # Mirrors the success branch's bottom-of-loop check. The next iteration's
-            # top-of-loop check would catch this spend — but only if there IS a next
-            # term, so without this a run whose final term blows the ceiling exits 0.
-            if budget_usd is not None:
-                spent = actual_cost(client.model, tokens_in_spent, tokens_out_spent, prices)
-                if spent is not None and spent > budget_usd:
-                    summary.aborted = True
-                    break
-            continue
 
-        consecutive_failures = 0
+        summary.ok += 1
         entry = result.entry
-        ledger.append(
-            LedgerRecord(
+        return Attempt(
+            record=LedgerRecord(
                 # `model` stays the chain's DECLARED primary (already in `base`) so the
                 # resume key matches what ledger.has() looks up. `served_by_model` records
                 # which model actually answered. Overriding `model` here would write a
@@ -240,18 +198,22 @@ def execute(
                 excerpt_chars=sum(len(e.text) for e in excerpts),
                 tokens_in=result.tokens_in,
                 tokens_out=result.tokens_out,
-            )
+            ),
+            model_call=ModelCall.ANSWERED,
         )
-        summary.ok += 1
-        tokens_in_spent += result.tokens_in
-        tokens_out_spent += result.tokens_out
 
-        if budget_usd is not None:
-            spent = actual_cost(client.model, tokens_in_spent, tokens_out_spent, prices)
-            if spent is not None and spent > budget_usd:
-                summary.aborted = True
-                break
-
+    outcome = execute_run(
+        terms,
+        ledger,
+        subject_of=lambda term: term.slug,
+        attempt=attempt,
+        prompt_version=prompt_version,
+        model=client.model,
+        budget_usd=budget_usd,
+        max_consecutive_failures=max_consecutive_failures,
+    )
+    summary.skipped = outcome.skipped
+    summary.aborted = outcome.aborted
     return summary
 
 

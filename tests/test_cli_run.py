@@ -181,6 +181,32 @@ def test_consecutive_failure_counter_resets_on_success(tmp_path):
     assert summary.ok == 1
 
 
+def test_a_term_with_no_excerpt_neither_trips_nor_clears_the_failure_counter(tmp_path):
+    """A subject the model was never asked about says nothing about the model's health.
+
+    The counter exists to stop paying a broken provider. A term whose pages yield no excerpt
+    costs nothing and never reaches the client, so it must leave the count where it found it
+    — not incrementing it (this is no provider failure) and not clearing it (this is no
+    evidence the provider recovered). The same holds for an unfetchable page.
+
+    Two failures either side of an excerpt-less term must therefore still stop on the third.
+    Were the skip to clear the count, the run would pay for a fourth — which is exactly what
+    a two-valued outcome would do, so this is pinned before the run is extracted rather than
+    after.
+    """
+    routes = {f"https://eng.libretexts.org/p{i}": HTML_HIT for i in range(5)}
+    routes["https://eng.libretexts.org/p2"] = HTML_MISS  # fetches fine, mentions no term
+    terms = [term(f"t{i}", f"https://eng.libretexts.org/p{i}") for i in range(5)]
+    client = StubClient([LLMTransportError("down")] * 4)
+
+    summary = run_execute(tmp_path, terms, routes, client, max_consecutive_failures=3)
+
+    assert summary.aborted is True
+    assert summary.llm_error == 3
+    assert summary.no_excerpt == 1
+    assert client.calls == 3  # the fifth term was never reached
+
+
 def test_estimate_cost_returns_none_for_unpriced_model():
     assert estimate_cost("mystery-model", 100, load_prices()) is None
 

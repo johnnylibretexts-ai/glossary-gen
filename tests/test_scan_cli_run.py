@@ -299,5 +299,34 @@ def test_a_transport_error_records_zero_tokens_without_crashing(tmp_path):
     assert record.tokens_out == 0
 
 
+def test_an_empty_article_neither_trips_nor_clears_the_failure_counter(tmp_path):
+    """The generator's twin: a page with no article is skipped before any paid call, so it
+    must be transparent to the consecutive-failure counter — neither a provider failure nor
+    evidence of recovery. Two failures either side of one must still stop on the third.
+
+    Pinned before the run is extracted, because a two-valued outcome cannot express
+    "untouched" and would silently buy a fourth failed call.
+    """
+    pages = [
+        Page(url=f"https://eng.libretexts.org/p{i}", blocks=() if i == 2 else PAGE.blocks)
+        for i in range(5)
+    ]
+    client = _TransportFailClient()
+
+    summary = execute(
+        pages,
+        client,
+        _ledger(tmp_path),
+        load_scan_prompt("v1"),
+        "v1",
+        max_consecutive_failures=3,
+    )
+
+    assert summary.aborted is True
+    assert summary.llm_error == 3
+    assert summary.empty_pages == 1
+    assert client.calls == 3  # the fifth page was never reached
+
+
 def test_estimate_scan_cost_returns_none_for_an_unpriced_model():
     assert estimate_scan_cost("no-such-model", 100, {}) is None
