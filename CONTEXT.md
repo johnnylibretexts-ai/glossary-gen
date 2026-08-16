@@ -95,6 +95,11 @@ _Avoid_: origin pages, cited pages
 
 ### Spend and resumption
 
+**Run**:
+One pass over a list of subjects, paying for each that is not already done. A run stops early if
+its spend ceiling is crossed or the model fails repeatedly; a later run resumes it from the ledger.
+_Avoid_: job, batch, session, invocation
+
 **Subject**:
 The thing one paid model call is made about — a term when writing definitions, a page when
 discovering them. What the ledger is keyed on.
