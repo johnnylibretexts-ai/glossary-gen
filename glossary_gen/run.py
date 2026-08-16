@@ -25,8 +25,13 @@ def actual_cost(
     """USD cost of tokens already spent, or None when the model has no configured price.
 
     Lives here because the run is the only thing that prices real spend: the estimators in
-    each CLI price a guess, before any tokens exist. A None means the ceiling cannot be
-    enforced, and a ceiling that cannot be enforced must never read as "under budget".
+    each CLI price a guess, before any tokens exist.
+
+    A None means the model has no configured price, so no ceiling can be computed — and the
+    run treats that as "do not trip", never as "over budget". Reversing that would abort
+    every run against a model missing from prices.json, on its first subject. The guard
+    against silently ignoring a ceiling is not here: both CLIs refuse to start when
+    --budget-usd is given for a model they cannot price.
     """
     entry = prices.get(model)
     if not entry:
@@ -71,7 +76,10 @@ def execute_run[T](
     ledger: Ledger,
     *,
     subject_of: Callable[[T], str],
-    attempt: Callable[[T], Attempt],
+    # Handed the subject the run keyed on, so the producer never recomputes it. Two
+    # independent computations that must agree are one edit away from not agreeing, and a
+    # row written under a key `ledger.has()` cannot match is re-paid for on every resume.
+    attempt: Callable[[T, str], Attempt],
     prompt_version: str,
     model: str,
     budget_usd: float | None = None,
@@ -91,6 +99,8 @@ def execute_run[T](
         if budget_usd is None:
             return False
         spent = actual_cost(model, tokens_in_spent, tokens_out_spent, prices)
+        # `actual_cost` returns None for an unpriced model; that must not read as "over
+        # budget", because a ceiling that cannot be computed must not abort the run.
         return spent is not None and spent > budget_usd
 
     for item in items:
@@ -106,7 +116,7 @@ def execute_run[T](
             result.aborted = True
             break
 
-        outcome = attempt(item)
+        outcome = attempt(item, subject)
         # Appended before anything else happens, so a crash costs one subject rather than
         # the run. Charged from that same record, so what was billed and what was written
         # down can never disagree.
@@ -116,12 +126,15 @@ def execute_run[T](
 
         # Three states, and `NOT_MADE` is deliberately neither branch: a subject the model
         # was never asked about is not a failure, and is not evidence the provider recovered.
-        if outcome.model_call is ModelCall.FAILED:
+        # Compared by value, not identity: `ModelCall` is a StrEnum precisely so a producer
+        # may hand back a plain "failed", and `is` would match neither branch — leaving the
+        # counter dead and the run paying its way through a whole book against an outage.
+        if outcome.model_call == ModelCall.FAILED:
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
                 result.aborted = True
                 break
-        elif outcome.model_call is ModelCall.ANSWERED:
+        elif outcome.model_call == ModelCall.ANSWERED:
             consecutive_failures = 0
 
         # The second of exactly two ceiling checks, and the reason the loop body has no

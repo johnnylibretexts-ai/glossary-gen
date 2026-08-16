@@ -52,11 +52,41 @@ def run(items, ledger, attempt, **kwargs):
     )
 
 
+def test_the_subject_the_run_keys_on_is_the_one_the_producer_records(tmp_path):
+    """One computation, not two that have to agree.
+
+    The run looks a subject up to decide whether to skip it; the producer writes a subject
+    onto the row. Computing those separately means a divergence puts every row under a key
+    `ledger.has()` can never match — so the subject is re-attempted and re-billed on every
+    resume, with no error and no visible symptom. Handing the computed subject to the
+    producer makes them the same value by construction rather than by agreement.
+    """
+    ledger = ledger_at(tmp_path)
+    handed = []
+
+    def attempt(item, subject):
+        handed.append(subject)
+        return Attempt(record=rec(subject), model_call=ModelCall.ANSWERED)
+
+    execute_run(
+        ["Page One", "Page Two"],
+        ledger,
+        subject_of=lambda item: item.lower().replace(" ", "-"),
+        attempt=attempt,
+        prompt_version="v1",
+        model=MODEL,
+    )
+
+    assert handed == ["page-one", "page-two"]
+    assert [r.subject for r in ledger.records()] == ["page-one", "page-two"]
+    assert ledger.has("page-one", "v1", MODEL)  # findable by the key the run used
+
+
 def test_each_subject_is_attempted_and_its_record_appended(tmp_path):
     ledger = ledger_at(tmp_path)
     seen = []
 
-    def attempt(item):
+    def attempt(item, subject):
         seen.append(item)
         return Attempt(record=rec(item), model_call=ModelCall.ANSWERED)
 
@@ -73,7 +103,7 @@ def test_a_subject_already_done_is_never_attempted(tmp_path):
     ledger.append(rec("a"))  # status ok, so `a` is done
     seen = []
 
-    def attempt(item):
+    def attempt(item, subject):
         seen.append(item)
         return Attempt(record=rec(item), model_call=ModelCall.ANSWERED)
 
@@ -94,7 +124,7 @@ def test_the_ceiling_is_seeded_from_the_ledger_not_from_zero(tmp_path):
     ledger.append(rec("already-done", tokens_in=1_000_000))
     seen = []
 
-    def attempt(item):
+    def attempt(item, subject):
         seen.append(item)
         return Attempt(record=rec(item), model_call=ModelCall.ANSWERED)
 
@@ -114,7 +144,7 @@ def test_spend_is_charged_from_the_record_the_producer_wrote(tmp_path):
     ledger = ledger_at(tmp_path)
     seen = []
 
-    def attempt(item):
+    def attempt(item, subject):
         seen.append(item)
         return Attempt(record=rec(item, tokens_in=1_000_000), model_call=ModelCall.ANSWERED)
 
@@ -133,7 +163,7 @@ def test_the_last_subject_crossing_the_ceiling_still_aborts(tmp_path):
     """
     ledger = ledger_at(tmp_path)
 
-    def attempt(item):
+    def attempt(item, subject):
         return Attempt(record=rec(item, tokens_in=1_000_000), model_call=ModelCall.ANSWERED)
 
     result = run(["only"], ledger, attempt, budget_usd=0.01)
@@ -153,7 +183,7 @@ def test_a_resume_with_nothing_left_to_do_is_not_aborted(tmp_path):
     ledger.append(rec("a", tokens_in=1_000_000))
     ledger.append(rec("b", tokens_in=1_000_000))
 
-    def attempt(item):
+    def attempt(item, subject):
         raise AssertionError(f"{item} is already done and must not be attempted")
 
     result = run(["a", "b"], ledger, attempt, budget_usd=0.01)
@@ -167,7 +197,7 @@ def test_the_run_stops_after_n_consecutive_provider_failures(tmp_path):
     ledger = ledger_at(tmp_path)
     seen = []
 
-    def attempt(item):
+    def attempt(item, subject):
         seen.append(item)
         return Attempt(record=rec(item, status="llm_error"), model_call=ModelCall.FAILED)
 
@@ -182,7 +212,7 @@ def test_an_answered_call_clears_the_failure_count(tmp_path):
     ledger = ledger_at(tmp_path)
     seen = []
 
-    def attempt(item):
+    def attempt(item, subject):
         seen.append(item)
         if item == "c":
             return Attempt(record=rec(item), model_call=ModelCall.ANSWERED)
@@ -206,7 +236,7 @@ def test_a_call_that_was_never_made_leaves_the_failure_count_untouched(tmp_path)
     ledger = ledger_at(tmp_path)
     seen = []
 
-    def attempt(item):
+    def attempt(item, subject):
         seen.append(item)
         if item == "c":
             return Attempt(record=rec(item), model_call=ModelCall.NOT_MADE)
@@ -215,4 +245,25 @@ def test_a_call_that_was_never_made_leaves_the_failure_count_untouched(tmp_path)
     result = run(["a", "b", "c", "d", "e"], ledger, attempt, max_consecutive_failures=3)
 
     assert seen == ["a", "b", "c", "d"]  # a(1) b(2) c(still 2) d(3) -> stop
+    assert result.aborted is True
+
+
+def test_a_producer_returning_the_plain_string_still_trips_the_counter(tmp_path):
+    """`ModelCall` is a StrEnum, whose whole purpose is to equal its own string value.
+
+    Compared by identity, `model_call="failed"` would match neither branch: the counter
+    would never increment and the run would walk an entire book against a dead provider,
+    paying for every subject. That failure is silent — no error, no abort, just the bill —
+    so the comparison is by value.
+    """
+    ledger = ledger_at(tmp_path)
+    seen = []
+
+    def attempt(item, subject):
+        seen.append(item)
+        return Attempt(record=rec(item, status="llm_error"), model_call="failed")
+
+    result = run(["a", "b", "c", "d", "e"], ledger, attempt, max_consecutive_failures=3)
+
+    assert seen == ["a", "b", "c"]
     assert result.aborted is True

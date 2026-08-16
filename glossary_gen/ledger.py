@@ -56,7 +56,10 @@ class Ledger:
     The record type is a constructor parameter so a second producer (the scanner) can
     reuse the resume and crash-tolerance behaviour with a page-shaped record. Any record
     type must expose `subject`, `prompt_version`, `model`, and `status`, because those four
-    are what keying and completion are computed from.
+    are what keying and completion are computed from, plus `tokens_in` and `tokens_out`,
+    which are what `run.execute_run` charges against the budget ceiling and re-reads when
+    seeding a resumed run. A record missing the token fields fails on its first subject,
+    after its row is already on disk — so they are part of the contract, not an extra.
     """
 
     def __init__(self, path: Path, record_cls: type[BaseModel] = LedgerRecord) -> None:

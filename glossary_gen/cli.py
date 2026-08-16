@@ -124,11 +124,13 @@ def execute(
     """
     summary = RunSummary()
 
-    def attempt(term: Term) -> Attempt:
+    def attempt(term: Term, subject: str) -> Attempt:
         failed_pages: list[str] = []
         pages = collect_pages(term, cache, failed_pages)
         base = {
-            "subject": term.slug,
+            # The subject the run keyed on, not `term.slug` recomputed: the row must land
+            # under the key `ledger.has()` will look for, or it is re-paid for every resume.
+            "subject": subject,
             "term": term.term,
             "prompt_version": prompt_version,
             "model": client.model,

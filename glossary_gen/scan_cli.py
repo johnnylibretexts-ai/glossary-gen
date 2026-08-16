@@ -137,9 +137,12 @@ def execute(
     """
     summary = ScanSummary()
 
-    def attempt(page: Page) -> Attempt:
+    def attempt(page: Page, subject: str) -> Attempt:
         base = {
-            "subject": slugify(page.url),
+            # The subject the run keyed on, not `slugify(page.url)` computed a second time:
+            # the row must land under the key `ledger.has()` will look for, or the page is
+            # re-scanned and re-paid for on every resume.
+            "subject": subject,
             "page_url": page.url,
             "prompt_version": prompt_version,
             "model": client.model,
