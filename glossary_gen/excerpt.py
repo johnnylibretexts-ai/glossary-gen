@@ -82,21 +82,27 @@ def excerpts_for_term(
     max_excerpts: int = 3,
     max_chars: int = 6000,
     min_chars: int = MIN_EXCERPT_CHARS,
-) -> list[Excerpt]:
-    """Return the highest-ranked paragraphs grounding `term`, across `pages`.
+) -> tuple[list[Excerpt], int]:
+    """Return the highest-ranked paragraphs grounding `term`, and their total length.
 
     Pure: no I/O. Ranking is documented in the module's task contract — paragraphs
     following a matching heading first, then definitional phrasing, then plain mentions.
 
-    Returns `[]` when the selected passages total fewer than `min_chars` characters: too
-    little page text to ground anything is not an excerpt, and the caller reports the term
-    as `no_excerpt` rather than paying for a definition the model would have to invent.
+    The list is empty when the selected passages total fewer than `min_chars` characters:
+    too little page text to ground anything is not an excerpt, and the caller reports the
+    term as `no_excerpt` rather than paying for a definition the model would have to invent.
     `min_chars=0` disables the floor, which is how the ranking tests exercise selection
     without every fixture needing a hundred characters of prose.
+
+    The total is reported either way, and that is the whole reason this returns a pair.
+    An unwritten term's row carries it as `x_excerpt_chars` (ADR-0006), where 0 — the term
+    never matched its own occurrence pages, an index defect — has to be distinguishable
+    from a total just under the floor, which is a book that mentions the term in passing
+    and a judgement for the reviewer rather than a bug.
     """
     needles = [n for n in _needles(term) if n.strip()]
     if not needles:
-        return []
+        return [], 0
     pattern = _pattern(needles)
 
     candidates: list[tuple[int, int, int, Excerpt]] = []
@@ -144,5 +150,5 @@ def excerpts_for_term(
     # Applied to the total, not per passage: several short paragraphs can legitimately add
     # up to enough, and the total is what `x_excerpt_chars` reports to the reviewer.
     if used_chars < min_chars:
-        return []
-    return selected
+        return [], used_chars
+    return selected, used_chars

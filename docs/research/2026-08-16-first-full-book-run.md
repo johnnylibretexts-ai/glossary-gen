@@ -31,13 +31,41 @@ Same tokens on `gemini-3.5-flash` would have cost $0.3626 for the scan alone —
            236 candidates verified, 0 rejected -> 212 terms merged (18 on >1 page)
     gen:   210 ok, 2 no_excerpt, 0 llm_error, 0 fetch_error -> 210 rows
 
-The two `no_excerpt` terms are `init` and `super` — almost certainly mangled `__init__` and
-`super()`, which is a term-extraction question rather than an excerpting one.
+The two `no_excerpt` terms are `init` and `super`.
 
-CSV shape checks, all clean: 21 columns; every row `x_status = needs-review` and
+**Correction, 2026-08-16.** This originally read "almost certainly mangled `__init__` and
+`super()`, which is a term-extraction question rather than an excerpting one." Both halves are
+wrong, and the mistake was reading *slugs* as if they were terms. `out/index.json` holds
+`term='__init__()'` and `term='super()'`, spelled correctly, with `slug='init'` and `slug='super'`
+because slugging strips punctuation — extraction was fine. The real cause was the excerpting bug
+fixed in `d53e235`: `bounded()` wrapped the whole alternation as `\b(a|b)\b`, and a trailing `\b`
+can never match after `)`, so any term ending in punctuation was unmatchable on its own pages.
+
+Re-excerpting both terms from the same ledger under ADR-0006 reports `x_excerpt_chars = 0` — not
+"this book barely discusses `super()`", which would have been a number under the floor, but "the
+term matched nothing at all," which is the signature of an index or matching defect. That is the
+distinction the sidecar exists to make legible, and this pair is its worked example.
+
+CSV shape checks: 21 columns; every row `x_status = needs-review` and
 `x_model = gemini-3.7-flash`; definitions 37–289 characters (median 130); no empty definitions;
-no `addedBy` column; no cell required formula-injection escaping. **13 rows have
+no `addedBy` column. **13 rows have
 `pages != x_source_pages`** — precisely the "worth a human's eye" signal the README describes.
+
+**Correction, 2026-08-16.** This paragraph originally said "all clean" and "no cell required
+formula-injection escaping." The second claim was true and the first was not: **76 cells in
+`out/glossary.csv` hold a lone `'`** where the value should be empty — 47 `x_example`, 15
+`aliases`, 14 `x_related`. `_safe()` tested `value[:1] in _FORMULA_PREFIXES`, and `"" in "=+-@…"`
+is `True` because the empty string is a substring of every string, so every empty cell was
+"escaped" into an apostrophe. The check that missed it looked for cells that *needed* escaping,
+never for cells that got it without asking.
+
+It survived the shape checks because no `ok` row has an empty `definition`, and the columns that
+can be empty are the ones nobody eyeballed. It surfaced only when the unwritten sidecar
+(ADR-0006) made an empty `definition` a normal thing to write, at which point a test asserting
+`row["definition"] == ""` failed against `"'"`. Fixed the same day; the guard now tests
+`value and value[0] in _FORMULA_PREFIXES`. **The numbers above are otherwise unaffected — but
+`out/glossary.csv` as written still contains the 76 bad cells and needs a regeneration to clear
+them.**
 
 ## Finding 1 — the estimator is ~2× high (FIXED 2026-08-16)
 

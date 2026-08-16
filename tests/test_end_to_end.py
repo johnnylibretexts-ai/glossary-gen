@@ -113,6 +113,15 @@ def test_full_run_writes_reviewable_csv(tmp_path, monkeypatch, capsys):
     assert "no_excerpt=1" in printed
     assert "fetch_error=1" in printed
 
+    # The two terms that got no definition are reported beside the CSV, not dropped.
+    unwritten = tmp_path / "out.unwritten.csv"
+    with unwritten.open(encoding="utf-8", newline="") as handle:
+        unwritten_rows = list(csv.DictReader(handle))
+    assert {r["x_status"] for r in unwritten_rows} == {"no_excerpt", "fetch_error"}
+    assert all(r["definition"] == "" for r in unwritten_rows)
+    assert "2 term(s) unwritten" in printed
+    assert str(unwritten) in printed
+
 
 def test_second_run_is_free_and_reproduces_the_csv(tmp_path, monkeypatch, capsys):
     payload = {

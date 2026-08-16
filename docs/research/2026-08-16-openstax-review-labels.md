@@ -274,5 +274,15 @@ itself worth weighing before a fourth attempt.
    1 definitional / 2 mention) is computed in `excerpt.py` and thrown away, and `x_category` /
    `x_related` are already sitting unused in every CSV row.
 2. Whether any number is permitted at all under ADR-0004, or only named observations.
-3. Whether the CSV should stop hiding its `no_excerpt` terms — `write_csv` filters the ledger to
-   `status == "ok"`, so a reviewer cannot see what was already trimmed for them.
+3. ~~Whether the CSV should stop hiding its `no_excerpt` terms~~ — **closed 2026-08-16 by
+   [ADR-0006](../adr/0006-unwritten-terms-are-reported-beside-the-csv.md).** They are reported in
+   a sidecar beside `--out`, not in the import CSV, and the unit is every term with no `ok` row
+   rather than `no_excerpt` alone. This also affects the soundness sheet's provenance: the eight
+   sub-floor rows named above are now visible output rather than terms the tool emits nothing
+   about, so a future labelling pass can reach them from an artifact instead of by diffing the
+   index against the CSV.
+4. Whether the **scanner** should do the same for candidates it rejects on evidence. It discards
+   them outright (see `CONTEXT.md`, Evidence) and writes them nowhere, which is the shape ADR-0006
+   just ruled against one stage downstream. Deliberately not acted on: this run rejected 0 of 236,
+   so there is no measured harm, and building a second sidecar on principle alone is the move
+   ADR-0004 closes by asking for evidence first.

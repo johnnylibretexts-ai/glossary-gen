@@ -107,6 +107,12 @@ A person deciding, term by term, what leaves the CSV for the book's glossary. No
 author, and not assumed to know its subject.
 _Avoid_: editor, user, curator
 
+**Unwritten**:
+A term in the index that a run produced no definition for — its pages yielded too little to ground
+one, would not fetch, or the model failed. Unwritten is not a verdict about the term: it records
+that the tool wrote nothing, never that the term does not belong.
+_Avoid_: skipped (already means resumed past), failed, dropped, missing
+
 **Term fit**:
 Whether a term belongs in this book's glossary at all, which depends on the book's audience.
 Independent of how well its definition came out — a term can fit perfectly and be badly defined.

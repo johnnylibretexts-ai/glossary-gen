@@ -1,3 +1,4 @@
+from glossary_gen.excerpt import MIN_EXCERPT_CHARS
 from glossary_gen.excerpt import excerpts_for_term as _excerpts_for_term
 from glossary_gen.models import Block, Page, Term
 
@@ -8,10 +9,11 @@ def excerpts_for_term(pages, term, **kwargs):
     These exercise *which* paragraphs get picked and in what order, which is unrelated to
     whether there is enough text to write from. Leaving the floor on would force every
     fixture to carry a hundred characters of filler prose and would say nothing extra.
-    The floor's own tests call `_excerpts_for_term` directly.
+    The floor's own tests call `_excerpts_for_term` directly, which is also the only way to
+    see the grounding total the pair carries — selection tests care about the passages.
     """
     kwargs.setdefault("min_chars", 0)
-    return _excerpts_for_term(pages, term, **kwargs)
+    return _excerpts_for_term(pages, term, **kwargs)[0]
 
 
 def para(text):
@@ -134,13 +136,31 @@ def test_refuses_grounding_too_thin_to_write_from():
     """
     page = Page(url="https://a", blocks=(head("Modulo"), para("The % operator.")))
     term = Term(term="Modulo", slug="modulo", aliases=(), pages=("https://a",))
-    assert _excerpts_for_term([page], term) == []
+    assert _excerpts_for_term([page], term)[0] == []
+
+
+def test_reports_the_grounding_total_even_when_it_is_under_the_floor():
+    """How far under the floor a term fell is what the unwritten CSV reports — ADR-0006.
+
+    Zero grounding means the term never matched its own occurrence pages, which is an index
+    defect. A number just under the floor means the book does discuss the term, briefly, and
+    a reviewer may still want it. Reporting both as 0 states a falsehood about the second.
+    """
+    page = Page(url="https://a", blocks=(head("Modulo"), para("The % operator.")))
+    term = Term(term="Modulo", slug="modulo", aliases=(), pages=("https://a",))
+    assert _excerpts_for_term([page], term) == ([], len("The % operator."))
+
+
+def test_reports_zero_grounding_when_the_term_never_matched_its_pages():
+    page = Page(url="https://a", blocks=(para("Nothing relevant on this page at all."),))
+    term = Term(term="Modulo", slug="modulo", aliases=(), pages=("https://a",))
+    assert _excerpts_for_term([page], term) == ([], 0)
 
 
 def test_accepts_grounding_at_the_floor():
     page = Page(url="https://a", blocks=(head("Modulo"), para("M" + "o" * 120)))
     term = Term(term="Modulo", slug="modulo", aliases=(), pages=("https://a",))
-    assert len(_excerpts_for_term([page], term)) == 1
+    assert len(_excerpts_for_term([page], term)[0]) == 1
 
 
 def test_the_floor_counts_total_grounding_not_each_passage():
@@ -154,8 +174,9 @@ def test_the_floor_counts_total_grounding_not_each_passage():
         ),
     )
     term = Term(term="Modulo", slug="modulo", aliases=(), pages=("https://a",))
-    got = _excerpts_for_term([page], term)
-    assert sum(len(e.text) for e in got) >= 100
+    got, chars = _excerpts_for_term([page], term)
+    assert all(len(e.text) < MIN_EXCERPT_CHARS for e in got), "neither clears the floor alone"
+    assert chars >= MIN_EXCERPT_CHARS
     assert len(got) == 2
 
 
