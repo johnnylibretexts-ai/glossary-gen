@@ -24,7 +24,7 @@ from glossary_gen.input import InputError
 from glossary_gen.ledger import Ledger
 from glossary_gen.llm import LLMClient, LLMError
 from glossary_gen.models import Page, slugify
-from glossary_gen.run import PRICES_PATH, actual_cost, load_prices
+from glossary_gen.run import PRICES_PATH, Attempt, ModelCall, execute_run, load_prices
 from glossary_gen.scan.candidates import merge, score_on_page, verify
 from glossary_gen.scan.content import extract_content
 from glossary_gen.scan.emit import EmitError, index_payload, report_payload, write_json
@@ -129,41 +129,17 @@ def execute(
     budget_usd: float | None = None,
     max_consecutive_failures: int = 5,
 ) -> ScanSummary:
-    """Propose, verify, and score one page at a time, recording every outcome."""
+    """Propose, verify, and score one page at a time, recording every outcome.
+
+    An adapter over `execute_run`, which owns spend, resumption and stopping. What stays
+    here is everything specific to a page: what its row holds, and what a scan produces
+    beyond the ledger.
+    """
     summary = ScanSummary()
-    consecutive_failures = 0
-    prices = load_prices()
-    # Seeded from the ledger, not zero: --budget-usd is a ceiling on TOTAL spend across
-    # resumes of this ledger file, matching cli.execute. Without this the ceiling can be
-    # crossed once per resume.
-    if budget_usd is not None:
-        tokens_in_spent = sum(r.tokens_in for r in ledger.records())
-        tokens_out_spent = sum(r.tokens_out for r in ledger.records())
-    else:
-        tokens_in_spent = 0
-        tokens_out_spent = 0
 
-    for page in pages:
-        subject = slugify(page.url)
-        if ledger.has(subject, prompt_version, client.model):
-            summary.skipped += 1
-            continue
-
-        # Checked after the resume check, not before: --budget-usd is a ceiling on SPEND,
-        # and a skipped page spends nothing. If the check ran first, a resumed run whose
-        # ledger already exceeds the ceiling could never finish — not even to skip past
-        # already-`ok` pages and let a human merge/emit what was already paid for. It would
-        # report `aborted` and exit non-zero despite doing (and needing to do) no work at
-        # all. `actual_cost` returns None for an unpriced model; that must not be treated
-        # as "over budget" (a None ceiling never trips).
-        if budget_usd is not None:
-            spent = actual_cost(client.model, tokens_in_spent, tokens_out_spent, prices)
-            if spent is not None and spent > budget_usd:
-                summary.aborted = True
-                break
-
+    def attempt(page: Page) -> Attempt:
         base = {
-            "subject": subject,
+            "subject": slugify(page.url),
             "page_url": page.url,
             "prompt_version": prompt_version,
             "model": client.model,
@@ -174,14 +150,17 @@ def execute(
         # A page whose extracted content has zero blocks (Index, Table of Contents,
         # Detailed Licensing — see scan/content.py) is genuinely contentless: there is
         # nothing for a model to find, so asking anyway is a real paid call that always
-        # returns nothing. Skip it before spending, and record it `ok` (not a new status)
-        # for the same resume reason as a term-free-but-nonempty page: `Ledger.has()`
-        # only counts `ok`, so anything else would re-pay for it on every resumed run.
+        # returns nothing. Recorded `ok` rather than a new status for the same resume
+        # reason as a term-free-but-nonempty page: `Ledger.has()` only counts `ok`, so
+        # anything else would re-pay for it on every resumed run. `NOT_MADE` because no
+        # provider was consulted, so this says nothing about whether one is healthy.
         if not page.blocks:
-            ledger.append(ScanRecord(**base, status="ok", n_proposed=0, n_verified=0))
             summary.ok += 1
             summary.empty_pages += 1
-            continue
+            return Attempt(
+                record=ScanRecord(**base, status="ok", n_proposed=0, n_verified=0),
+                model_call=ModelCall.NOT_MADE,
+            )
 
         try:
             candidates, raw = propose_terms(client, template, page)
@@ -190,34 +169,21 @@ def execute(
             # `complete_raw` was a real provider call, even though it ended in a schema
             # error and got retried. `propose_terms` attaches the accumulated total to
             # `LLMStructuredOutputError`; a bare `LLMTransportError` never gets that far
-            # (raised by `complete_raw` itself, before any reply exists), so `getattr`
-            # with a 0 default is correct there, not a workaround. Both the running
-            # counters (ceiling correctness within THIS run) and the ledger row (ceiling
-            # correctness across a RESUMED run, whose seeding sums every record's
-            # tokens_in/tokens_out) must see this spend, or --budget-usd is blind to it.
-            failed_tokens_in = getattr(exc, "tokens_in", 0)
-            failed_tokens_out = getattr(exc, "tokens_out", 0)
-            tokens_in_spent += failed_tokens_in
-            tokens_out_spent += failed_tokens_out
-            ledger.append(
-                ScanRecord(
+            # (raised by `complete_raw` itself, before any reply exists), so `getattr` with
+            # a 0 default is correct there, not a workaround. The counts go on the record
+            # because that is what the run charges against the ceiling, and what a later
+            # resume re-reads.
+            summary.llm_error += 1
+            return Attempt(
+                record=ScanRecord(
                     **base,
                     status="llm_error",
                     error=str(exc),
-                    tokens_in=failed_tokens_in,
-                    tokens_out=failed_tokens_out,
-                )
+                    tokens_in=getattr(exc, "tokens_in", 0),
+                    tokens_out=getattr(exc, "tokens_out", 0),
+                ),
+                model_call=ModelCall.FAILED,
             )
-            summary.llm_error += 1
-            consecutive_failures += 1
-            if consecutive_failures >= max_consecutive_failures:
-                summary.aborted = True
-                break
-            continue
-
-        consecutive_failures = 0
-        tokens_in_spent += raw.tokens_in
-        tokens_out_spent += raw.tokens_out
 
         verified = [c for c in candidates.terms if verify(c, page)]
         summary.unverified += len(candidates.terms) - len(verified)
@@ -232,11 +198,12 @@ def execute(
                 )
             )
 
+        summary.ok += 1
         # A page that defines nothing is `ok` with n_proposed = 0, never its own status:
         # Ledger.has() counts only `ok`, so a distinct status would re-pay for every
         # term-free page on every resume, forever.
-        ledger.append(
-            ScanRecord(
+        return Attempt(
+            record=ScanRecord(
                 **base,
                 status="ok",
                 n_proposed=len(candidates.terms),
@@ -244,10 +211,22 @@ def execute(
                 served_by_model=raw.model,
                 tokens_in=raw.tokens_in,
                 tokens_out=raw.tokens_out,
-            )
+            ),
+            model_call=ModelCall.ANSWERED,
         )
-        summary.ok += 1
 
+    outcome = execute_run(
+        pages,
+        ledger,
+        subject_of=lambda page: slugify(page.url),
+        attempt=attempt,
+        prompt_version=prompt_version,
+        model=client.model,
+        budget_usd=budget_usd,
+        max_consecutive_failures=max_consecutive_failures,
+    )
+    summary.skipped = outcome.skipped
+    summary.aborted = outcome.aborted
     return summary
 
 

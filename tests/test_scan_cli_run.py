@@ -328,5 +328,26 @@ def test_an_empty_article_neither_trips_nor_clears_the_failure_counter(tmp_path)
     assert client.calls == 3  # the fifth page was never reached
 
 
+def test_a_final_page_that_crosses_the_ceiling_still_aborts(tmp_path):
+    """A top-of-loop ceiling check needs a NEXT page to fire, and the last page has none.
+
+    A scan whose final page crosses --budget-usd used to report success and exit 0, so the
+    overspend was invisible until someone read the ledger. The generator has caught this
+    since a62b3d6; the scanner never has, because its check ran only before each page.
+
+    _FakeClient bills 100 in / 20 out, which is $0.00008 at gemini-3.5-flash rates — over
+    the $0.00 ceiling here, and the page is the only one in the run.
+    """
+    client = _FakeClient([GOOD])
+    client.model = "gemini-3.5-flash"
+
+    summary = execute(
+        [PAGE], client, _ledger(tmp_path), load_scan_prompt("v1"), "v1", budget_usd=0.0
+    )
+
+    assert summary.ok == 1  # the page itself completed
+    assert summary.aborted is True
+
+
 def test_estimate_scan_cost_returns_none_for_an_unpriced_model():
     assert estimate_scan_cost("no-such-model", 100, {}) is None
