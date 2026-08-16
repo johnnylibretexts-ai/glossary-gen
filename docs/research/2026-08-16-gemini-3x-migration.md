@@ -3,16 +3,33 @@
 Companion to [`2026-08-16-gemini-flash-pricing.md`](2026-08-16-gemini-flash-pricing.md), which
 answers what the models *cost*. This one answers what it would take to *call* one.
 
-## Bottom line
+## Bottom line — CORRECTED 2026-08-16, same day
 
-Moving to `gemini-3.7-flash` is **not** a `--model` change. Google's current docs describe a
-different HTTP endpoint (`POST /v1beta/interactions`), a different request body, a different way
-to ask for JSON, and four generation parameters that must be removed — and `GeminiClient` uses the
-older shape for all four. Whether the older shape still works against a 3.x model is **the open
-question**, and this note does not answer it: the docs simply no longer describe it.
+**Moving to `gemini-3.7-flash` is a `--model` change. It already works.** Verified against the
+live API within hours of writing this note:
 
-Nothing here is urgent. `gemini-3.5-flash` works today and a real billed run has been completed
-against it. This is a record of what a migration involves, written before anyone starts one.
+- `GET /v1beta/models` reports `gemini-3.7-flash` with
+  `supportedGenerationMethods: generateContent, countTokens, createCachedContent,
+  batchGenerateContent`. `:generateContent` is not withdrawn.
+- One real request through the **unmodified** `GeminiClient` — `temperature: 0.2` and
+  `responseMimeType: "application/json"` both still sent — returned valid JSON that `parse_entry`
+  accepted (47 in / 142 out, about $0.0006).
+- A full 136-page book scan then ran on `gemini-3.7-flash` with zero `llm_error` rows.
+
+The original conclusion below was wrong, and the way it was wrong is worth keeping. Every *fact*
+in it is accurate: Google really does say to strip `temperature`, and really has stopped
+documenting `responseMimeType` and `:generateContent`. The *inference* — that the old shape must
+therefore be rejected — did not follow. "The docs recommend a new way" is not "the old way is
+refused."
+
+**The lesson: for a live service, the API is a better primary source than its documentation.**
+Both things that settled this were queries to the API itself, and the cheaper one was free. The
+note's own provenance warning called this: two findings rested on an *absence* in summarised doc
+pages, which is the weakest evidence there is.
+
+What survives as true: the Interactions API is the documented direction of travel, so a rewrite
+will be worth doing eventually — just not as a precondition for using a 3.x model. Read the rest
+of this note as a description of that future work, not of a blocker.
 
 ## Provenance, and a warning about it
 
@@ -158,22 +175,41 @@ or give `prices.json` effective dates. The first needs no new machinery.
 
 ## Unverified / could not confirm
 
-- **Whether `:generateContent` still works at all**, for 3.x models or for `gemini-3.5-flash`. The
-  docs no longer describe it; that is not the same as it being switched off, and this repo's own
-  successful billed run is evidence it worked recently for 3.5. Not tested here. **This is the
-  single question that decides whether the migration is small or large.**
-- **Whether a retirement date exists for `:generateContent` or for `gemini-3.5-flash`.** No such
-  date was found. Absence of a notice is not absence of a plan.
-- **What happens when a stripped parameter is sent anyway** — error, warning, or silently ignored.
+*Three entries below were resolved the same day by querying the API; struck through and answered
+rather than deleted, so the reasoning trail survives.*
+
+- ~~**Whether `:generateContent` still works at all**~~ — **ANSWERED: yes.** Listed as supported on
+  `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash` and `gemini-3.5-flash-lite`, and
+  exercised across a full 136-page scan.
+- **Whether a retirement date exists for `:generateContent` or for `gemini-3.5-flash`.** Still no
+  such date found, and `gemini-3.5-flash` is still listed and fully supported. Absence of a notice
+  is not absence of a plan.
+- ~~**What happens when a stripped parameter is sent anyway**~~ — **ANSWERED for `temperature`:**
+  accepted without error by `gemini-3.7-flash`; the reply was valid JSON. Whether it is *honoured*
+  or silently ignored is untested — a determinism check across repeated calls would settle that,
+  and it matters, because `temperature: 0.2` was chosen for stable definitions.
+- ~~**Whether `responseMimeType` still works**~~ — **ANSWERED: yes**, JSON came back and
+  `parse_entry` accepted it. `response_format` with a `schema` remains the better long-term
+  approach, since it moves the contract server-side.
 - **The Interactions API's response shape** — where reply text lives, and where token counts live.
   Both are required before any cost or ledger code could be written against it.
 - **Whether `response_format.schema` is mandatory** or merely shown in every example.
 - Everything in §3 and §4 that rests on a *absence* ("the page does not mention X"), for the
   summariser reason given at the top.
 
-## Suggested next step
+## What was actually done
 
-One real request against a live key would settle most of this for about a cent: call
-`gemini-3.7-flash` via the existing `:generateContent` path and see whether it answers, errors on
-`temperature`, or 404s. That single result decides between "delete one line and change a default"
-and "write a second Gemini client".
+The step suggested here — one real request through the existing `:generateContent` path — was
+taken the same day, preceded by the free `GET /v1beta/models` probe. Between them they cost about
+$0.0006 and answered the note's central question in the opposite direction to its conclusion; see
+the corrected bottom line. `gemini-3.7-flash` then scanned a full 136-page book with no client
+changes at all.
+
+**Remaining work, none of it blocking:**
+
+- Migrate to the Interactions API eventually, since that is the documented direction. Its response
+  shape still needs establishing before any ledger or cost code can be written against it.
+- Check whether `temperature` is *honoured* or merely *tolerated* by 3.x — repeated identical
+  calls, compared. It was chosen for reproducibility, so being silently ignored would matter.
+- Give `prices.json` effective dates, or update `gemini-3.7-flash` / `gemini-3.6-flash` before
+  2027-01-01, when their introductory rate doubles.
