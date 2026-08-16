@@ -170,13 +170,23 @@ than quantities:
   *Shift cipher*, *Panel data*. The book stops to explain the puzzle, not Python, and the scanner
   correctly observes a definition. This is ADR-0004's opposition in its clearest form.
 
-The borderline pile is the more interesting result, because most of it is not a fit problem at
-all: *Modulo*/*Modulus*, *Immutable*/*Immutable object*, *Mutable data type*/*Mutable object*,
-*Computer program*/*Program*, *Repetition*/*Repetition operator*, and *Boolean value*/*Boolean
-variable*/*Bool data type* are **near-duplicate entries that survived merge**. Slug identity keeps
-them apart by design, and no fit signal will ever fix them. If the human pass sees the same thing,
-the reviewer's real burden may be duplication rather than worthiness — which would be a different
-project from the one this note pre-registers, and worth knowing before building either.
+The borderline pile looked at first like a different problem hiding inside this one:
+*Modulo*/*Modulus*, *Immutable*/*Immutable object*, *Mutable data type*/*Mutable object*,
+*Computer program*/*Program*, *Repetition*/*Repetition operator* and *Boolean value*/*Boolean
+variable* read as near-duplicate entries that survived merge, which no fit signal would ever fix.
+
+**Measured, that reading does not hold, and it is corrected here rather than removed.** The
+cheapest rule that could catch any of them — one term's words a strict subset of another's — fires
+on **73 of the 212** and collapses **3 of the 6**. The other 70 are *Function* against *Max
+function*, *Statement* against *If statement*, *Dictionary* against *Nested dictionary*: about
+seventy real terms deleted to collapse three. *Modulo*/*Modulus* and *Mutable data type*/*Mutable
+object* need a rule no string comparison supplies. *Boolean value*/*Boolean variable* are defined
+on the **same page**, which is evidence the book distinguishes them rather than that merge failed.
+
+Clean duplicates come to *Computer program*/*Program* and *Modulo*/*Modulus* — **about 1% of the
+book**, caught by no single rule. Duplication is therefore not the reviewer's burden, and the
+sentence that suggested it was over-read from a pre-pass that was never ground truth. The measured
+version now sits in `merge`'s docstring so the next reader does not re-derive it.
 
 ## What this pass cannot test
 

@@ -102,6 +102,17 @@ def merge(verified: Sequence[VerifiedCandidate]) -> list[MergedTerm]:
     and "Dictionaries" slugify differently and both survive, by design (see the spec's
     known limitations); a string rule aggressive enough to merge them also merges
     genuinely distinct terms.
+
+    That last clause is now measured rather than asserted. Over the 212 terms of the
+    OpenStax run, the cheapest such rule — one term's words a strict subset of another's
+    — fires on 73 pairs and collapses 3 of the 6 near-duplicates a reader flagged. The
+    other 70 are "Function" against "Max function", "Statement" against "If statement",
+    "Dictionary" against "Nested dictionary": deleting roughly seventy real terms to
+    collapse three. Meanwhile "Modulo"/"Modulus" needs a rule no string comparison
+    supplies, and "Boolean value"/"Boolean variable" are defined on one page, which is
+    evidence the book distinguishes them rather than that we failed to. Genuine
+    duplicates ran to about 1% of the book. Do not add a similarity rule here without
+    numbers of the same kind.
     """
     groups: dict[str, list[VerifiedCandidate]] = {}
     for candidate in verified:
