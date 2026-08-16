@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field
@@ -28,14 +29,33 @@ class PageCandidates(BaseModel):
     terms: list[Candidate] = Field(default_factory=list)
 
 
-class ScoredCandidate(BaseModel):
-    """A verified candidate with its per-page score, before cross-page merging."""
+class Corroboration(StrEnum):
+    """An independent signal from a page agreeing that a term is defined there.
+
+    Recorded individually and never fused into one number — see ADR-0004. A `StrEnum` so a
+    corroboration survives a round trip through JSON as the word it is, keeping the sidecar
+    readable by the human it is written for.
+    """
+
+    HEADING = "heading"
+    CUE = "cue"
+    MULTIPAGE = "multipage"
+
+
+class VerifiedCandidate(BaseModel):
+    """A candidate whose evidence checked out, with what the page corroborated.
+
+    `confidence` is the model's own, unmodified: nothing here adjusts it, because a
+    corroboration is a separate observation about the page, not a correction to what the
+    model said.
+    """
 
     term: str
     aliases: list[str] = Field(default_factory=list)
     evidence: str
     page_url: str
-    score: float
+    confidence: float
+    corroborations: list[Corroboration] = Field(default_factory=list)
 
     @computed_field
     @property
@@ -43,13 +63,14 @@ class ScoredCandidate(BaseModel):
         return slugify(self.term)
 
 
-class ScoredTerm(BaseModel):
-    """One merged term, ready to emit."""
+class MergedTerm(BaseModel):
+    """One term, collapsed across every page that proposed it, ready to emit."""
 
     term: str
     aliases: list[str] = Field(default_factory=list)
     pages: list[str]
-    score: float
+    confidence: float
+    corroborations: list[Corroboration] = Field(default_factory=list)
     evidence: str = ""
 
     @computed_field

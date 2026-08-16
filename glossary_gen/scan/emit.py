@@ -6,29 +6,28 @@ from pathlib import Path
 from typing import Any
 
 from glossary_gen.models import Book
-from glossary_gen.scan.models import ScoredTerm
+from glossary_gen.scan.models import MergedTerm
 
 
 class EmitError(Exception):
     """The scan produced nothing worth writing."""
 
 
-def index_payload(book: Book, terms: Sequence[ScoredTerm], *, min_score: float) -> dict[str, Any]:
+def index_payload(book: Book, terms: Sequence[MergedTerm]) -> dict[str, Any]:
     """Build exactly what `glossary_gen.input.load_input` accepts — and nothing more.
 
-    Scores are deliberately absent: `input.py` owns this schema, and adding a field to it
-    here would make the scanner the second owner of a contract that already has one. The
-    scores go to the sidecar report instead.
+    Confidence and corroborations are deliberately absent: `input.py` owns this schema, and
+    adding a field to it here would make the scanner the second owner of a contract that
+    already has one. They go to the sidecar report instead.
 
-    Raises EmitError if no terms meet the min_score threshold or if the input list is empty.
+    Every verified term is written. There is no threshold to filter on — see ADR-0004 — so
+    the only way to emit nothing is to have found nothing.
+
+    Raises EmitError if the input list is empty.
     """
     if not terms:
         raise EmitError("the scan produced no terms; nothing to write")
-    kept = [term for term in terms if term.score >= min_score]
-    if not kept:
-        raise EmitError(
-            f"min_score={min_score} filtered out all {len(terms)} terms; nothing to write"
-        )
+    kept = terms
     return {
         "book": {
             "library": book.library,
@@ -44,15 +43,25 @@ def index_payload(book: Book, terms: Sequence[ScoredTerm], *, min_score: float) 
     }
 
 
-def report_payload(terms: Sequence[ScoredTerm]) -> dict[str, Any]:
-    """The score sidecar: everything a reviewer needs to trim the list by hand."""
+def report_payload(terms: Sequence[MergedTerm]) -> dict[str, Any]:
+    """The scanner's diagnostic sidecar.
+
+    Deliberately NOT a review aid: it records what the scanner observed, so a prompt or
+    verification change can be compared against a previous run. The reviewer works from the
+    generated CSV, which is the artifact a person can actually read (ADR-0004).
+
+    `confidence` and `corroborations` are reported separately and never combined. A fused
+    number told you only that it had saturated; "heading fired, cue did not" tells you what
+    the scanner actually saw.
+    """
     return {
         "count": len(terms),
         "terms": [
             {
                 "slug": term.slug,
                 "term": term.term,
-                "score": round(term.score, 4),
+                "confidence": round(term.confidence, 4),
+                "corroborations": [str(c) for c in term.corroborations],
                 "pages": list(term.pages),
                 "evidence": term.evidence,
             }

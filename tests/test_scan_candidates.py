@@ -1,15 +1,12 @@
 from glossary_gen.models import Block, Page
 from glossary_gen.scan.candidates import (
-    CUE_BONUS,
-    HEADING_BONUS,
     MIN_EVIDENCE_CHARS,
-    MULTIPAGE_BONUS,
+    corroborations_on_page,
     has_heading_match,
     merge,
-    score_on_page,
     verify,
 )
-from glossary_gen.scan.models import ScoredCandidate, Candidate
+from glossary_gen.scan.models import Candidate, Corroboration, VerifiedCandidate
 
 PAGE = Page(
     url="https://eng.libretexts.org/x",
@@ -48,47 +45,6 @@ NO_HEADING = Page(
 )
 
 
-def test_score_starts_from_the_model_confidence():
-    candidate = Candidate(
-        term="Base case", evidence="A base case stops the descent.", confidence=0.5
-    )
-    assert score_on_page(candidate, NO_HEADING) == 0.5
-
-
-def test_score_adds_a_bonus_when_the_term_is_a_heading():
-    # "calls itself" deliberately carries no definitional cue, so this isolates the
-    # heading signal. DEFINITIONAL matches "is a|is an|is the|is called|refers to|means".
-    candidate = Candidate(term="Recursion", evidence="calls itself", confidence=0.5)
-    assert score_on_page(candidate, PAGE) == 0.5 + HEADING_BONUS
-
-
-def test_score_matches_a_heading_through_an_alias():
-    candidate = Candidate(
-        term="Recursive descent", aliases=["Recursion"], evidence="calls itself", confidence=0.4
-    )
-    assert score_on_page(candidate, PAGE) == 0.4 + HEADING_BONUS
-
-
-def test_score_adds_both_bonuses_when_both_signals_are_present():
-    candidate = Candidate(
-        term="Recursion",
-        evidence="Recursion is a technique where a function calls itself.",
-        confidence=0.5,
-    )
-    assert score_on_page(candidate, PAGE) == 0.5 + HEADING_BONUS + CUE_BONUS
-
-
-def test_score_adds_a_bonus_for_definitional_phrasing():
-    candidate = Candidate(term="Widget", evidence="A widget is a thing.", confidence=0.5)
-    page = Page(url="https://z", blocks=(Block(kind="paragraph", text="A widget is a thing."),))
-    assert score_on_page(candidate, page) == 0.5 + CUE_BONUS
-
-
-def test_score_is_clamped_to_one():
-    candidate = Candidate(term="Recursion", evidence="Recursion is the idea", confidence=1.0)
-    assert score_on_page(candidate, PAGE) == 1.0
-
-
 def test_has_heading_match_is_false_when_term_and_aliases_are_all_blank():
     # Candidate validation now rejects a whitespace-only term, so build one that
     # bypasses validation to prove the `has_heading_match` guard itself holds:
@@ -105,9 +61,9 @@ def test_has_heading_match_is_true_for_a_normal_term():
     assert has_heading_match(candidate, PAGE) is True
 
 
-def _scored(term, page_url, score, aliases=None):
-    return ScoredCandidate(
-        term=term, aliases=aliases or [], evidence="e", page_url=page_url, score=score
+def _scored(term, page_url, confidence, aliases=None):
+    return VerifiedCandidate(
+        term=term, aliases=aliases or [], evidence="e", page_url=page_url, confidence=confidence
     )
 
 
@@ -116,17 +72,6 @@ def test_merge_deduplicates_by_slug_and_unions_pages():
 
     assert len(merged) == 1
     assert merged[0].pages == ["https://a", "https://b"]
-
-
-def test_merge_keeps_the_highest_score_and_adds_the_multipage_bonus():
-    merged = merge([_scored("Recursion", "https://a", 0.6), _scored("Recursion", "https://b", 0.4)])
-
-    assert merged[0].score == 0.6 + MULTIPAGE_BONUS
-
-
-def test_merge_does_not_add_the_multipage_bonus_for_a_single_page():
-    merged = merge([_scored("Recursion", "https://a", 0.6)])
-    assert merged[0].score == 0.6
 
 
 def test_merge_unions_aliases_without_duplicates():
@@ -145,11 +90,104 @@ def test_merge_records_a_variant_surface_form_as_an_alias():
     assert "recursion" in merged[0].aliases
 
 
-def test_merge_orders_output_by_descending_score():
-    merged = merge([_scored("Low", "https://a", 0.2), _scored("High", "https://b", 0.9)])
-    assert [t.term for t in merged] == ["High", "Low"]
-
-
 def test_merge_emits_no_duplicate_slugs():
     merged = merge([_scored("List", "https://a", 0.5), _scored("list", "https://b", 0.5)])
     assert len({t.slug for t in merged}) == len(merged)
+
+
+# --- corroboration replaces the fused score (ADR-0004) ---
+
+
+def test_corroborations_names_each_signal_it_found():
+    got = corroborations_on_page(
+        _candidate("Recursion is a technique where a function calls itself."), PAGE
+    )
+    assert set(got) == {Corroboration.HEADING, Corroboration.CUE}
+
+
+def test_corroborations_omits_a_signal_that_did_not_fire():
+    page = Page(
+        url="https://a", blocks=(Block(kind="paragraph", text="We use recursion often here."),)
+    )
+    got = corroborations_on_page(
+        Candidate(term="Recursion", evidence="We use recursion often here.", confidence=0.9), page
+    )
+    assert got == []
+
+
+def test_multipage_is_merges_business_not_a_pages_business():
+    """MULTIPAGE cannot be known from one page, so `corroborations_on_page` never emits it."""
+    got = corroborations_on_page(
+        _candidate("Recursion is a technique where a function calls itself."), PAGE
+    )
+    assert Corroboration.MULTIPAGE not in got
+
+
+def _verified(term, page_url, confidence, corroborations=()):
+    return VerifiedCandidate(
+        term=term,
+        evidence="e" * 30,
+        page_url=page_url,
+        confidence=confidence,
+        corroborations=list(corroborations),
+    )
+
+
+def test_merge_promotes_the_most_confident_surface_form():
+    got = merge(
+        [
+            _verified("recursion", "https://a", 0.4),
+            _verified("Recursion", "https://b", 0.9),
+        ]
+    )
+    assert [t.term for t in got] == ["Recursion"]
+    assert got[0].aliases == ["recursion"]
+
+
+def test_merge_breaks_a_confidence_tie_on_corroboration_count():
+    got = merge(
+        [
+            _verified("recursion", "https://a", 0.9),
+            _verified("Recursion", "https://b", 0.9, [Corroboration.HEADING]),
+        ]
+    )
+    assert got[0].term == "Recursion"
+
+
+def test_merge_breaks_a_total_tie_on_first_seen_for_determinism():
+    got = merge(
+        [
+            _verified("recursion", "https://a", 0.9),
+            _verified("Recursion", "https://b", 0.9),
+        ]
+    )
+    assert got[0].term == "recursion"
+
+
+def test_merge_unions_corroborations_and_adds_multipage():
+    got = merge(
+        [
+            _verified("Recursion", "https://a", 0.9, [Corroboration.HEADING]),
+            _verified("Recursion", "https://b", 0.8, [Corroboration.CUE]),
+        ]
+    )
+    assert set(got[0].corroborations) == {
+        Corroboration.HEADING,
+        Corroboration.CUE,
+        Corroboration.MULTIPAGE,
+    }
+
+
+def test_merge_does_not_add_multipage_for_a_single_page():
+    got = merge([_verified("Recursion", "https://a", 0.9, [Corroboration.HEADING])])
+    assert Corroboration.MULTIPAGE not in got[0].corroborations
+
+
+def test_merge_orders_by_slug_because_nothing_ranks_them():
+    got = merge(
+        [
+            _verified("Zebra", "https://a", 0.2),
+            _verified("Apple", "https://b", 0.9),
+        ]
+    )
+    assert [t.term for t in got] == ["Apple", "Zebra"]

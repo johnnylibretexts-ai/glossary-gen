@@ -1,5 +1,17 @@
-from glossary_gen.excerpt import excerpts_for_term
+from glossary_gen.excerpt import excerpts_for_term as _excerpts_for_term
 from glossary_gen.models import Block, Page, Term
+
+
+def excerpts_for_term(pages, term, **kwargs):
+    """Selection/ranking tests, with the grounding floor off.
+
+    These exercise *which* paragraphs get picked and in what order, which is unrelated to
+    whether there is enough text to write from. Leaving the floor on would force every
+    fixture to carry a hundred characters of filler prose and would say nothing extra.
+    The floor's own tests call `_excerpts_for_term` directly.
+    """
+    kwargs.setdefault("min_chars", 0)
+    return _excerpts_for_term(pages, term, **kwargs)
 
 
 def para(text):
@@ -111,3 +123,37 @@ def test_page_order_breaks_rank_ties():
     ]
     result = excerpts_for_term(pages, make_term())
     assert [e.page_url for e in result] == ["https://a", "https://b"]
+
+
+def test_refuses_grounding_too_thin_to_write_from():
+    """A passage too short to ground anything is not an excerpt — see CONTEXT.md, Excerpt.
+
+    Measured on a real book: 14 characters of page text still produced a fluent, correct
+    definition of "modulo", because the model supplied it. Correctness there is evidence
+    the model knew Python, not evidence the book taught it.
+    """
+    page = Page(url="https://a", blocks=(head("Modulo"), para("The % operator.")))
+    term = Term(term="Modulo", slug="modulo", aliases=(), pages=("https://a",))
+    assert _excerpts_for_term([page], term) == []
+
+
+def test_accepts_grounding_at_the_floor():
+    page = Page(url="https://a", blocks=(head("Modulo"), para("M" + "o" * 120)))
+    term = Term(term="Modulo", slug="modulo", aliases=(), pages=("https://a",))
+    assert len(_excerpts_for_term([page], term)) == 1
+
+
+def test_the_floor_counts_total_grounding_not_each_passage():
+    """Several short passages can add up to enough; the CSV reports the total too."""
+    page = Page(
+        url="https://a",
+        blocks=(
+            head("Modulo"),
+            para("The % operator returns a remainder after division of two numbers."),
+            para("Modulo is a common operation in programming and in number theory."),
+        ),
+    )
+    term = Term(term="Modulo", slug="modulo", aliases=(), pages=("https://a",))
+    got = _excerpts_for_term([page], term)
+    assert sum(len(e.text) for e in got) >= 100
+    assert len(got) == 2

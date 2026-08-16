@@ -6,7 +6,11 @@ from glossary_gen.cli import dry_run, run
 from glossary_gen.fetch import PageCache
 from glossary_gen.models import Term
 
-HTML_HIT = "<html><body><p>Recursion is a technique.</p></body></html>"
+_REAL_PARAGRAPH = (
+    "Recursion is a technique where a function calls itself to solve a smaller "
+    "instance of the same problem, continuing until it reaches a base case."
+)
+HTML_HIT = f"<html><body><p>{_REAL_PARAGRAPH}</p></body></html>"
 HTML_MISS = "<html><body><p>Nothing relevant here.</p></body></html>"
 
 

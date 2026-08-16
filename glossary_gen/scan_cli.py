@@ -25,10 +25,10 @@ from glossary_gen.ledger import Ledger
 from glossary_gen.llm import LLMClient, LLMError
 from glossary_gen.models import Page, slugify
 from glossary_gen.run import PRICES_PATH, Attempt, ModelCall, execute_run, load_prices
-from glossary_gen.scan.candidates import merge, score_on_page, verify
+from glossary_gen.scan.candidates import corroborations_on_page, merge, verify
 from glossary_gen.scan.content import extract_content
 from glossary_gen.scan.emit import EmitError, index_payload, report_payload, write_json
-from glossary_gen.scan.models import ScanRecord, ScoredCandidate
+from glossary_gen.scan.models import ScanRecord, VerifiedCandidate
 from glossary_gen.scan.propose import load_scan_prompt, propose_terms, scan_prompt_versions
 from glossary_gen.scan.toc import TocError, discover
 
@@ -102,7 +102,7 @@ class ScanSummary:
     # scan/content.py). These are recorded `ok` but never sent to the model, so they are
     # a subset of `ok`, not an addition to it.
     empty_pages: int = 0
-    candidates: list[ScoredCandidate] = field(default_factory=list)
+    candidates: list[VerifiedCandidate] = field(default_factory=list)
 
 
 def estimate_scan_cost(
@@ -129,7 +129,7 @@ def execute(
     budget_usd: float | None = None,
     max_consecutive_failures: int = 5,
 ) -> ScanSummary:
-    """Propose, verify, and score one page at a time, recording every outcome.
+    """Propose, verify, and corroborate one page at a time, recording every outcome.
 
     An adapter over `execute_run`, which owns spend, resumption and stopping. What stays
     here is everything specific to a page: what its row holds, and what a scan produces
@@ -192,12 +192,13 @@ def execute(
         summary.unverified += len(candidates.terms) - len(verified)
         for candidate in verified:
             summary.candidates.append(
-                ScoredCandidate(
+                VerifiedCandidate(
                     term=candidate.term,
                     aliases=candidate.aliases,
                     evidence=candidate.evidence,
                     page_url=page.url,
-                    score=score_on_page(candidate, page),
+                    confidence=candidate.confidence,
+                    corroborations=corroborations_on_page(candidate, page),
                 )
             )
 
@@ -241,18 +242,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--book", required=True, help="book root URL on *.libretexts.org")
     parser.add_argument("--out", type=Path, default=Path("out/index.json"), help="index path")
     parser.add_argument(
-        "--report", type=Path, default=Path("out/index-report.json"), help="score sidecar path"
+        "--report",
+        type=Path,
+        default=Path("out/index-report.json"),
+        help="diagnostic sidecar path",
     )
     parser.add_argument("--cache-dir", type=Path, default=Path("cache"), help="page cache dir")
     parser.add_argument("--ledger", type=Path, default=Path("out/scan.jsonl"), help="ledger path")
     parser.add_argument("--prompt-version", default="v1", choices=scan_prompt_versions())
     parser.add_argument("--model", default="gemini-3.5-flash", help="Gemini model name")
-    parser.add_argument(
-        "--min-score",
-        type=float,
-        default=0.0,
-        help="omit terms scoring below this (default 0.0: emit everything, trim by hand)",
-    )
     parser.add_argument("--limit", type=_positive_int, help="scan at most N pages (smoke runs)")
     parser.add_argument(
         "--delay", type=float, default=0.3, help="seconds between real page fetches"
@@ -306,7 +304,7 @@ def run(argv: list[str] | None = None) -> int:
         if len(report.candidates) > 20:
             print(f"  ... and {len(report.candidates) - 20} more")
         print("\nThis is a free preview. Structural candidates are NOT the scanner's output —")
-        print("a real run reads each page with a model and scores what it finds.")
+        print("a real run reads each page with a model and verifies what it finds.")
         return EXIT_OK
 
     prices = load_prices(PRICES_PATH)
@@ -350,10 +348,9 @@ def run(argv: list[str] | None = None) -> int:
     )
     terms = merge(summary.candidates)
 
-    # The REPORT is written first and unconditionally. When a strict --min-score filters
-    # everything out, `index_payload` refuses to write an index at all (it would be rejected
-    # by `load_input`, which requires a non-empty terms list) — but that is exactly the run
-    # where a human most needs to see what was found and what threshold discarded it.
+    # The REPORT is written first and unconditionally. A scan that verified nothing cannot
+    # write an index at all (`load_input` requires a non-empty terms list) — and that is
+    # exactly the run where someone most needs to see what the scanner did observe.
     write_json(args.report, report_payload(terms))
 
     print(
@@ -364,15 +361,14 @@ def run(argv: list[str] | None = None) -> int:
     print(f"candidates: {len(summary.candidates)} verified, {summary.unverified} rejected")
 
     try:
-        write_json(args.out, index_payload(book, terms, min_score=args.min_score))
+        write_json(args.out, index_payload(book, terms))
     except EmitError as exc:
         print(f"error: {exc}", file=sys.stderr)
-        print(f"scores were still written to {args.report}", file=sys.stderr)
+        print(f"the diagnostic sidecar was still written to {args.report}", file=sys.stderr)
         return EXIT_RUN_ABORTED
 
-    kept = sum(1 for t in terms if t.score >= args.min_score)
-    print(f"terms: {len(terms)} merged, {kept} written to {args.out}")
-    print(f"scores: {args.report}")
+    print(f"terms: {len(terms)} merged, all written to {args.out}")
+    print(f"diagnostics: {args.report}")
     return EXIT_RUN_ABORTED if summary.aborted else EXIT_OK
 
 

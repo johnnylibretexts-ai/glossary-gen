@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from glossary_gen.scan.candidates import CUE_BONUS, HEADING_BONUS, MULTIPAGE_BONUS
+from glossary_gen.scan.models import Corroboration
 from glossary_gen.scan.evaluate import recall, replay
 
 FIXTURE = Path(__file__).parent / "fixtures" / "replay_minimal.json"
@@ -42,41 +42,42 @@ def test_recall_reports_candidate_volume_and_not_precision():
     assert not hasattr(report, "precision")
 
 
-def test_replay_score_matches_model():
-    """Exact score of a grounded candidate reflects confidence plus applicable
-    bonuses.
+def test_replay_reports_confidence_and_corroborations_unfused():
+    """The model's confidence is passed through untouched, and each page signal is named.
+
+    Previously these were added together and clamped, which is what ADR-0004 removed: the
+    old assertion for "Recursion" expected exactly 1.0, and so would have been satisfied by
+    any confidence at or above 0.75 — the clamp hid the input.
     """
     terms = replay(_fixture())
-    # "Recursion": confidence=0.9, heading match, "is a" in evidence
-    #   -> 0.9 + HEADING_BONUS + CUE_BONUS = clamped to 1.0
+    # "Recursion": confidence=0.9, heading match, "is a" in evidence.
     recursion = next(t for t in terms if t.slug == "recursion")
-    expected_score = min(0.9 + HEADING_BONUS + CUE_BONUS, 1.0)
-    assert recursion.score == expected_score
-    # "Base case": confidence=0.7, no heading, "is the" in evidence
-    #   -> 0.7 + CUE_BONUS
+    assert recursion.confidence == 0.9
+    assert set(recursion.corroborations) == {Corroboration.HEADING, Corroboration.CUE}
+    # "Base case": confidence=0.7, no heading, "is the" in evidence.
     base_case = next(t for t in terms if t.slug == "base-case")
-    expected_score = 0.7 + CUE_BONUS
-    assert base_case.score == expected_score
+    assert base_case.confidence == 0.7
+    assert base_case.corroborations == [Corroboration.CUE]
 
 
-def test_replay_merge_picks_highest_score_and_preserves_aliases():
-    """When a term appears on multiple pages with different surface forms, the
-    highest-scoring form wins as term, the loser becomes an alias, and the
-    multipage bonus is applied.
+def test_replay_merge_promotes_the_confident_form_and_preserves_aliases():
+    """The most confident surface form represents the term; the other becomes an alias.
+
+    "Algorithm" on page1: confidence=0.5, heading, "is a".
+    "algorithm" on page2: confidence=0.4, no heading, no cue.
+    Both slug to "algorithm", so they merge, and 0.5 beats 0.4.
     """
     terms = replay(_fixture_scoring())
     assert len(terms) == 1
     term = terms[0]
 
-    # "Algorithm" on page1: confidence=0.5, heading, "is a"
-    #   -> 0.5 + HEADING_BONUS + CUE_BONUS = 0.75
-    # "algorithm" on page2: confidence=0.4, no heading, no definitional cue
-    #   -> 0.4
-    # Both slug to "algorithm", so they merge.
-    # Winner is "Algorithm" with score 0.75 (higher than 0.4).
-    # After multipage merge: 0.75 + MULTIPAGE_BONUS = 0.80 (below 1.0, bonus visible)
     assert term.slug == "algorithm"
     assert term.term == "Algorithm"
     assert "algorithm" in term.aliases
-    expected_score = 0.5 + HEADING_BONUS + CUE_BONUS + MULTIPAGE_BONUS
-    assert term.score == expected_score
+    assert term.confidence == 0.5
+    # Unioned across both pages, plus MULTIPAGE, which only merging can know.
+    assert set(term.corroborations) == {
+        Corroboration.HEADING,
+        Corroboration.CUE,
+        Corroboration.MULTIPAGE,
+    }

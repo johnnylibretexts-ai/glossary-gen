@@ -8,7 +8,8 @@ from glossary_gen.cli import run
 PAGE_HIT = """
 <html><body>
 <h2>Recursion</h2>
-<p>Recursion is a technique where a function calls itself.</p>
+<p>Recursion is a technique where a function calls itself to solve a smaller
+instance of the same problem, continuing until it reaches a base case.</p>
 </body></html>
 """
 PAGE_MISS = "<html><body><p>Nothing relevant here at all.</p></body></html>"

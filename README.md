@@ -36,8 +36,8 @@ into `glossary-gen`.
 It walks the book's table of contents, and for each page asks a model one question — *what
 terms does this page define?* — requiring a verbatim quote from that page as evidence for
 every candidate it proposes. Only candidates whose quote actually checks out against the page
-survive; what's left is then scored, so you get a ranked, reviewable list rather than a flat
-dump of headings.
+survive; what's left is merged into one entry per term, so you get a reviewable list rather than
+a flat dump of headings. It is not ranked — see [ADR-0004](docs/adr/0004-the-scanner-does-not-rank.md).
 
 **Free preview first.** `--dry-run` walks the book and lists heading-derived "structural
 candidates" — no model call, no key, no cost:
@@ -54,12 +54,12 @@ Real output against that book:
       - Basic output
       ...
     This is a free preview. Structural candidates are NOT the scanner's output —
-    a real run reads each page with a model and scores what it finds.
+    a real run reads each page with a model and verifies what it finds.
 
 Structural candidates are headings with the obvious OpenStax boilerplate (Summary, Key Terms,
 Exercises, …) filtered out — good for confirming the TOC resolves and sizing the book before
 spending anything. They are **not** what the scanner produces. A real run reads every page
-with a model and scores what it actually finds defined there.
+with a model and verifies what it actually finds defined there.
 
 **A real run**, capped for a first smoke test and with a spend ceiling:
 
@@ -69,12 +69,13 @@ with a model and scores what it actually finds defined there.
 
 Every term this writes is an **unreviewed candidate** — the same `x_status = needs-review`
 posture stated elsewhere in this README, just one step earlier in the pipeline: nothing here
-has been read by a human. `--min-score` defaults to `0.0`, so by default *everything* verified
-is emitted and a human trims the list before it becomes `glossary-gen`'s input. The scores
+has been read by a human. **Everything verified is emitted** — there is no threshold, because the
+scanner does not rank (ADR-0004) — and a human trims the list. The scanner's observations
 themselves do not go into the index: `input.py` is the only file that owns the index schema,
 so the scanner doesn't get to add a field to it. They go to the `--report` sidecar instead —
-one row per term with its score, source pages, and evidence quote, for whoever does the
-trimming.
+one row per term with its confidence, its corroborations, source pages, and evidence quote. That
+sidecar is a **diagnostic**, not a review aid: it is how you compare one scan against another after
+a prompt change. Trimming happens on the generated CSV, which is the artifact a person can read.
 
 Cost guards, in the order they apply:
 
@@ -95,12 +96,12 @@ recorded in [`docs/research/2026-08-16-gemini-flash-pricing.md`](docs/research/2
 Any other model — including `gemini-3.7-flash` — has no entry, which disables `--budget-usd`
 for it. Prices move, so re-check before a large run.
 
-A replay-based recall eval harness exists under `tests/eval/` — it scores the
+A replay-based recall eval harness exists under `tests/eval/` — it exercises the
 candidate-selection and verification logic against fixed fixtures, offline, with no model
 call. It has been measured against a live model on a real book: against Python Programming
 (OpenStax), `glossary-scan` found 11 of a 19-term reference index (recall 11/19 = 0.579).
 That measurement is pinned as a regression floor of 0.55 in `tests/eval/test_recall_openstax.py`,
-so a prompt or scoring change that drops recall below the measured baseline fails CI. Recall
+so a prompt or verification change that drops recall below the measured baseline fails CI. Recall
 0.579 is measured on **one book against a partial reference set** — read it as a baseline to
 regress against, not as a validated recall rate for the tool in general.
 
@@ -139,11 +140,11 @@ consecutive-failure breaker ends a genuinely stuck run.
 
 ### How glossary-scan works
 
-    TOC ──▶ fetch pages ──▶ extract article ──▶ per-page model call ──▶ verify ──▶ score ──▶ merge ──▶ emit
+    TOC ──▶ fetch pages ──▶ extract article ──▶ per-page model call ──▶ verify ──▶ corroborate ──▶ merge ──▶ emit
              (cached)        (chrome stripped)         │                  └─ pure, free ─────────────┘
                                                        └── consults ledger ──┘
 
-Only the model call costs money. Verification, scoring, merging and writing are pure functions
+Only the model call costs money. Verification, corroboration, merging and writing are pure functions
 over data — which is why the eval harness under `tests/eval/` can replay a recorded scan through
 all of them offline, with no key and no spend.
 
@@ -162,21 +163,28 @@ copied verbatim from the page, and that span is then looked for in the page text
 case-insensitively, since the HTML has already been reflowed, and subject to a 20-character floor
 so a two-word fragment can't satisfy it. A candidate whose quote isn't found is discarded outright.
 This is the anti-hallucination mechanism: a model that invents a term invents its evidence too, and
-invented evidence doesn't appear on the page. It is never softened into a score penalty.
+invented evidence doesn't appear on the page. It is never softened into a corroboration.
 
-**Scoring corroborates; it doesn't decide.** A surviving candidate starts at the model's own
-confidence and gains a fixed bonus for each independent signal from the page: `+0.15` if the term
-or one of its aliases appears in a heading, `+0.10` if its evidence matches the same
-`is a`/`is called`/`refers to` regex `excerpt.py` uses to rank grounding paragraphs, and `+0.05` if
-the term turned up on more than one page. The result is clamped to `1.0`. Reusing `excerpt.py`'s
-regex is deliberate: agreement between what the scanner rates highly and what the generator can
-later ground a definition in predicts whether a term will survive step 2 at all. The weights are
-fixed rather than fitted — nineteen labelled reference terms cannot support fitting four
-parameters, so the eval harness reports what they buy instead of tuning them.
+**Corroboration is reported, not scored.** A surviving candidate keeps the model's own confidence
+unchanged, and the scanner records by name each independent signal the page supplied: `heading` if
+the term or an alias appears in a heading, `cue` if its evidence matches the same
+`is a`/`is called`/`refers to` regex `excerpt.py` uses to rank grounding paragraphs, and
+`multipage` if the term turned up on more than one page. Reusing `excerpt.py`'s regex is
+deliberate: agreement between what the scanner corroborates and what the generator can later ground
+a definition in predicts whether a term will survive step 2.
+
+**These are never combined into one number, and the scanner does not rank.** It used to: confidence
+plus fixed bonuses, clamped to 1.0. On a real 212-term book that tied 64% of terms at exactly 1.0,
+and the tie contained both the best entries and the worst, while genuinely useful terms sat below
+it. Every signal answers *"is this defined on this page?"*, which is not the question a reviewer
+trimming a glossary asks — and the two are mildly opposed, since a book most clearly defines the
+words basic enough to need explaining. Full reasoning:
+[ADR-0004](docs/adr/0004-the-scanner-does-not-rank.md).
 
 **Merging is where the index contract is honoured.** The same term proposed on several pages
-collapses into one row: pages and aliases are unioned, the highest-scoring surface form becomes the
-`term`, and every other observed spelling is preserved as an alias so nothing seen is lost.
+collapses into one row: pages, aliases and corroborations are unioned, the most confident surface
+form becomes the `term` (ties broken by corroboration count, then by order seen), and every other
+observed spelling is preserved as an alias so nothing seen is lost.
 Deduplicating by slug is mandatory, not tidiness — `input.py` rejects an index containing two terms
 with the same slug, so an unmerged index would be refused by the very tool it is built for.
 Singular and plural are deliberately *not* unified: "Dictionary" and "Dictionaries" slug
@@ -188,14 +196,14 @@ genuinely distinct terms. Near-duplicates are left for the human doing the revie
 | `scan/toc.py` | table-of-contents walk and book metadata, via the public `getTOC` endpoint |
 | `scan/content.py` | narrowing a fetched page to its article content |
 | `scan/propose.py` | the scan prompt and one model call per page |
-| `scan/candidates.py` | `verify` / `score_on_page` / `merge` — pure, no I/O, no LLM |
-| `scan/emit.py` | writing the index and the score sidecar |
+| `scan/candidates.py` | `verify` / `corroborations_on_page` / `merge` — pure, no I/O, no LLM |
+| `scan/emit.py` | writing the index and the diagnostic sidecar |
 | `scan/evaluate.py` | the offline replay harness behind `tests/eval/` |
 | `scan_cli.py` | argument parsing, cost control, the orchestration loop |
 
 The boundaries from [How it works](#how-it-works) still hold, and the scanner is on the far side of
 one of them: `input.py` remains the only file that knows the index format. The scanner conforms to
-that format rather than extending it, which is why scores live in the `--report` sidecar instead of
+that format rather than extending it, which is why the scanner's own observations live in the `--report` sidecar instead of
 in the index. `fetch.py`, `ledger.py` and `llm.py` are shared with `glossary-gen` — the scanner
 adds a page-shaped ledger record and a second entry point, not a second copy of the machinery.
 
@@ -205,12 +213,11 @@ adds a page-shaped ledger record and a second entry point, not a second copy of 
 |---|---|---|
 | `--book` (required) | — | book root URL on `*.libretexts.org` |
 | `--out` | `out/index.json` | index path, written in the [input format](#input-format) |
-| `--report` | `out/index-report.json` | score sidecar path |
+| `--report` | `out/index-report.json` | diagnostic sidecar path |
 | `--cache-dir` | `cache` | page cache dir — same on-disk cache file and format as `glossary-gen`'s `--cache-dir` |
 | `--ledger` | `out/scan.jsonl` | ledger path; resume/skip and cost-ceiling state live here |
 | `--prompt-version` | `v1` | scan prompt version |
 | `--model` | `gemini-3.5-flash` | Gemini model name |
-| `--min-score` | `0.0` | omit terms scoring below this (default: emit everything, trim by hand) |
 | `--limit` | — | scan at most N pages (smoke runs) |
 | `--delay` | `0.3` | seconds between real page fetches |
 | `--budget-usd` | — | abort if spend exceeds this |
@@ -543,6 +550,14 @@ Pages are deduplicated before fetching — hundreds of terms usually cluster ont
 distinct pages. For each term: check the ledger, excerpt the grounding paragraphs, and only
 then call a model. A term with no excerpt costs nothing, because the call is skipped
 entirely.
+
+**A term with too little page text gets no definition.** If the selected passages total under
+`MIN_EXCERPT_CHARS` (100), `glossary-gen` records the term `no_excerpt` and never calls a model.
+Measured on a real book, 14 characters of page text still produced a fluent, correct definition of
+*modulo* — supplied by the model, not the page, while `x_source_pages` cited the page as its
+source. Correctness there was evidence the model knew Python, not that the book taught it. The
+floor is what makes "page-grounded" mean something; `x_excerpt_chars` in the CSV reports how much
+text actually backed each definition, so a reviewer can see how thin the survivors are.
 
 Excerpt selection ranks *definitional-looking* text first — a paragraph following a heading
 that matches the term, then one containing "is a"/"is called"/"refers to", then any other
