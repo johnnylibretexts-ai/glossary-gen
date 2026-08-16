@@ -436,12 +436,25 @@ the OpenAI-compatible fallback's default `llama3.1` — has no configured price.
 resuming a run seeds the running token counters from every `tokens_in`/`tokens_out`
 already in the ledger, so a resumed run cannot blow through the ceiling once per resume.
 
-**The ceiling is a floor, not an exact meter.** It only counts tokens from LLM calls that
-returned a usable result and were billed by the provider *and* recorded in the ledger.
-A call that the provider billed but that then failed Pydantic schema validation
-(`llm_error`) is not currently attributable to a token count and is therefore invisible to
-`--budget-usd` — actual provider spend can run slightly ahead of what this tool reports or
-enforces.
+**The ceiling is a floor, not an exact meter** — but only by a bounded amount, and not for the
+reason you might expect. **Every reply the provider billed is charged**, including one that failed
+schema validation and was retried, and one whose term ultimately failed: `generate_entry` and
+`propose_candidates` carry the accumulated token counts out on the raised exception, the failure is
+written to the ledger with them, and the run reseeds its running total from rows of *every* status.
+That is what makes `--budget-usd` bound total spend across resumes rather than per invocation.
+
+Two things it genuinely cannot see:
+
+- **The subject that crosses the ceiling is paid for in full.** Spend is checked before a subject
+  is attempted and again once its attempt has been charged, so the crossing is detected after the
+  fact. A run can therefore end slightly over. The overshoot is bounded by one subject's cost —
+  which, since a subject may bill more than one reply, is a few calls rather than a few cents.
+- **A call billed without a reply reports nothing.** If the request is served and charged but the
+  connection drops before the response arrives, there is no usage block to read a token count from,
+  so it is recorded as zero. Nothing can recover that number after the fact.
+
+Neither is a leak you can close by reading the ledger more carefully; both are the cost of enforcing
+a ceiling from the client side.
 
 ## Reliability notes
 
