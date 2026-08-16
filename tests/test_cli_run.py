@@ -524,7 +524,7 @@ def test_build_client_preserves_the_ledger_keys(monkeypatch):
     args = build_parser().parse_args(["--input", "index.json"])
     client = build_client(args)
     assert client.name == "gemini"
-    assert client.model == "gemini-3.5-flash"
+    assert client.model == "gemini-3.7-flash"
 
 
 def test_build_client_wraps_every_provider_in_the_retry_policy(monkeypatch):
@@ -560,3 +560,8 @@ def test_generation_estimate_tracks_the_measured_run():
     # A band, not an upper bound: the estimator is calibrated on one book and cannot
     # guarantee it exceeds the actual on another. This catches a skew, not a miss.
     assert 0.9 * actual <= estimated <= 1.25 * actual, f"{estimated} vs {actual}"
+
+
+def test_default_model_is_priced():
+    """A default the price table cannot price would disable --budget-usd out of the box."""
+    assert build_parser().parse_args(["--input", "x.json"]).model in load_prices()
