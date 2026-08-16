@@ -110,6 +110,12 @@ One recorded try at producing a result for a subject, successful or not. A subje
 several; the failures are deliberate history, not noise.
 _Avoid_: record, row, entry
 
+**Request**:
+One round trip to a provider. Several may go into a single attempt — a refused request is retried
+without anything being recorded, and only a request that came back with a reply was billed. The
+ledger never sees requests individually.
+_Avoid_: call, attempt, try
+
 **Ledger**:
 The append-only record of every attempt. What makes a run resumable, and what stops a second run
 paying for work the first already finished.

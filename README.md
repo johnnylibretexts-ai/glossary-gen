@@ -109,13 +109,29 @@ terms, and `glossary-gen` grounded all 39 of them (0 without excerpts, 0 page fa
 spend was $0.0135, against a $0.03 pre-flight estimate (`prices.json`'s rates are still the
 unverified placeholders noted below — the estimate and the actual both used them).
 
-**Known limitation:** the LLM layer has no retry/backoff for HTTP 429 (rate limiting) — unlike
-`PageCache`, which does retry 429 for page fetches. `--delay` paces page *fetches*, not model
-calls, so it does not help here. On a rate-limited (e.g. free-tier) key, a long unattended run
-can trip the consecutive-failure breaker and stop early; this was observed in practice as a scan
-halting after 7 pages. The tool's behavior under 429 is correct as far as it goes (the failure is
-recorded with 0 tokens billed, and the breaker stops the run rather than burning the budget) — but
-completing a full book on a rate-limited key currently requires re-running to resume past the gap.
+**Rate limiting.** A refused model request is waited out and retried, up to three requests per
+refusal. When the provider says *when* to come back — a `Retry-After` header, or the `RetryInfo`
+block Gemini returns with an exhausted quota — that hint is obeyed exactly, up to a 60-second cap.
+A hint longer than the cap is read as "not coming back within this run": the subject fails at once
+rather than the tool appearing to hang for an hour. Each wait is announced on stderr, so a run that
+has gone quiet can be told apart from one that has stalled.
+
+**The hole this leaves** is a provider that meters you *without* sending a hint. The unhinted wait
+is deliberately short — roughly twelve seconds across two retries, not a full per-minute quota
+window — because buying that window blind would cost every genuinely broken run five times as long
+in dead waiting before the consecutive-failure breaker stops it. So on an unhinted per-minute
+quota the subject still fails, the ledger still records it, and a re-run still resumes past it for
+free. That is the scenario behind the scan that once halted after 7 pages; it is now much less
+likely and not impossible. `--delay` paces page *fetches*, not model calls, and does not help here.
+Why the waiting lives in the transport and nowhere above it:
+[ADR-0003](docs/adr/0003-backoff-belongs-to-the-transport.md).
+
+**The ceiling is per refusal, not per term.** A term whose reply also fails to parse is retried up
+to three times, and each of those enters a fresh retry loop — so one term's worst case is nine
+requests and six waits against a single provider, about six minutes at the 60-second cap, doubled
+again if a fallback provider is configured. That worst case needs the provider to be metering *and*
+answering with unparseable text at the same time. It is left unbounded on purpose; the
+consecutive-failure breaker ends a genuinely stuck run.
 
 ### How glossary-scan works
 
@@ -429,12 +445,18 @@ enforces.
 
 ## Reliability notes
 
-- **No backoff between retries.** Page fetches (`fetch.py`) and structured-output retries
-  (`generate.py`) both retry a bounded number of times with no delay between attempts.
-  This is fine against LibreTexts pages, but it matters against a quota-limited provider:
-  a provider returning `429` in a tight loop gets hit again immediately, which can make a
-  rate limit worse rather than better. If you're running against a provider with a strict
-  per-minute quota, keep `--max-terms` small and watch for repeated `llm_error` rows.
+- **Three layers retry, and only the lowest one sleeps.** A *request* the provider refused is
+  waited out by the transport (`RetryingClient`, wrapping each client in `build_client`). A reply
+  that arrived but did not parse is retried **immediately** by `generate.py` and
+  `scan/propose.py` — a malformed reply is not a server asking for time, and the same request a
+  minute later is no more likely to parse. Page fetches (`fetch.py`) retry `429`/`5xx` three times
+  with no delay, which is fine against LibreTexts pages because they do not meter us.
+
+  The split is deliberate and load-bearing. The loops nest, so one term already costs up to nine
+  requests when the provider is both metering and answering with prose; adding a delay to the
+  outer loops would make it sleep on every one of them, for a failure that is not about timing. If
+  you are about to make these consistent, read
+  [ADR-0003](docs/adr/0003-backoff-belongs-to-the-transport.md) first.
 
 ## Output columns
 
@@ -520,7 +542,7 @@ format changes, `input.py` changes and nothing else. If the import contract chan
 
 ## Development
 
-    python3 -m pytest          # 127 tests, ~0.3s
+    python3 -m pytest          # 274 tests, ~1s
     python3 -m ruff check .
     python3 -m ruff format --check .
 
@@ -543,6 +565,12 @@ else.
 through on the former and not the latter, so misclassifying a bad reply as a transport
 failure makes it burn a second provider call to produce the same error. Then add the client
 to the chain in `cli.build_client` and its per-million-token prices to `prices.json`.
+
+Raise a non-200 through `refusal(self.name, response)` rather than constructing the error
+yourself: that is what decides whether the refusal is temporary, and a client that raises a bare
+`LLMTransportError` for a `429` gets no backoff at all. Pass `body_hint=` if your provider puts its
+retry delay in the error body, as Gemini does. You do not need to implement retrying — `build_client`
+wraps every client in `RetryingClient`, which is the only place the policy lives.
 
 Every free-text cell (`term`, `definition`, `x_category`, `x_context`, `x_example`,
 `aliases`, `x_related`) is checked for a leading `=`, `+`, `-`, `@`, tab, or carriage
