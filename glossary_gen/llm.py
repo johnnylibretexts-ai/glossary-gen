@@ -271,7 +271,7 @@ class GeminiClient:
         self,
         *,
         api_key: str,
-        model: str = "gemini-3.5-flash",
+        model: str = "gemini-3.7-flash",
         base_url: str = "https://generativelanguage.googleapis.com/v1beta",
         client: httpx.Client | None = None,
     ) -> None:

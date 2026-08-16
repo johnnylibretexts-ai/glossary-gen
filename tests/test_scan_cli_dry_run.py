@@ -126,3 +126,13 @@ def test_dry_run_aborts_when_toc_has_no_content_pages(tmp_path, monkeypatch, cap
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "no content pages" in captured.err
+
+
+def test_default_model_is_the_same_for_both_commands():
+    """The two entry points share a ledger format and a price table; differing defaults
+    would silently key their ledgers apart and price the same book two ways."""
+    from glossary_gen.cli import build_parser as gen_parser
+
+    scan_default = build_parser().parse_args(["--book", BOOK]).model
+    gen_default = gen_parser().parse_args(["--input", "x.json"]).model
+    assert scan_default == gen_default == "gemini-3.7-flash"

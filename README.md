@@ -90,7 +90,8 @@ Cost guards, in the order they apply:
 - `--delay` (default `0.3`s) is politeness between real page fetches — spacing out requests to
   LibreTexts' servers, not a rate-limit workaround.
 
-`glossary_gen/prices.json` prices `gemini-3.5-flash` and `gemini-3.5-flash-lite`, verified
+`glossary_gen/prices.json` prices `gemini-3.7-flash` (the default), `gemini-3.6-flash`,
+`gemini-3.5-flash` and `gemini-3.5-flash-lite`, verified
 2026-08-16 against [Google's price list](https://ai.google.dev/gemini-api/docs/pricing) and
 recorded in [`docs/research/2026-08-16-gemini-flash-pricing.md`](docs/research/2026-08-16-gemini-flash-pricing.md).
 Any other model — including `gemini-3.7-flash` — has no entry, which disables `--budget-usd`
@@ -217,7 +218,7 @@ adds a page-shaped ledger record and a second entry point, not a second copy of 
 | `--cache-dir` | `cache` | page cache dir — same on-disk cache file and format as `glossary-gen`'s `--cache-dir` |
 | `--ledger` | `out/scan.jsonl` | ledger path; resume/skip and cost-ceiling state live here |
 | `--prompt-version` | `v1` | scan prompt version |
-| `--model` | `gemini-3.5-flash` | Gemini model name |
+| `--model` | `gemini-3.7-flash` | Gemini model name. **Changing it re-runs the whole book** — see the ledger note under [Usage](#usage) |
 | `--limit` | — | scan at most N pages (smoke runs) |
 | `--delay` | `0.3` | seconds between real page fetches |
 | `--budget-usd` | — | abort if spend exceeds this |
@@ -389,6 +390,14 @@ an unfetchable page, no excerpt found — are **not** treated as done and are re
 the next run; a failed term can accumulate more than one row in the ledger before it
 finally succeeds, which is expected and used as failure history.
 
+**Changing `--model` re-runs the whole book.** The ledger is keyed on
+`(subject, prompt_version, model)`, so a ledger built against one model has nothing a run on
+another counts as done: every term is re-attempted and re-paid for. That is correct — a definition
+written by a different model is a different result, not a cached one — but it is a real bill, so
+give a model change its own `--out` path if you want to compare, and expect to pay again. The
+default moved to `gemini-3.7-flash` on 2026-08-16; a ledger from before then will re-run in full
+unless you pass `--model gemini-3.5-flash` explicitly.
+
 To regenerate already-succeeded terms after editing a prompt, copy `prompts/v1.md` to
 `prompts/v2.md`, edit it, and pass `--prompt-version v2`. The ledger keeps rows for
 **every** prompt version and model you've ever run against it — that's what makes resume
@@ -415,7 +424,7 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 | `--cache-dir` | `cache` | on-disk HTML page cache; reused across runs so pages already fetched are never re-fetched |
 | `--ledger` | `out/run.jsonl` | append-only run log; the resume/skip and cost-ceiling state live here. **Point every book at its own `--ledger` path** — see the prompt-iteration note above for why a shared/default path across books is safe for the CSV but wastes ledger disk space and history clarity |
 | `--prompt-version` | `v1` | filename stem under `prompts/`, e.g. `v2` for `prompts/v2.md` |
-| `--model` | `gemini-3.5-flash` | model name passed to the Gemini client only; the OpenAI-compatible fallback's model comes from `GLOSSARY_GEN_OPENAI_MODEL` |
+| `--model` | `gemini-3.7-flash` | model name passed to the Gemini client only; the OpenAI-compatible fallback's model comes from `GLOSSARY_GEN_OPENAI_MODEL`. **Changing it re-runs the whole book** — the ledger is keyed on it |
 | `--library`, `--cover-id`, `--book-id` | — | override the input file's `book` block; required (from one source or the other) when the input is CSV, which never carries a book block |
 | `--max-terms` | — | process at most N terms (smoke runs); must be a positive integer |
 | `--budget-usd` | — | pre-run estimate gate **and** mid-run abort ceiling, see Cost control below |
@@ -433,7 +442,8 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 ## Cost control
 
 Per-token prices live in `glossary_gen/prices.json`, keyed by model name. It covers
-`gemini-3.5-flash` (the default) and `gemini-3.5-flash-lite`, both verified 2026-08-16 against
+`gemini-3.7-flash` (the default), `gemini-3.6-flash`, `gemini-3.5-flash` and
+`gemini-3.5-flash-lite`, all verified 2026-08-16 against
 [Google's published rates](https://ai.google.dev/gemini-api/docs/pricing) and recorded with their
 source in [`docs/research/2026-08-16-gemini-flash-pricing.md`](docs/research/2026-08-16-gemini-flash-pricing.md).
 Any other model — `gemini-3.7-flash`, or the OpenAI-compatible fallback's default `llama3.1` —

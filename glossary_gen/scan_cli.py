@@ -258,7 +258,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cache-dir", type=Path, default=Path("cache"), help="page cache dir")
     parser.add_argument("--ledger", type=Path, default=Path("out/scan.jsonl"), help="ledger path")
     parser.add_argument("--prompt-version", default="v1", choices=scan_prompt_versions())
-    parser.add_argument("--model", default="gemini-3.5-flash", help="Gemini model name")
+    parser.add_argument("--model", default="gemini-3.7-flash", help="Gemini model name")
     parser.add_argument("--limit", type=_positive_int, help="scan at most N pages (smoke runs)")
     parser.add_argument(
         "--delay", type=float, default=0.3, help="seconds between real page fetches"

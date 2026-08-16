@@ -288,7 +288,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--ledger", type=Path, default=Path("out/run.jsonl"), help="run ledger path"
     )
     parser.add_argument("--prompt-version", default="v1", choices=prompt_versions())
-    parser.add_argument("--model", default="gemini-3.5-flash", help="Gemini model name")
+    parser.add_argument(
+        # Changing this changes the ledger key: rows are keyed on (subject, prompt_version,
+        # model), so an existing ledger built against another model has nothing this run
+        # counts as done, and the whole book is re-attempted and re-paid for. That is
+        # correct — a definition written by a different model is a different result — but
+        # it is a bill, so it is stated in the README rather than discovered.
+        "--model",
+        default="gemini-3.7-flash",
+        help="Gemini model name",
+    )
     parser.add_argument("--library", help="overrides the input file's book block")
     parser.add_argument("--cover-id", help="overrides the input file's book block")
     parser.add_argument("--book-id", help="overrides the input file's book block")
