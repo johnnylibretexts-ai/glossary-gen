@@ -537,8 +537,9 @@ a ceiling from the client side.
   own authorship is exactly the failure this was designed against.
 - **`pages` holds URLs, not Conductor page IDs.** Resolving a URL to a `pageID` needs
   Conductor context this tool doesn't have, so resolution is the importer's job.
-- **`x_status` is always `needs-review`.** Nothing in this file has been read by a human.
-  Do not import it as approved content.
+- **`x_status` is always `needs-review` in this file.** Nothing in it has been read by a
+  human. Do not import it as approved content. The sidecar described below is the one place
+  `x_status` carries anything else, and it is not an import file.
 - **`pages` and `x_source_pages` are different on purpose.** `pages` is where the term is
   *used* (straight from the index); `x_source_pages` is which pages actually grounded the
   definition. When they diverge you're looking at either a bad index mapping or a term
@@ -550,6 +551,41 @@ a ceiling from the client side.
 - **Rows only ever come from one run.** The CSV is filtered to the current invocation's
   prompt version, model, and input slugs, so a shared ledger cannot leak another run's rows.
 
+### The unwritten sidecar
+
+Not every term gets a definition. A term whose pages ground too little, won't fetch, or whose
+model call keeps failing is **unwritten** — and every unwritten term is reported in a second
+CSV beside `--out`:
+
+    --out out/glossary.csv  ──▶  out/glossary.csv             the import file, definitions only
+                                 out/glossary.unwritten.csv   what got no definition, and why
+
+The path is derived from `--out`; there is no flag for it. The file is **always written**,
+header-only when nothing is unwritten, so its absence never has to be read as either "clean
+run" or "stale directory."
+
+It carries the same 21 columns, so you can concatenate the two into one sheet. What differs:
+
+- **`definition` is empty**, and `x_status` holds `no_excerpt`, `fetch_error` or `llm_error`
+  instead of `needs-review`. Those values are disjoint, so a concatenated sheet stays legible.
+- **`x_excerpt_chars` is the shortfall.** `0` means the term matched nothing at all on its own
+  occurrence pages — an index or matching defect, not a thin book. Anything between `0` and
+  `MIN_EXCERPT_CHARS` means the book does mention it, briefly, and whether it belongs anyway is
+  your call. On the first full book run both unwritten terms read `0`, and the cause was a
+  regex bug that made `super()` and `__init__()` unmatchable — exactly the class of problem this
+  number is meant to expose rather than silently absorb.
+- **A term is unwritten when it has no `ok` row**, not when it has a failed one. A term that
+  failed in an earlier run and succeeded in this one is in the import CSV, not here.
+
+**Do not feed this file to the importer.** A row with an empty `definition` and a
+`needs-review` status would become an empty glossary entry, which is why it is a separate file
+rather than extra rows in the CSV. See
+[ADR-0006](docs/adr/0006-unwritten-terms-are-reported-beside-the-csv.md).
+
+Terms a run never reached — after it aborts on the spend ceiling or repeated model failure —
+have no ledger record and are absent from both files. That run prints `run aborted early` and
+exits non-zero, so the gap is announced rather than silent.
+
 Every free-text cell (`term`, `definition`, `x_category`, `x_context`, `x_example`,
 `aliases`, `x_related`) is checked for a leading `=`, `+`, `-`, `@`, tab, or carriage
 return and prefixed with `'` when found, since a definition sourced from scraped web text
@@ -558,8 +594,8 @@ formula even inside a quoted CSV field.
 
 ## How it works
 
-    load input ──▶ plan ──▶ fetch unique pages ──▶ per-term loop ──▶ write CSV
-                    │           (cached)              │
+    load input ──▶ plan ──▶ fetch unique pages ──▶ per-term loop ──┬─▶ write CSV
+                    │           (cached)              │            └─▶ write unwritten sidecar
                     └── consults ledger ──────────────┘
 
 Pages are deduplicated before fetching — hundreds of terms usually cluster onto ~100–150
@@ -574,6 +610,12 @@ Measured on a real book, 14 characters of page text still produced a fluent, cor
 source. Correctness there was evidence the model knew Python, not that the book taught it. The
 floor is what makes "page-grounded" mean something; `x_excerpt_chars` in the CSV reports how much
 text actually backed each definition, so a reviewer can see how thin the survivors are.
+
+Such a term is not dropped on the floor. It is reported in the [unwritten
+sidecar](#the-unwritten-sidecar) with the grounding it *did* find, so the reviewer decides whether
+it belongs in the glossary anyway — a term can be correctly denied a definition and still be one
+the book's readers need. On the first full book run that was 2 terms of 212 (`init` and `super`,
+both mangled by term extraction rather than by excerpting); at today's floor it would be about 10.
 
 Excerpt selection ranks *definitional-looking* text first — a paragraph following a heading
 that matches the term, then one containing "is a"/"is called"/"refers to", then any other

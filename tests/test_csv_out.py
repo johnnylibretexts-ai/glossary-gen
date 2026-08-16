@@ -1,6 +1,6 @@
 import csv
 
-from glossary_gen.csv_out import COLUMNS, CORE_COLUMNS, write_csv
+from glossary_gen.csv_out import COLUMNS, CORE_COLUMNS, write_csv, write_unwritten_csv
 from glossary_gen.ledger import LedgerRecord
 from glossary_gen.models import Book
 
@@ -56,6 +56,17 @@ def write(path, records, book=BOOK, *, prompt_version=PROMPT_VERSION, model=MODE
     if slugs is None:
         slugs = {r.subject for r in records}
     return write_csv(path, records, book, prompt_version=prompt_version, model=model, slugs=slugs)
+
+
+def write_unwritten(
+    path, records, book=BOOK, *, prompt_version=PROMPT_VERSION, model=MODEL, slugs=None
+):
+    """Same defaulting as `write`, for the sidecar that reports unwritten terms."""
+    if slugs is None:
+        slugs = {r.subject for r in records}
+    return write_unwritten_csv(
+        path, records, book, prompt_version=prompt_version, model=model, slugs=slugs
+    )
 
 
 def test_header_order_is_core_then_extension_then_provenance(tmp_path):
@@ -207,3 +218,166 @@ def test_csv_scopes_to_the_run_slugs(tmp_path):
     rows = read(path)
     assert [r["term"] for r in rows] == ["Recursion"]
     assert rows[0]["definition"] == "From this book."
+
+
+# --- the unwritten sidecar (ADR-0006) ---------------------------------------------------
+
+
+def test_an_unwritten_term_gets_a_row_carrying_its_status_and_no_definition(tmp_path):
+    """The whole point: a term the run failed to define is reported, not silently dropped.
+
+    `x_status` holds the ledger status verbatim rather than `needs-review`, which would put
+    "a human must read this" on a row with nothing to read.
+    """
+    path = tmp_path / "unwritten.csv"
+    written = write_unwritten(path, [make_record("modulo", status="no_excerpt", definition="")])
+    assert written == 1
+    row = read(path)[0]
+    assert row["term"] == "Recursion"
+    assert row["definition"] == ""
+    assert row["x_status"] == "no_excerpt"
+
+
+def test_an_empty_cell_stays_empty_rather_than_becoming_a_lone_apostrophe(tmp_path):
+    """`"" in "=+-@..."` is True — the empty string is a substring of every string — so a
+    `value[:1] in ...` guard escapes empty cells. The first full-book run shipped 76 such
+    cells across `x_example`, `aliases` and `x_related`.
+    """
+    record = make_record().model_copy(
+        update={"x_example": "", "aliases": [], "x_related": [], "x_context": ""}
+    )
+    path = tmp_path / "out.csv"
+    write(path, [record])
+    row = read(path)[0]
+    assert row["x_example"] == ""
+    assert row["aliases"] == ""
+    assert row["x_related"] == ""
+    assert row["x_context"] == ""
+
+
+def test_a_term_that_later_succeeded_is_not_unwritten(tmp_path):
+    """Membership is "has no ok row", not "has a non-ok row". With a shared ledger a term
+    that failed in one run and succeeded in the next carries both records; reporting it
+    unwritten would tell the reviewer to chase a term that has a definition in the CSV.
+    """
+    path = tmp_path / "unwritten.csv"
+    written = write_unwritten(
+        path,
+        [
+            make_record("modulo", status="no_excerpt", definition=""),
+            make_record("modulo", status="ok"),
+        ],
+    )
+    assert written == 0
+    assert read(path) == []
+
+
+def test_the_latest_failed_attempt_is_the_one_reported(tmp_path):
+    """A term can accumulate several failures under one key — that history is the ledger's
+    job, not the sidecar's. The reviewer needs the current state, once.
+    """
+    path = tmp_path / "unwritten.csv"
+    early = make_record("modulo", status="fetch_error", definition="")
+    late = make_record("modulo", status="no_excerpt", definition="")
+    written = write_unwritten(path, [early, late])
+    assert written == 1
+    assert read(path)[0]["x_status"] == "no_excerpt"
+
+
+def test_every_failure_status_is_reported_not_just_no_excerpt(tmp_path):
+    """`llm_error` is the worst of the three — the model was billed and the term vanished
+    anyway — so scoping the sidecar to `no_excerpt` would leave the costliest loss hidden.
+    """
+    path = tmp_path / "unwritten.csv"
+    written = write_unwritten(
+        path,
+        [
+            make_record("a", status="no_excerpt", definition=""),
+            make_record("b", status="fetch_error", definition=""),
+            make_record("c", status="llm_error", definition=""),
+            make_record("d", status="ok"),
+        ],
+    )
+    assert written == 3
+    assert {r["x_status"] for r in read(path)} == {"no_excerpt", "fetch_error", "llm_error"}
+
+
+def test_the_sidecar_is_written_even_when_nothing_is_unwritten(tmp_path):
+    """Written conditionally, a previous run's file survives a clean run and reports terms
+    that now have definitions — and its absence would mean either "nothing was unwritten"
+    or "this directory is stale", with no way to tell which.
+    """
+    path = tmp_path / "unwritten.csv"
+    written = write_unwritten(path, [make_record("recursion", status="ok")])
+    assert written == 0
+    assert path.exists()
+    with path.open(encoding="utf-8", newline="") as handle:
+        assert next(csv.reader(handle)) == COLUMNS
+
+
+def test_a_stale_sidecar_is_replaced_not_appended_to(tmp_path):
+    path = tmp_path / "unwritten.csv"
+    write_unwritten(path, [make_record("modulo", status="no_excerpt", definition="")])
+    write_unwritten(path, [make_record("recursion", status="ok")])
+    assert read(path) == []
+
+
+def test_the_sidecar_scopes_to_the_run_the_same_way_the_csv_does(tmp_path):
+    """A prior book's failures share the default ledger path; a prior prompt version's
+    share the ledger outright. Neither belongs in this run's report.
+    """
+    path = tmp_path / "unwritten.csv"
+    written = write_unwritten(
+        path,
+        [
+            make_record("photosynthesis", status="no_excerpt", definition=""),
+            make_record("modulo", status="no_excerpt", definition="", prompt_version="v0"),
+            make_record("modulo", status="no_excerpt", definition="", model="llama3.1"),
+            make_record("modulo", status="no_excerpt", definition=""),
+        ],
+        prompt_version=PROMPT_VERSION,
+        model=MODEL,
+        slugs={"modulo"},
+    )
+    assert written == 1
+    assert read(path)[0]["x_prompt_version"] == PROMPT_VERSION
+
+
+def test_a_term_defined_under_another_prompt_version_is_unwritten_for_this_run(tmp_path):
+    """Scoping happens before the done-check, deliberately: v1's definition is not in v2's
+    CSV, so under v2 the term genuinely has none and the reviewer should be told.
+    """
+    path = tmp_path / "unwritten.csv"
+    written = write_unwritten(
+        path,
+        [
+            make_record("modulo", status="ok", prompt_version="v1"),
+            make_record("modulo", status="no_excerpt", definition="", prompt_version="v2"),
+        ],
+        prompt_version="v2",
+        slugs={"modulo"},
+    )
+    assert written == 1
+
+
+def test_an_unwritten_row_carries_the_grounding_it_did_find(tmp_path):
+    """0 is an index defect, 97 is a book that mentions the term in passing — ADR-0006."""
+    path = tmp_path / "unwritten.csv"
+    record = make_record("modulo", status="no_excerpt", definition="").model_copy(
+        update={"excerpt_chars": 97, "source_pages": []}
+    )
+    write_unwritten(path, [record])
+    row = read(path)[0]
+    assert row["x_excerpt_chars"] == "97"
+    assert row["pages"] == "https://a|https://b"
+    assert row["x_source_pages"] == ""
+
+
+def test_the_sidecar_has_the_same_columns_as_the_import_csv(tmp_path):
+    """Same 21 columns so the two files concatenate into one sheet — the single-file view
+    the reviewer wants, without handing an importer rows it would turn into empty entries.
+    """
+    path = tmp_path / "unwritten.csv"
+    write_unwritten(path, [make_record("modulo", status="no_excerpt", definition="")])
+    with path.open(encoding="utf-8", newline="") as handle:
+        assert next(csv.reader(handle)) == COLUMNS

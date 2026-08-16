@@ -10,7 +10,7 @@ from pathlib import Path
 
 import httpx
 
-from glossary_gen.csv_out import write_csv
+from glossary_gen.csv_out import write_csv, write_unwritten_csv
 from glossary_gen.excerpt import excerpts_for_term
 from glossary_gen.fetch import FetchError, PageCache
 from glossary_gen.generate import generate_entry, load_prompt, prompt_versions
@@ -231,11 +231,15 @@ def execute(
                 model_call=ModelCall.NOT_MADE,
             )
 
-        excerpts = excerpts_for_term(pages, term)
+        excerpts, excerpt_chars = excerpts_for_term(pages, term)
         if not excerpts:
+            # The grounding total goes on the row even though no definition was written:
+            # 0 means the term never matched its own occurrence pages (an index defect),
+            # while a total just under the floor means the book mentions it in passing and
+            # the reviewer may want it anyway. See ADR-0006.
             summary.no_excerpt += 1
             return Attempt(
-                record=LedgerRecord(**base, status="no_excerpt"),
+                record=LedgerRecord(**base, status="no_excerpt", excerpt_chars=excerpt_chars),
                 model_call=ModelCall.NOT_MADE,
             )
 
@@ -316,12 +320,22 @@ def collect_pages(term: Term, cache: PageCache, failed: list[str]) -> list[Page]
     return pages
 
 
+def unwritten_path(out: Path) -> Path:
+    """`out/glossary.csv` -> `out/glossary.unwritten.csv`.
+
+    Derived from `--out` rather than given its own flag: a file that always exists whenever
+    `--out` does needs no knob, and a knob could be set to something inconsistent with it —
+    the two halves of one run's report landing in different directories.
+    """
+    return out.with_suffix(".unwritten" + (out.suffix or ".csv"))
+
+
 def dry_run(terms: Sequence[Term], cache: PageCache) -> CoverageReport:
     """Fetch and excerpt every term without calling any model."""
     report = CoverageReport(total=len(terms))
     for term in terms:
         pages = collect_pages(term, cache, report.failed_pages)
-        if pages and excerpts_for_term(pages, term):
+        if pages and excerpts_for_term(pages, term)[0]:
             report.with_excerpts += 1
         else:
             report.without_excerpts += 1
@@ -496,19 +510,24 @@ def run(argv: list[str] | None = None) -> int:
         budget_usd=args.budget_usd,
     )
 
-    written = write_csv(
-        args.out,
-        ledger.records(),
-        book,
-        prompt_version=args.prompt_version,
-        model=client.model,
-        slugs={t.slug for t in parsed.terms},
-    )
+    scope = {
+        "prompt_version": args.prompt_version,
+        "model": client.model,
+        "slugs": {t.slug for t in parsed.terms},
+    }
+    records = ledger.records()
+    written = write_csv(args.out, records, book, **scope)
+    unwritten_out = unwritten_path(args.out)
+    unwritten = write_unwritten_csv(unwritten_out, records, book, **scope)
     print(
         f"ok={summary.ok} no_excerpt={summary.no_excerpt} "
         f"fetch_error={summary.fetch_error} llm_error={summary.llm_error} skipped={summary.skipped}"
     )
     print(f"wrote {written} row(s) to {args.out}")
+    # A second line, not a redefinition of the first: `written` is what a reviewer and the
+    # end-to-end test both read as "definitions produced", and folding definition-less rows
+    # into it would look like tidying while destroying what the number meant (ADR-0006).
+    print(f"{unwritten} term(s) unwritten -> {unwritten_out}")
     if summary.aborted:
         print("error: run aborted early — see the ledger", file=sys.stderr)
         return EXIT_RUN_ABORTED

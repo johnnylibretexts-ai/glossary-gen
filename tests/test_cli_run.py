@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import httpx
 import pytest
 
@@ -9,7 +11,9 @@ from glossary_gen.cli import (
     estimate_cost,
     execute,
     load_prices,
+    unwritten_path,
 )
+from glossary_gen.excerpt import MIN_EXCERPT_CHARS
 from glossary_gen.fetch import PageCache
 from glossary_gen.generate import load_prompt
 from glossary_gen.ledger import Ledger, LedgerRecord
@@ -565,3 +569,40 @@ def test_generation_estimate_tracks_the_measured_run():
 def test_default_model_is_priced():
     """A default the price table cannot price would disable --budget-usd out of the box."""
     assert build_parser().parse_args(["--input", "x.json"]).model in load_prices()
+
+
+def test_the_sidecar_path_is_derived_from_the_out_path():
+    """Derived rather than its own flag, so the two halves of a run's report cannot be
+    pointed at different directories.
+    """
+    assert unwritten_path(Path("out/glossary.csv")) == Path("out/glossary.unwritten.csv")
+    assert unwritten_path(Path("/tmp/a/b.csv")) == Path("/tmp/a/b.unwritten.csv")
+    assert unwritten_path(Path("out/glossary")) == Path("out/glossary.unwritten.csv")
+
+
+def test_an_unwritten_term_records_how_much_grounding_it_did_find(tmp_path):
+    """The record carries the shortfall, not a flat 0 — see ADR-0006. `HTML_MISS` mentions
+    no term at all, so 0 here is the honest number and means "never matched its pages".
+    """
+    routes = {"https://eng.libretexts.org/p0": HTML_MISS}
+    terms = [term("t0", "https://eng.libretexts.org/p0")]
+    ledger_path = tmp_path / "run.jsonl"
+    run_execute(tmp_path, terms, routes, StubClient([]))
+    records = Ledger(ledger_path).records()
+    assert [r.status for r in records] == ["no_excerpt"]
+    assert records[0].excerpt_chars == 0
+
+
+def test_an_unwritten_term_records_grounding_that_fell_just_under_the_floor(tmp_path):
+    """The other half of the same distinction: a book that mentions the term in passing.
+
+    Anything above 0 and below MIN_EXCERPT_CHARS is a judgement for the reviewer rather
+    than an index defect, and the two must not both report as 0.
+    """
+    thin = "Recursion is neat."
+    routes = {"https://eng.libretexts.org/p0": f"<html><body><p>{thin}</p></body></html>"}
+    terms = [term("t0", "https://eng.libretexts.org/p0")]
+    run_execute(tmp_path, terms, routes, StubClient([]))
+    records = Ledger(tmp_path / "run.jsonl").records()
+    assert records[0].status == "no_excerpt"
+    assert 0 < records[0].excerpt_chars < MIN_EXCERPT_CHARS
