@@ -93,6 +93,75 @@ def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _can_be_asked() -> bool:
+    """Whether there is a terminal to put a question to.
+
+    `sys.stdin` is `None` when fd 0 is closed (`nohup cmd 0<&- &`, some daemon launches),
+    raises `ValueError` once closed in-process, and raises `OSError` (`EBADF`) when it is
+    bound to an already-detached descriptor — `isatty()` bottoms out in an ioctl on the
+    raw fd. All three are the daemonised launches this guard exists for, so `isatty()`
+    alone would turn exactly those into an uncaught traceback with an undefined exit code.
+
+    No terminal is not the same as no answer: the caller decides what a missing terminal
+    means, and both callers here treat it as "cannot consent", never as "proceed".
+    """
+    try:
+        return sys.stdin is not None and sys.stdin.isatty()
+    except (ValueError, OSError):
+        return False
+
+
+def refuse_unattended(args: argparse.Namespace) -> int | None:
+    """Refuse a run whose consent can never be obtained. `None` means carry on.
+
+    Called immediately after parsing, before any fetching, because whether consent is
+    *possible* depends only on `--yes` and the terminal — never on the estimate. Deferring
+    it to where the estimate exists would make a forgotten `--yes` crawl an entire book,
+    minutes of traffic, before refusing; on a cron schedule it would do that every tick.
+
+    `EXIT_INPUT_ERROR`, not `EXIT_RUN_ABORTED`: nothing started and nothing was spent, so
+    this is a misconfigured invocation. Exit 3 promises a run that began and can be
+    resumed from its ledger, and there is no ledger here.
+
+    A dry run is never refused: it calls no model and spends nothing, so there is nothing
+    to consent to. Both CLIs define `--dry-run`, and the check lives here rather than at
+    the two call sites so they cannot drift on it.
+    """
+    if args.dry_run or args.yes or _can_be_asked():
+        return None
+    print(
+        "error: refusing to spend without confirmation; pass --yes for an unattended run",
+        file=sys.stderr,
+    )
+    return EXIT_INPUT_ERROR
+
+
+def confirm_spend(args: argparse.Namespace) -> int | None:
+    """Put the cost to the operator once it is known. `None` means proceed.
+
+    Shared by both CLIs rather than written twice: ADR-0002 records that the last pair of
+    copies of the spend logic drifted, and five of the eight fixes that followed were one
+    fix applied twice.
+
+    `input()` is never reached without a terminal — `refuse_unattended` has already
+    returned by then — so this cannot raise EOFError and exit undefined. Declining is not
+    a failure: it is a run that did exactly what was asked, hence `EXIT_OK`.
+
+    Without a terminal it **refuses** rather than returning "proceed". That branch is
+    unreachable through either CLI today, and it is written this way so it stays harmless
+    if it ever becomes reachable: a helper whose money decision defaults to yes when it
+    cannot ask is one reordering away from being the defect this pair was written to fix.
+    """
+    if args.yes:
+        return None
+    if not _can_be_asked():
+        return refuse_unattended(args)
+    if input("proceed? [y/N] ").strip().casefold() not in {"y", "yes"}:
+        print("aborted by user")
+        return EXIT_OK
+    return None
+
+
 def build_client(args: argparse.Namespace) -> LLMClient:
     """Gemini first when a key is present; an OpenAI-compatible endpoint as fallback."""
     clients: list[LLMClient] = []
@@ -307,7 +376,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--budget-usd", type=float, help="abort if the estimated spend exceeds this"
     )
-    parser.add_argument("--yes", action="store_true", help="skip the cost confirmation prompt")
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="confirm the spend up front; required for a non-interactive run",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -362,6 +435,13 @@ def run(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_INPUT_ERROR
 
+    # After reading the input, before touching the network. Both failures exit 2, so
+    # refusing first would tell the operator of a CI job with a typo in --input to pass
+    # --yes, which fixes nothing. `load_input` does no I/O beyond the local file, so the
+    # run still does no work before consent is settled.
+    if (refusal := refuse_unattended(args)) is not None:
+        return refusal
+
     terms = parsed.terms[: args.max_terms] if args.max_terms else parsed.terms
     cache = PageCache(args.cache_dir, build_http_client())
 
@@ -399,13 +479,8 @@ def run(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return EXIT_INPUT_ERROR
-    if (
-        not args.yes
-        and sys.stdin.isatty()
-        and input("proceed? [y/N] ").strip().casefold() not in {"y", "yes"}
-    ):
-        print("aborted by user")
-        return EXIT_OK
+    if (refusal := confirm_spend(args)) is not None:
+        return refusal
 
     ledger = Ledger(args.ledger)
     if ledger.skipped_lines:

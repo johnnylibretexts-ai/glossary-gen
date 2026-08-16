@@ -142,8 +142,13 @@ halted after 7 pages did so on a metered key; this one was not metered.
       --out out/glossary.csv --ledger out/run.jsonl
 
 Both `--dry-run` first: free, and the scan's dry run warms the page cache so the paid run does no
-fetching. Note that the `proceed? [y/N]` gate is `and sys.stdin.isatty()`, so it is **skipped
-entirely** when stdin is not a terminal — an unattended invocation spends without asking.
+fetching.
+
+⚠️ **Both paid commands above now need `--yes` if you are not at a terminal.** When this run was
+made, the `proceed? [y/N]` gate was `and sys.stdin.isatty()`, so it was **skipped entirely** for a
+non-terminal stdin and an unattended invocation spent without asking. That hole is closed: such a
+run is refused with exit 2 before it fetches anything, and `--yes` is how an unattended run
+consents. Copying the block above into a script without it will exit 2 rather than spend.
 
 ## Open, in the order they are worth taking
 
