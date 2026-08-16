@@ -1,0 +1,213 @@
+slug,term,model_fit,model_reason
+abstraction,Abstraction,yes,It is a foundational computer science concept that introductory students need defined.
+aliasing,Aliasing,yes,It is a specific programming concept where multiple variables reference the same mutable object.
+and-operator,And operator,yes,It is a core logical operator with specific boolean evaluation rules in Python.
+append,Append,yes,It is a primary method and operation used to add items to Python lists.
+arithmetic-operator,Arithmetic operator,yes,It is a foundational programming construct governing how calculations are expressed in code.
+ascii,ASCII,yes,This is a technical character encoding standard that beginners need defined.
+assignment-operator,Assignment operator,yes,Beginners frequently confuse assignment with mathematical equality and need a clear definition.
+assignment-statement,Assignment statement,yes,It is a fundamental programming construct used to bind values to variables.
+associativity,Associativity,yes,It is a technical rule governing the evaluation order of operators with the same precedence.
+base-case,Base case,yes,It is an essential term required for understanding how recursion terminates.
+binary,Binary,yes,Its role in computing and low-level data representation is new to beginner programmers.
+binary-search,Binary search,yes,It is a standard foundational algorithm frequently introduced in first programming courses.
+bool-data-type,Bool data type,yes,It is one of Python's fundamental built-in data types.
+boolean-value,Boolean value,yes,It is a basic computational concept representing truth values (True or False).
+boolean-variable,Boolean variable,borderline,It is largely self-explanatory once both 'variable' and 'boolean value' are understood.
+box-plot,Box plot,borderline,It is a standard statistical visualization concept that may be defined in data analysis modules.
+branch,Branch,yes,It is an important control flow term describing an execution path in conditional logic.
+break-statement,Break statement,yes,It is a specific Python keyword used to exit a loop early.
+built-in-function,Built-in function,yes,This is a core concept describing pre-packaged functions provided directly by Python.
+class,Class,yes,It is a fundamental concept in object-oriented programming that requires clear explanation.
+class-attribute,Class attribute,yes,It is a specific object-oriented concept distinguishing shared class variables from instance variables.
+code-point,Code point,yes,This is a specialized technical term in character encoding systems.
+comma-separated-value-file,Comma separated value file,yes,It is a standard data format commonly processed in introductory Python file I/O lessons.
+comment,Comment,yes,It is a basic programming construct used to write non-executable notes in source code.
+comparison-operator,Comparison operator,yes,It is a standard syntactic category of operators used to compare values.
+composition,Composition,yes,An essential programming paradigm concept describing how functions or objects are combined.
+computer,Computer,no,Readers with general computer literacy already know what a computer is.
+computer-program,Computer program,no,The general concept of a program is familiar to anyone who uses computers.
+concatenation,Concatenation,yes,It is standard programming jargon for joining strings or sequences together.
+condition,Condition,borderline,It is a common English word whose programming meaning is fairly intuitive.
+conditional-expression,Conditional expression,yes,It refers to a specific syntactic construct for inline decision-making in code.
+container,Container,yes,It is a formal programming term for data structures that hold collections of objects.
+continue-statement,Continue statement,yes,It is a specific Python control flow keyword used to skip to the next loop iteration.
+control-flow,Control flow,yes,This is a fundamental programming concept explaining the order in which statements execute.
+copy-method,Copy method,borderline,"While specific, understanding shallow versus deep copies is an important programming topic."
+count,count(),borderline,"It is a standard built-in method for sequence types, though specific method names are sometimes omitted from glossaries."
+data-filtering,Data filtering,borderline,"While an intuitive concept, it represents a specific computational task commonly introduced in basic data manipulation."
+data-science,Data science,no,This is a broad professional field rather than a specific programming concept needed in an introductory glossary.
+data-science-life-cycle,Data science life cycle,no,This is a high-level workflow framework outside the scope of fundamental Python programming concepts.
+data-slicing,Data slicing,yes,Slicing is a core Python mechanism for accessing subsets of sequence data structures.
+data-type,Data type,yes,This is an essential foundational concept for understanding how computers categorize and manipulate values.
+dataframe,DataFrame,borderline,It is specific to data science libraries like pandas rather than core introductory Python.
+default-parameter-value,Default parameter value,yes,This is a key Python function definition feature that beginners must learn.
+descending-order,Descending order,no,This is a standard mathematical and everyday term already familiar to readers.
+diamond-problem,Diamond problem,borderline,It is an advanced multiple-inheritance concept that may be beyond the core requirements of a first course.
+dictionary,Dictionary,yes,Dictionaries are one of Python's most essential built-in data structures.
+dictionary-comprehension,Dictionary comprehension,yes,This is a distinct Python syntactic construct for concisely constructing dictionaries.
+docstring,Docstring,yes,"This is a standard Python-specific feature used for documenting modules, classes, and functions."
+dunder-variable,Dunder variable,yes,It is Python-specific terminology for double-underscore attributes that requires explanation.
+elif-statement,Elif statement,yes,This is a core conditional control structure specific to Python syntax.
+else-statement,Else statement,yes,This is a fundamental control flow keyword used across conditional branching.
+encapsulation,Encapsulation,yes,This is a core object-oriented programming principle introduced in basic programming.
+equality,Equality,no,This is a standard mathematical and everyday concept already familiar to readers.
+escape-sequence,Escape sequence,yes,This is a specific programming syntax concept used to represent special characters in strings.
+euclid-s-method,Euclid's method,no,It is a specific mathematical algorithm rather than a core programming concept.
+except-clause,Except clause,yes,This is a core component of Python's structured exception handling mechanism.
+explicit-type-conversion,Explicit type conversion,yes,Understanding how to manually cast values between data types is critical for beginners.
+exploratory-data-analysis,Exploratory data analysis,borderline,"It is relevant if the course includes basic data analysis modules, but peripheral to core language mechanics."
+expression,Expression,yes,This has a precise technical meaning in programming regarding syntax that evaluates to a value.
+factorial,Factorial,no,This is a standard mathematical concept that general readers are expected to know or look up separately.
+feature,Feature,no,This is too general as everyday vocabulary or too domain-specific if referring to machine learning inputs.
+fibonacci-sequence,Fibonacci sequence,no,This is an external mathematical sequence used for coding exercises rather than a programming term.
+field-width,Field width,yes,This is a specific technical term used when formatting string and numeric output.
+file-buffer,File buffer,yes,This is a technical concept related to how file input/output operations manage memory.
+find,find(),borderline,"While it is a common string method, specific methods are often documented in reference tables rather than conceptual glossaries."
+floating-point,Floating-point,yes,It is a foundational data type with distinct computer representation rules.
+floor-division,Floor division,yes,It is a specific arithmetic operation in Python with distinct syntax and behavior.
+for-loop,For loop,yes,This is one of the most critical iteration constructs in introductory programming.
+format-specifier,Format specifier,yes,This is specialized syntax used within string formatting that requires technical explanation.
+formatted-string-literal,Formatted string literal,yes,"Commonly known as f-strings, this is a core modern Python feature for string interpolation."
+function,Function,yes,This is a foundational building block of structured programming that new learners must master.
+function-argument,Function argument,yes,Understanding the distinction between arguments and parameters is an essential early programming concept.
+function-overloading,Function overloading,yes,It is an important computer science concept regarding function signatures and behavior.
+function-parameter,Function parameter,yes,It is a foundational concept in function definition for novice programmers.
+global-scope,Global scope,yes,Variable scope rules are critical and non-intuitive for beginners.
+google-colaboratory,Google Colaboratory,no,It is a specific proprietary tool rather than a general programming concept.
+greater-than,Greater than,no,This is basic mathematical knowledge that does not require an explanation.
+greater-than-or-equal,Greater than or equal,no,This is a standard mathematical comparison familiar to general computer users.
+greatest-common-divisor,Greatest common divisor,no,This is a standard mathematical concept rather than a programming-specific term.
+has-a-relationship,Has-a relationship,yes,It is an essential concept for understanding object-oriented composition.
+help-function,Help function,yes,This is a built-in Python tool used specifically for interactive documentation.
+hierarchical-inheritance,Hierarchical inheritance,yes,It explains a specific structure in object-oriented programming hierarchies.
+high-level-language,High-level language,yes,It introduces how Python relates to machine architecture and other languages.
+histogram,Histogram,borderline,It is a standard data representation chart from introductory statistics.
+hypertext-markup-language,HyperText Markup Language,borderline,It is general web terminology that may only be tangentially relevant in an introductory Python text.
+identity,Identity,yes,This is a technical Python concept describing object memory addresses that is distinct from equality.
+if-statement,If statement,yes,Conditional branching is a core building block of programming logic.
+immutable,Immutable,yes,This is a central concept in Python data types that beginners must learn.
+immutable-object,Immutable object,yes,Mutability is a crucial Python concept that frequently confuses new programmers.
+implicit-type-conversion,Implicit type conversion,yes,Understanding how Python automatically handles types is essential for debugging.
+import-statement,Import statement,yes,This is the primary Python mechanism for loading modules and external libraries.
+in-operator,In operator,yes,Membership testing with 'in' is a fundamental Python-specific syntax feature.
+index,Index,yes,Zero-based indexing is a fundamental and often counterintuitive concept for novices.
+inequality,Inequality,no,This is a basic mathematical concept readers will already understand.
+infinite-loop,Infinite loop,yes,It is a common control flow error that beginners must learn to identify.
+inheritance,Inheritance,yes,It is one of the core pillars of object-oriented programming.
+init,__init__(),yes,It is the foundational constructor method used across Python classes.
+input,Input,no,Computer-literate readers already understand the general concept of computer input.
+instance,Instance,yes,Distinguishing a class from an instance is central to learning OOP.
+instance-attribute,Instance attribute,yes,It is a fundamental component of object state in Python.
+instance-method,Instance method,yes,"It defines object behavior, making it a key object-oriented concept."
+integer,Integer,yes,"Although a math concept, its role as a discrete data type in programming needs explicit definition."
+interpreted-language,Interpreted language,yes,It explains how Python executes code compared to compiled languages.
+interpreter,Interpreter,yes,Novices need to understand the software component executing their Python scripts.
+is-a-relationship,Is-a relationship,yes,This is a fundamental object-oriented programming concept describing class inheritance.
+join-method,join() method,borderline,"While frequently used, individual standard library methods are sometimes too specific for a general glossary."
+key,Key,yes,This has a specific structural meaning as the identifier in dictionary mappings.
+keyword,Keyword,yes,This refers to reserved words in Python syntax that cannot be used as identifiers.
+keyword-argument,Keyword argument,yes,It is a core Python mechanism for passing named parameters to functions.
+less-than,Less than,no,This is an elementary mathematical concept known to all readers.
+less-than-or-equal,Less than or equal,no,This is basic mathematics that requires no glossary definition.
+library,Library,yes,Understanding reusable collections of code is essential for writing practical programs.
+line-plot,Line plot,borderline,It is a common chart type that may be explained if introducing plotting libraries.
+list,List,yes,It is one of Python's most fundamental built-in data structures.
+list-comprehension,List comprehension,yes,It is a unique and widely used Python construct that requires explanation for beginners.
+list-of-lists,List-of-lists,borderline,"It is a common informal description for a 2D list structure, though 'nested list' is more standard."
+local-scope,Local scope,yes,Understanding variable scope within functions is a crucial concept for novice programmers.
+logical-operator,Logical operator,yes,"Novices need a clear definition of operators like and, or, and not used in boolean expressions."
+loop,Loop,yes,Iteration is one of the fundamental control structures taught in a first programming course.
+loop-body,Loop body,yes,Identifies the indented block of statements executed during each iteration of a loop.
+loop-else-statement,Loop else statement,yes,Python's loop-else clause is a unique and often confusing feature that warrants explanation.
+loop-expression,Loop expression,no,This is not standard Python terminology compared to terms like loop header or comprehension.
+lower-method,Lower() method,borderline,"Individual built-in string methods are self-explanatory, though common in introductory coursework."
+mad-lib,Mad lib,no,A familiar word game used as a practice project rather than a formal technical term.
+magic-method,Magic method,yes,Explains the special double-underscore methods that define object behavior in Python.
+max-function,Max function,no,The purpose and meaning of finding a maximum value is self-evident.
+memory-diagram,Memory diagram,yes,"This is an introductory pedagogical technique used to trace variables, references, and memory allocation."
+method-overriding,Method overriding,yes,A core object-oriented concept when introducing class inheritance.
+min-function,Min function,no,The function's purpose is intuitive and maps directly to basic arithmetic.
+mixin-class,Mixin class,no,This is an advanced object-oriented design pattern beyond the scope of a CS1 course.
+mode,Mode,borderline,It has distinct technical meanings in statistics and file I/O that could cause ambiguity.
+module,Module,yes,A fundamental Python concept for organizing code and importing external libraries.
+modulo,Modulo,yes,The remainder operator is unfamiliar in syntax and usage to most introductory students.
+modulus,Modulus,yes,Novices frequently need an explanation for the remainder operator (%) and its common use cases.
+multilevel-inheritance,Multilevel inheritance,borderline,A specific OOP concept that may be too detailed depending on the depth of inheritance covered.
+multiple-inheritance,Multiple inheritance,yes,An important feature of Python's object model that beginners encounter when learning OOP.
+mutable-data-type,Mutable data type,yes,This is a core programming concept describing objects whose state can be modified after creation.
+mutable-object,Mutable object,yes,The distinction between mutable and immutable data types is essential for understanding Python behavior.
+name,__name__,yes,A standard special variable crucial for writing reusable Python modules and main scripts.
+name-collision,Name collision,yes,Explains the problem that occurs when identical identifier names conflict across scopes or imports.
+name-error,Name error,yes,This is a specific Python runtime exception indicating an undefined variable identifier.
+named-replacement-field,Named replacement field,borderline,"Specific to string formatting syntax, which might be explained under string formatting generally."
+ndarray,Ndarray,borderline,It is specific to the NumPy library rather than core standard Python.
+negative-indexing,Negative indexing,yes,This is a distinctive Python sequence feature unfamiliar to people without coding background.
+nested-dictionary,Nested dictionary,yes,A common compound data structure used to model hierarchical data in introductory courses.
+nested-list,Nested list,yes,The standard way multidimensional data and matrices are introduced in basic Python.
+nested-loop,Nested loop,yes,A critical and often challenging control flow concept for beginners processing multidimensional data.
+nesting,Nesting,yes,A fundamental structural concept referring to placing control structures or data types inside one another.
+newline-character,Newline character,yes,Novices need an explanation of escape sequences and invisible control characters in text processing.
+not-operator,Not operator,yes,A basic unary logical operator essential for forming conditional expressions.
+numbered-replacement-field,Numbered replacement field,borderline,A narrow technical term for positional format placeholders that may be too specific for a glossary.
+numpy,NumPy,yes,The standard third-party library commonly introduced for numerical arrays and scientific computing.
+object,Object,yes,It is a foundational concept in Python and object-oriented programming that beginners must learn.
+object-oriented-programming,Object-oriented programming,yes,It is a major programming paradigm central to Python that requires formal definition for novices.
+operator-overloading,Operator overloading,yes,It is a specific programming mechanism in Python defining how operators interact with user-defined classes.
+or-operator,Or operator,yes,It is a fundamental logical operator whose specific boolean behavior needs clear definition for beginners.
+output,Output,no,It is a standard computing term that general computer users already understand.
+overflow-error,Overflow error,yes,It is a fundamental error concept in computer arithmetic that beginners need defined.
+palindrome,Palindrome,no,"It is a general vocabulary word and common puzzle concept, not a programming-specific term."
+pandas,Pandas,borderline,It is a major Python third-party library that may or may not be covered in an introductory CS1 textbook.
+panel-data,Panel data,no,It is a specialized statistical term rather than a core programming concept.
+pass-statement,Pass statement,yes,This is a Python-specific keyword used as a syntactical placeholder.
+path,Path,yes,Understanding file system paths is an essential technical skill for introductory programming.
+pep-8,PEP 8,yes,It is the official style guide standard specific to the Python programming community.
+plotly,Plotly,borderline,A specific third-party visualization library that may be introduced in applied programming chapters.
+polymorphism,Polymorphism,yes,It is a key object-oriented programming concept that is new to introductory students.
+pop-operation,Pop operation,yes,A fundamental sequence and data structure operation that novice programmers need explained.
+positional-argument,Positional argument,yes,It is a fundamental function-call mechanism specific to programming syntax.
+precedence,Precedence,yes,"It governs the order of operations in code expressions, which novices must carefully learn."
+prime-number,Prime number,no,This is a basic mathematical concept that readers already know.
+program,Program,no,It is an everyday term familiar to anyone with basic computer literacy.
+python-enhancement-proposal,Python Enhancement Proposal,yes,It is a key community and design standard mechanism specific to the Python ecosystem.
+python-package-index,Python Package Index,yes,It is the primary repository for third-party Python software that new developers need to know.
+python-standard-library,Python Standard Library,yes,"It refers to the built-in collection of modules provided with Python, essential for new programmers."
+python-tutor,Python Tutor,no,It is an external educational software tool rather than a glossary term.
+range-function,Range function,yes,It is a fundamental built-in sequence generator essential for controlling loops.
+real-division,Real division,yes,It clarifies standard floating-point division in contrast to integer or floor division.
+recursion,Recursion,yes,It is a fundamental computer science concept and problem-solving technique.
+recursion-tree,Recursion tree,borderline,"It is a useful pedagogical diagram for visualizing recursive calls, though not strictly an independent core concept."
+recursive-case,Recursive case,yes,It is a critical component of recursive function design that beginners must understand.
+remove-operation,Remove operation,yes,A core list method with specific behavior regarding value search and deletion.
+repetition,Repetition,no,A general English word that is too broad and intuitive to warrant a standalone glossary entry.
+repetition-operator,Repetition operator,yes,A specific Python syntax feature where sequence types are multiplied to repeat elements.
+repl,REPL,yes,It is an essential Python environment concept unfamiliar to non-programmers.
+replacement-field,Replacement field,yes,It is the technical term for placeholders inside Python format strings.
+return-statement,Return statement,yes,It is an essential control-flow construct for passing values back from functions.
+round-off-error,Round-off error,yes,It explains unintuitive floating-point inaccuracies that surprise introductory programmers.
+scope,Scope,yes,"It defines variable visibility and lifetime, which is a major conceptual hurdle for novices."
+self,Self,yes,"It is a crucial, distinctive Python convention used to reference instance variables in classes."
+series,Series,borderline,"It is a specific data structure if Pandas is taught, but ambiguous or irrelevant otherwise."
+shell,Shell,yes,It describes the interactive environment or command-line interface used to run Python code.
+shift-cipher,Shift cipher,borderline,It is an introductory algorithm example rather than a core language feature.
+snake-case,Snake case,yes,It is a standard Python naming convention that new programmers must learn.
+sorting,Sorting,no,This is an everyday concept that computer-literate beginners already understand.
+split-method,split() method,yes,It is a core string manipulation method commonly taught and referenced in introductory Python.
+statement,Statement,yes,It is a fundamental syntactic building block of code in Python.
+step-size,Step size,borderline,"The general concept is intuitive, but its specific mechanics in slicing and range functions warrant explanation."
+string,String,yes,This is a fundamental programming data type representing text.
+string-length,String length,no,A self-explanatory concept once the basic definition of a string is understood.
+string-slicing,String slicing,yes,This is a specific Python syntax mechanism for extracting substrings.
+sum-function,Sum function,borderline,A standard Python built-in function whose behavior is largely self-evident from its name.
+super,super(),yes,This is a complex object-oriented programming feature that beginners need defined.
+syntax,Syntax,yes,This is a foundational concept in programming that defines the rules for valid code structure.
+traceback,Traceback,yes,This is standard Python terminology for error call stack reports.
+transpose-operator,Transpose operator,borderline,A domain-specific matrix operation that may only appear in scientific or array-oriented modules.
+try-statement,Try statement,yes,A core Python control flow construct essential for learning exception handling.
+tuple,Tuple,yes,This is a core built-in Python data structure unfamiliar to non-programmers.
+unicode,Unicode,yes,This is a technical character encoding standard essential for understanding text representation.
+upper-method,Upper() method,borderline,A specific built-in string method that is helpful to know but quite narrow in scope.
+value,Value,yes,It represents a core fundamental concept of data in programming.
+variable,Variable,yes,This is a foundational concept in programming that differs from mathematical variables.
+while-loop,While loop,yes,This is a fundamental control flow structure in programming.
