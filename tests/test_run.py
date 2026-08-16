@@ -5,7 +5,7 @@ from glossary_gen.run import Attempt, ModelCall, RunResult, execute_run
 
 # A model that prices.json prices. `actual_cost` returns None for an unpriced model and the
 # ceiling short-circuits on None, so a made-up name would let every budget test pass through
-# the guard it means to prove. gemini-3.5-flash is 0.3 in / 2.5 out per Mtok.
+# the guard it means to prove. gemini-3.5-flash is 1.5 in / 9.0 out per Mtok.
 MODEL = "gemini-3.5-flash"
 
 
@@ -118,7 +118,7 @@ def test_the_ceiling_is_seeded_from_the_ledger_not_from_zero(tmp_path):
 
     Restarting the count at zero on every resume lets the ceiling be crossed once per
     invocation, which for a book-sized run is the difference between a cap and a suggestion.
-    1,000,000 tokens_in at 0.3/Mtok is $0.30, comfortably over the $0.01 ceiling here.
+    1,000,000 tokens_in at 1.5/Mtok is $1.50, comfortably over the $0.01 ceiling here.
     """
     ledger = ledger_at(tmp_path)
     ledger.append(rec("already-done", tokens_in=1_000_000))
@@ -150,7 +150,7 @@ def test_spend_is_charged_from_the_record_the_producer_wrote(tmp_path):
 
     result = run(["a", "b"], ledger, attempt, budget_usd=0.01)
 
-    assert seen == ["a"]  # `a` cost $0.30, so `b` was never attempted
+    assert seen == ["a"]  # `a` cost $1.50, so `b` was never attempted
     assert result.aborted is True
 
 

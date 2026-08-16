@@ -320,7 +320,7 @@ def run(argv: list[str] | None = None) -> int:
         return EXIT_INPUT_ERROR
     if estimate is not None:
         print(f"estimated cost: ${estimate:.2f} for {len(pages)} pages")
-        print("note: prices.json rates are UNVERIFIED placeholders — check your provider")
+        print("note: priced from prices.json, verified 2026-08-16 — re-check before a large run")
     # Mirrors cli.py's confirmation gate exactly, so the two entry points behave
     # identically for unattended runs (cron, CI, nohup, a pipe): only prompt when
     # stdin is a tty, or a non-interactive run without --yes would hit input() and

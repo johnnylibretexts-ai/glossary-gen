@@ -1,6 +1,10 @@
 {
-  "_comment": "USD per 1,000,000 tokens, keyed by model name. THESE RATES ARE PLACEHOLDERS AND ARE NOT VERIFIED \u2014 check your provider's current pricing page before relying on --budget-usd, because a wrong rate makes the ceiling wrong in whichever direction the error runs. A model with no entry here disables --budget-usd, and passing --budget-usd for an unpriced model refuses to start rather than running without a ceiling.",
+  "_comment": "USD per 1,000,000 tokens, keyed by model name. Verified 2026-08-16 against https://ai.google.dev/gemini-api/docs/pricing (Gemini Developer API, Standard tier, paid) and recorded in docs/research/2026-08-16-gemini-flash-pricing.md. A model with no entry disables --budget-usd, and passing --budget-usd for an unpriced model refuses to start rather than running without a ceiling. Verify any rate you add against the provider's own current page: a rate that is wrong in the cheap direction does not disable the ceiling, it silently raises it, and the run reports success while overspending. These two models are adjacent rows on that page and were previously transposed here.",
   "gemini-3.5-flash": {
+    "input_per_mtok": 1.5,
+    "output_per_mtok": 9.0
+  },
+  "gemini-3.5-flash-lite": {
     "input_per_mtok": 0.3,
     "output_per_mtok": 2.5
   }
