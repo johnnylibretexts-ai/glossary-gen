@@ -10,7 +10,7 @@ from glossary_gen.scan.emit import (
     report_payload,
     write_json,
 )
-from glossary_gen.scan.models import ScoredTerm
+from glossary_gen.scan.models import Corroboration, MergedTerm
 
 BOOK = Book(
     library="eng",
@@ -20,19 +20,24 @@ BOOK = Book(
     index_url="https://eng.libretexts.org/Bookshelves/CS/Python_Programming_(OpenStax)",
 )
 TERMS = [
-    ScoredTerm(
+    MergedTerm(
         term="Recursion",
         aliases=["recursive"],
         pages=["https://eng.libretexts.org/a"],
-        score=0.9,
+        confidence=0.9,
+        corroborations=[Corroboration.HEADING, Corroboration.CUE],
     ),
-    ScoredTerm(term="Base case", pages=["https://eng.libretexts.org/b"], score=0.3),
+    MergedTerm(
+        term="Base case",
+        pages=["https://eng.libretexts.org/b"],
+        confidence=0.3,
+    ),
 ]
 
 
 def test_emitted_index_is_accepted_by_the_consumer(tmp_path):
     path = tmp_path / "index.json"
-    write_json(path, index_payload(BOOK, TERMS, min_score=0.0))
+    write_json(path, index_payload(BOOK, TERMS))
 
     loaded = load_input(path)
 
@@ -42,42 +47,28 @@ def test_emitted_index_is_accepted_by_the_consumer(tmp_path):
     assert loaded.terms[0].aliases == ("recursive",)
 
 
-def test_min_score_filters_low_confidence_terms(tmp_path):
-    path = tmp_path / "index.json"
-    write_json(path, index_payload(BOOK, TERMS, min_score=0.5))
-
-    assert [t.term for t in load_input(path).terms] == ["Recursion"]
-
-
-def test_scores_are_absent_from_the_index_payload():
-    payload = index_payload(BOOK, TERMS, min_score=0.0)
+def test_scanner_signals_are_absent_from_the_index_payload():
+    payload = index_payload(BOOK, TERMS)
     assert set(payload["terms"][0]) == {"term", "aliases", "pages"}
 
 
-def test_report_carries_the_scores(tmp_path):
+def test_report_carries_confidence_and_corroborations_separately(tmp_path):
     path = tmp_path / "report.json"
     write_json(path, report_payload(TERMS))
 
     report = json.loads(path.read_text(encoding="utf-8"))
 
     assert report["terms"][0]["slug"] == "recursion"
-    assert report["terms"][0]["score"] == 0.9
+    assert report["terms"][0]["confidence"] == 0.9
+    # Reported as the words they are, never fused into one number — see ADR-0004.
+    assert report["terms"][0]["corroborations"] == ["heading", "cue"]
+    assert report["terms"][1]["corroborations"] == []
     assert report["count"] == 2
-
-
-def test_min_score_above_all_terms_raises_emit_error():
-    with pytest.raises(EmitError):
-        index_payload(BOOK, TERMS, min_score=0.99)
-
-
-def test_emit_error_message_names_threshold_and_pre_filter_count():
-    with pytest.raises(EmitError, match=r"min_score=0\.99 filtered out all 2 terms"):
-        index_payload(BOOK, TERMS, min_score=0.99)
 
 
 def test_empty_terms_list_raises_emit_error():
     with pytest.raises(EmitError, match=r"the scan produced no terms"):
-        index_payload(BOOK, [], min_score=0.5)
+        index_payload(BOOK, [])
 
 
 def test_report_payload_unfiltered_even_when_index_would_fail():

@@ -69,8 +69,18 @@ def test_parser_requires_a_book_url():
     args = parser.parse_args(["--book", "https://eng.libretexts.org/x"])
 
     assert args.book == "https://eng.libretexts.org/x"
-    assert args.min_score == 0.0
     assert args.dry_run is False
+
+
+def test_parser_has_no_min_score_flag():
+    """Removed with the fused score it thresholded on — see ADR-0004.
+
+    It cut terms out of the index permanently, before generation, on a number that tied
+    64% of a real book's terms at the ceiling; and because a cut term was never written
+    anywhere, the damage was invisible.
+    """
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["--book", BOOK, "--min-score", "0.5"])
 
 
 def test_limit_rejects_zero():

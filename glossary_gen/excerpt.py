@@ -11,6 +11,15 @@ RANK_AFTER_HEADING = 0
 RANK_DEFINITIONAL = 1
 RANK_MENTION = 2
 
+# Below this much page text, total, there is nothing to ground a definition in and none is
+# written — the term is reported `no_excerpt` instead. Deliberately NOT `MIN_EVIDENCE_CHARS`
+# from the scanner: that answers "is this span findable on the page", this answers "is this
+# enough to write from", and coupling them would let a change to one silently move the other.
+# Measured on a real book, 14 characters still yielded a fluent, correct definition of
+# "modulo" — supplied by the model, not by the page, while `x_source_pages` cited the page
+# as its source. This floor is what makes "page-grounded" mean something.
+MIN_EXCERPT_CHARS = 100
+
 
 def _needles(term: Term) -> tuple[str, ...]:
     return (term.term, *term.aliases)
@@ -54,11 +63,18 @@ def excerpts_for_term(
     *,
     max_excerpts: int = 3,
     max_chars: int = 6000,
+    min_chars: int = MIN_EXCERPT_CHARS,
 ) -> list[Excerpt]:
     """Return the highest-ranked paragraphs grounding `term`, across `pages`.
 
     Pure: no I/O. Ranking is documented in the module's task contract — paragraphs
     following a matching heading first, then definitional phrasing, then plain mentions.
+
+    Returns `[]` when the selected passages total fewer than `min_chars` characters: too
+    little page text to ground anything is not an excerpt, and the caller reports the term
+    as `no_excerpt` rather than paying for a definition the model would have to invent.
+    `min_chars=0` disables the floor, which is how the ranking tests exercise selection
+    without every fixture needing a hundred characters of prose.
     """
     needles = [n for n in _needles(term) if n.strip()]
     if not needles:
@@ -107,4 +123,8 @@ def excerpts_for_term(
         seen_normalized.append(normalized_text)
         used_chars += len(excerpt.text)
         selected.append(excerpt)
+    # Applied to the total, not per passage: several short paragraphs can legitimately add
+    # up to enough, and the total is what `x_excerpt_chars` reports to the reviewer.
+    if used_chars < min_chars:
+        return []
     return selected

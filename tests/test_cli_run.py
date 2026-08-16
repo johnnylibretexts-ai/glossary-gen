@@ -16,7 +16,14 @@ from glossary_gen.ledger import Ledger, LedgerRecord
 from glossary_gen.llm import LLMResult, LLMTransportError, ProviderChain, RawResult
 from glossary_gen.models import GlossaryEntry, Term
 
-HTML_HIT = "<html><body><p>Recursion is a technique.</p></body></html>"
+# Paragraphs are realistic length on purpose: `excerpts_for_term` refuses grounding
+# under MIN_EXCERPT_CHARS, and a 24-character fixture paragraph was never a fair
+# stand-in for a real book page.
+_REAL_PARAGRAPH = (
+    "Recursion is a technique where a function calls itself to solve a smaller "
+    "instance of the same problem, continuing until it reaches a base case."
+)
+HTML_HIT = f"<html><body><p>{_REAL_PARAGRAPH}</p></body></html>"
 HTML_MISS = "<html><body><p>Nothing relevant.</p></body></html>"
 
 

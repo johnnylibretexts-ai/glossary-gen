@@ -59,13 +59,17 @@ penalised.
 _Avoid_: quote, proof, snippet, excerpt
 
 **Confidence**:
-A model's own stated certainty about a candidate. Only ever an input to a score.
-_Avoid_: score
+A model's own stated certainty about a candidate, recorded exactly as given. Nothing adjusts it,
+and it is never combined with anything else into a single figure.
+_Avoid_: score, rating, certainty
 
-**Score**:
-A candidate's confidence after corroboration by independent signals from the page. It ranks terms
-for the human reviewing them; it never decides whether a term survives.
-_Avoid_: rating, weight, relevance, confidence
+**Corroboration**:
+An independent signal from a page agreeing that a term is defined there — the term in a heading, a
+definitional cue in its evidence, or the term appearing on more than one page. Each is recorded by
+name and they are never fused into one number. A corroboration says the page defines the term; it
+says nothing about whether the term belongs in a glossary, which depends on the book's audience and
+is a human's judgement.
+_Avoid_: score, weight, bonus, relevance, ranking
 
 **Merge**:
 Collapsing the same term proposed on several pages into one entry — unioning its pages and
@@ -76,7 +80,10 @@ _Avoid_: dedupe, collapse, consolidate
 
 **Excerpt**:
 A passage chosen from a page because a definition can be grounded in it. Distinct from evidence:
-evidence proves a term belongs in the index, an excerpt is the raw material for explaining it.
+evidence proves a term belongs in the index, an excerpt is the raw material for explaining it. A
+passage too short to ground anything is not an excerpt — where a page yields too little, the term
+has no excerpt and no definition is written, because what came back would be the model's knowledge
+wearing the page's provenance.
 _Avoid_: context, evidence, passage, chunk
 
 **Definition**:

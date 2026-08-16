@@ -5,7 +5,12 @@ from collections.abc import Sequence
 
 from glossary_gen.excerpt import DEFINITIONAL
 from glossary_gen.models import Page
-from glossary_gen.scan.models import Candidate, ScoredCandidate, ScoredTerm
+from glossary_gen.scan.models import (
+    Candidate,
+    Corroboration,
+    MergedTerm,
+    VerifiedCandidate,
+)
 
 # A span shorter than this proves nothing — "a", "is", or a bare term name occurs on
 # almost any page, so accepting it would make the gate a no-op for short hallucinations.
@@ -36,12 +41,10 @@ def verify(candidate: Candidate, page: Page) -> bool:
     return evidence in _normalize(page_text(page))
 
 
-# Weights are deliberately fixed, not fitted. Nineteen labelled reference terms
-# cannot support fitting four parameters; the eval harness reports what these buy
-# instead.
-HEADING_BONUS = 0.15
-CUE_BONUS = 0.10
-MULTIPAGE_BONUS = 0.05
+# There are no weights here any more, and adding some back is the mistake ADR-0004 exists to
+# prevent. Fusing these signals into one number produced a figure that tied 64% of a real
+# book's 212 terms at the ceiling, ranking almost nothing — and every signal answers "is this
+# defined on this page?", which is not the question a reviewer trimming a glossary is asking.
 
 
 def _needle_pattern(candidate: Candidate) -> re.Pattern[str] | None:
@@ -69,18 +72,25 @@ def has_heading_match(candidate: Candidate, page: Page) -> bool:
     return any(block.kind == "heading" and pattern.search(block.text) for block in page.blocks)
 
 
-def score_on_page(candidate: Candidate, page: Page) -> float:
-    """Model confidence plus corroboration bonuses, clamped to 1.0."""
-    score = candidate.confidence
+def corroborations_on_page(candidate: Candidate, page: Page) -> list[Corroboration]:
+    """Which independent signals on this page agree the term is defined here.
+
+    Never emits `MULTIPAGE`: whether a term appears on more than one page cannot be known
+    from one page, so it is `merge`'s to add.
+    """
+    found: list[Corroboration] = []
     if has_heading_match(candidate, page):
-        score += HEADING_BONUS
+        found.append(Corroboration.HEADING)
     if DEFINITIONAL.search(candidate.evidence):
-        score += CUE_BONUS
-    return min(score, 1.0)
+        found.append(Corroboration.CUE)
+    return found
 
 
-def merge(scored: Sequence[ScoredCandidate]) -> list[ScoredTerm]:
-    """Collapse per-page candidates into one row per slug, highest score first.
+def merge(verified: Sequence[VerifiedCandidate]) -> list[MergedTerm]:
+    """Collapse per-page candidates into one row per slug, ordered by slug.
+
+    Ordered by slug, not by any measure of quality, because there is no longer one and
+    inventing an order would imply a ranking the scanner cannot justify (ADR-0004).
 
     Deduplication by slug is mandatory, not cosmetic: `input.load_input` raises
     `InputError` on a duplicate slug, so an unmerged index would be rejected by the very
@@ -89,30 +99,42 @@ def merge(scored: Sequence[ScoredCandidate]) -> list[ScoredTerm]:
     known limitations); a string rule aggressive enough to merge them also merges
     genuinely distinct terms.
     """
-    groups: dict[str, list[ScoredCandidate]] = {}
-    for candidate in scored:
+    groups: dict[str, list[VerifiedCandidate]] = {}
+    for candidate in verified:
         groups.setdefault(candidate.slug, []).append(candidate)
 
-    merged: list[ScoredTerm] = []
+    merged: list[MergedTerm] = []
     for members in groups.values():
-        best = max(members, key=lambda c: c.score)
+        # Which spelling represents the term: the most confident, then the best corroborated,
+        # then whichever was seen first. `max` is stable and returns the earliest of equals,
+        # so the last clause is the existing iteration order rather than an arbitrary pick —
+        # an index would produce the same result and read as if it did more.
+        best = max(members, key=lambda c: (c.confidence, len(c.corroborations)))
         pages: list[str] = []
         aliases: list[str] = []
+        corroborations: list[Corroboration] = []
         for member in members:
             if member.page_url not in pages:
                 pages.append(member.page_url)
             for alias in (*member.aliases, member.term):
                 if alias != best.term and alias not in aliases:
                     aliases.append(alias)
-        score = best.score + (MULTIPAGE_BONUS if len(pages) > 1 else 0.0)
+            # Unioned across every page that proposed the term: a heading match on page 2 is
+            # a real observation even when page 1 is the one representing the term.
+            for corroboration in member.corroborations:
+                if corroboration not in corroborations:
+                    corroborations.append(corroboration)
+        if len(pages) > 1:
+            corroborations.append(Corroboration.MULTIPAGE)
         merged.append(
-            ScoredTerm(
+            MergedTerm(
                 term=best.term,
                 aliases=aliases,
                 pages=pages,
-                score=min(score, 1.0),
+                confidence=best.confidence,
+                corroborations=corroborations,
                 evidence=best.evidence,
             )
         )
-    merged.sort(key=lambda t: (-t.score, t.slug))
+    merged.sort(key=lambda t: t.slug)
     return merged

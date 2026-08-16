@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from glossary_gen.scan.models import Candidate, PageCandidates, ScanRecord, ScoredTerm
+from glossary_gen.scan.models import Candidate, MergedTerm, PageCandidates, ScanRecord
 
 
 def test_candidate_requires_a_term_and_evidence():
@@ -28,8 +28,8 @@ def test_page_candidates_defaults_to_an_empty_list():
     assert PageCandidates().terms == []
 
 
-def test_scored_term_slug_is_derived_from_the_term():
-    term = ScoredTerm(term="List comprehension", pages=["https://x"], score=0.5)
+def test_merged_term_slug_is_derived_from_the_term():
+    term = MergedTerm(term="List comprehension", pages=["https://x"], confidence=0.5)
     assert term.slug == "list-comprehension"
 
 
