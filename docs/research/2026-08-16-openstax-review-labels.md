@@ -141,6 +141,38 @@ and left sealed, it is a held-out prediction rather than a post-hoc comparison �
 strongest of the two baselines, because if one sentence of audience is enough to match expert
 judgement, no page-derived signal needs building at all.
 
+### The seal was broken on 2026-08-16, before any human label existed
+
+At the owner's instruction, and it cannot be restored. What it bought and what it cost are both
+recorded here rather than left to inference.
+
+|  | cuts | rate | borderline | yes |
+|---|---|---|---|---|
+| agent pre-pass | 12 | 5.7% | 26 | 174 |
+| sealed baseline | 32 | 15.1% | 30 | 150 |
+
+Exact agreement 160/212 (75.5%). **Ten of the pre-pass's twelve cuts were independently cut by the
+sealed pass**, and those ten are precisely the two clusters the pre-pass described: the spelled-out
+operator names (*Greater than*, *Greater than or equal*, *Less than*, *Less than or equal*,
+*Descending order*, *Computer*) and the exercise topics (*Mad lib*, *Palindrome*, *Prime number*,
+*Panel data*). Two passes with different prompts, different context and different framing found the
+same two structures. That is the most durable thing in this file.
+
+No term cut by the pre-pass was kept by the baseline. The reverse happened six times — *Max
+function*, *Min function*, *Mixin class*, *Euclid's method*, *Loop expression*, *Data science life
+cycle* — where the baseline, seeing only the term and one sentence, cut things a reader of the book
+would want. Every remaining disagreement is one step on the scale, mostly `borderline` against
+`yes`.
+
+**What this cannot do is settle the question.** Both passes come from one model family, so a shared
+blind spot appears as consensus, and the pre-registered bar asked a candidate to beat this baseline
+**against human labels** — which no longer exists as an unused test, because the baseline is now
+public and any later human pass can be accused of having been influenced by it. The two cut rates
+agree only on the band, not the number: 5.7% against 15.1% is a factor of nearly three.
+
+The honest status: **the flag band is well supported, the ten-term core cut list is the strongest
+candidate a signal could aim at, and clause 2 of the bar can no longer be run as written.**
+
 ## An agent pre-pass — not ground truth
 
 `2026-08-16-openstax-term-fit-agent-pass.csv` holds an assistant's judgement of all 212 terms
