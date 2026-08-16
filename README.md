@@ -89,11 +89,11 @@ Cost guards, in the order they apply:
 - `--delay` (default `0.3`s) is politeness between real page fetches — spacing out requests to
   LibreTexts' servers, not a rate-limit workaround.
 
-⚠️ **`glossary_gen/prices.json`'s rates are unverified placeholders** — the same file and the
-same caveat as the rest of this README: it covers exactly one model, `gemini-3.5-flash`, and
-that rate has not been checked against current provider pricing. `--budget-usd` is only as
-accurate as those numbers; check your provider's current pricing before relying on it as a
-hard ceiling.
+`glossary_gen/prices.json` prices `gemini-3.5-flash` and `gemini-3.5-flash-lite`, verified
+2026-08-16 against [Google's price list](https://ai.google.dev/gemini-api/docs/pricing) and
+recorded in [`docs/research/2026-08-16-gemini-flash-pricing.md`](docs/research/2026-08-16-gemini-flash-pricing.md).
+Any other model — including `gemini-3.7-flash` — has no entry, which disables `--budget-usd`
+for it. Prices move, so re-check before a large run.
 
 A replay-based recall eval harness exists under `tests/eval/` — it scores the
 candidate-selection and verification logic against fixed fixtures, offline, with no model
@@ -105,9 +105,13 @@ so a prompt or scoring change that drops recall below the measured baseline fail
 regress against, not as a validated recall rate for the tool in general.
 
 A separate, real, billed run — a 20-page bounded scan of the same book — produced 39 verified
-terms, and `glossary-gen` grounded all 39 of them (0 without excerpts, 0 page failures). Actual
-spend was $0.0135, against a $0.03 pre-flight estimate (`prices.json`'s rates are still the
-unverified placeholders noted below — the estimate and the actual both used them).
+terms, and `glossary-gen` grounded all 39 of them (0 without excerpts, 0 page failures). It
+reported $0.0135 actual against a $0.03 pre-flight estimate — but **both figures were computed
+with a rate since found to be wrong**, the one belonging to `gemini-3.5-flash-lite` rather than
+`gemini-3.5-flash`. Real spend was 3.6–5× those numbers depending on the token split, and the
+ledger that would settle it exactly is long gone. What survives the correction is the ratio: the
+estimate and the actual were computed the same way, so estimate-vs-actual agreement still holds
+even though neither absolute figure does.
 
 **Rate limiting.** A refused model request is waited out and retried, up to three requests per
 refusal. When the provider says *when* to come back — a `Retry-After` header, or the `RetryInfo`
@@ -421,10 +425,18 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 
 ## Cost control
 
-Per-token prices live in `glossary_gen/prices.json`, keyed by model name. As of this
-writing it covers **exactly one model**, `gemini-3.5-flash`, and **that rate is an unverified
-placeholder** — check your provider's current pricing before relying on `--budget-usd`. Any other model — including
-the OpenAI-compatible fallback's default `llama3.1` — has no configured price.
+Per-token prices live in `glossary_gen/prices.json`, keyed by model name. It covers
+`gemini-3.5-flash` (the default) and `gemini-3.5-flash-lite`, both verified 2026-08-16 against
+[Google's published rates](https://ai.google.dev/gemini-api/docs/pricing) and recorded with their
+source in [`docs/research/2026-08-16-gemini-flash-pricing.md`](docs/research/2026-08-16-gemini-flash-pricing.md).
+Any other model — `gemini-3.7-flash`, or the OpenAI-compatible fallback's default `llama3.1` —
+has no configured price.
+
+**Verify a rate before you add one, and record where you checked.** Until 2026-08-16 this file
+carried `gemini-3.5-flash-lite`'s rate under `gemini-3.5-flash` — the two are adjacent rows on
+Google's price list — which understated input 5× and output 3.6×. An error in that direction does
+not disable the ceiling; it silently raises it, so a run reports success having spent several
+times what `--budget-usd` was set to allow.
 
 - With an unpriced model and no `--budget-usd`, the tool warns once to stderr and
   proceeds; there is no way to estimate or enforce a ceiling it can't price.

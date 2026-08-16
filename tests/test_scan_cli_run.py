@@ -240,7 +240,7 @@ def test_budget_ceiling_trips_on_a_run_of_only_failures(tmp_path):
     """
     client = _FakeClient([BAD, BAD, BAD, BAD, BAD, BAD])
     client.model = "gemini-3.5-flash"
-    # First page's 3 failed attempts cost (300*0.3 + 60*2.5) / 1e6 = $0.00024 — comfortably
+    # First page's 3 failed attempts cost (300*1.5 + 60*9.0) / 1e6 = $0.00099 — comfortably
     # over this ceiling, so the second page must never be attempted.
     summary = execute(
         [PAGE, PAGE2],
