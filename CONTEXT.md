@@ -100,6 +100,29 @@ The pages an excerpt was actually drawn from when writing a definition — alway
 occurrence pages. Conflating the two attributes a definition to pages nothing read.
 _Avoid_: origin pages, cited pages
 
+### Review
+
+**Reviewer**:
+A person deciding, term by term, what leaves the CSV for the book's glossary. Not the book's
+author, and not assumed to know its subject.
+_Avoid_: editor, user, curator
+
+**Term fit**:
+Whether a term belongs in this book's glossary at all, which depends on the book's audience.
+Independent of how well its definition came out — a term can fit perfectly and be badly defined.
+_Avoid_: relevance, importance, glossary-worthiness
+
+**Definition soundness**:
+Whether a generated definition is correct and stands on its own. Independent of whether the term
+belongs — a definition can be flawless for a term that should not be in the glossary.
+_Avoid_: quality, accuracy, correctness
+
+**Verdict**:
+What a reviewer decides about one term — keep, cut, or fix. Derived from term fit and definition
+soundness rather than judged on its own: cut when the term does not fit, fix when it fits but its
+definition is unsound.
+_Avoid_: decision, disposition, outcome
+
 ### Spend and resumption
 
 **Run**:
