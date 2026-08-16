@@ -191,3 +191,17 @@ def test_merge_orders_by_slug_because_nothing_ranks_them():
         ]
     )
     assert [t.term for t in got] == ["Apple", "Zebra"]
+
+
+def test_has_heading_match_finds_a_term_that_ends_in_punctuation():
+    """Same trailing-`\\b` defect as `excerpt._pattern`: a heading could never corroborate
+    a term like `super()`, so it silently lost a corroboration as well as its definition."""
+    page = Page(url="https://x", blocks=(Block(kind="heading", text="The super() method"),))
+    candidate = Candidate(term="super()", evidence="e" * 30, confidence=0.9)
+    assert has_heading_match(candidate, page) is True
+
+
+def test_has_heading_match_still_requires_a_word_boundary():
+    page = Page(url="https://x", blocks=(Block(kind="heading", text="Listen carefully"),))
+    candidate = Candidate(term="list", evidence="e" * 30, confidence=0.9)
+    assert has_heading_match(candidate, page) is False

@@ -25,9 +25,27 @@ def _needles(term: Term) -> tuple[str, ...]:
     return (term.term, *term.aliases)
 
 
+def bounded(needle: str) -> str:
+    """Escape a needle, anchoring each end with `\\b` only where one can exist.
+
+    `\\b` sits between a word character and a non-word one, so a needle ending in `)` — like
+    `super()` or `__init__()` — can never satisfy a trailing `\\b` when the page continues
+    with a space. Wrapping the whole alternation as `\\b(a|b)\\b` therefore made every term
+    ending in punctuation unmatchable: `super()` and `__init__()` reached the CSV with no
+    definition at all, and `count()` and `find()` survived only via a paren-free alias.
+
+    Anchoring per needle rather than per group also tightens the plain case, since each
+    alternative gets the boundaries its own spelling justifies instead of the group's.
+    """
+    edge = r"\b"
+    left = edge if needle[:1].isalnum() or needle[:1] == "_" else ""
+    right = edge if needle[-1:].isalnum() or needle[-1:] == "_" else ""
+    return f"{left}{re.escape(needle)}{right}"
+
+
 def _pattern(needles: Sequence[str]) -> re.Pattern[str]:
-    alternatives = "|".join(re.escape(n) for n in needles if n.strip())
-    return re.compile(rf"\b({alternatives})\b", re.IGNORECASE)
+    alternatives = "|".join(bounded(n) for n in needles if n.strip())
+    return re.compile(f"({alternatives})", re.IGNORECASE)
 
 
 def _normalize(text: str) -> str:
