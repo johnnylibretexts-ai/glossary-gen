@@ -1,6 +1,6 @@
 import pytest
 
-from glossary_gen.llm import LLMStructuredOutputError, RawResult
+from glossary_gen.llm import LLMStructuredOutputError, LLMTransportError, RawResult
 from glossary_gen.models import Block, Page
 from glossary_gen.scan.propose import (
     build_scan_prompt,
@@ -28,8 +28,11 @@ class _FakeClient:
 
     def complete_raw(self, prompt):
         self.prompts.append(prompt)
+        reply = self._replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply  # the provider went away on this attempt
         return RawResult(
-            text=self._replies.pop(0),
+            text=reply,
             model=self.model,
             provider=self.name,
             tokens_in=7,
@@ -75,6 +78,22 @@ def test_propose_terms_retries_malformed_output():
     assert len(client.prompts) == 2
 
 
+def test_propose_terms_reports_what_every_attempt_cost_not_just_the_last():
+    """A page that parsed on its third try still paid for the first two.
+
+    `scan_cli.execute` charges the returned `RawResult` against the ceiling and writes it
+    to an `ok` ledger row that later runs reseed from, so reporting only the winning
+    attempt's tokens hides the rest permanently. Same defect the generator had.
+    _FakeClient bills 7/2 per attempt; three attempts is 21/6.
+    """
+    client = _FakeClient(["nope", "still nope", '{"terms": []}'])
+
+    _, raw = propose_terms(client, load_scan_prompt("v1"), PAGE)
+
+    assert len(client.prompts) == 3
+    assert (raw.tokens_in, raw.tokens_out) == (21, 6)
+
+
 def test_propose_terms_gives_up_after_the_retry_budget():
     client = _FakeClient(["nope", "still nope", "nope again"])
 
@@ -95,6 +114,22 @@ def test_propose_terms_attaches_accumulated_tokens_to_the_raised_exception():
     assert len(client.prompts) == 3
     assert excinfo.value.tokens_in == 21
     assert excinfo.value.tokens_out == 6
+
+
+def test_propose_terms_attaches_accumulated_tokens_to_a_mid_retry_transport_error():
+    """An outage on the second attempt does not refund the first.
+
+    Attempt one reached a reply and was billed 7/2 before the chain went down.
+    `scan_cli.execute` reads the spend off the exception, so letting a transport error
+    escape bare records a zero for a page that really cost something.
+    """
+    client = _FakeClient(["nope", LLMTransportError("all providers failed")])
+
+    with pytest.raises(LLMTransportError) as excinfo:
+        propose_terms(client, load_scan_prompt("v1"), PAGE)
+
+    assert len(client.prompts) == 2
+    assert (excinfo.value.tokens_in, excinfo.value.tokens_out) == (7, 2)
 
 
 def test_propose_terms_rejects_a_bare_json_array():

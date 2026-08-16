@@ -9,6 +9,7 @@ from glossary_gen.llm import (
     _FENCE,
     LLMClient,
     LLMStructuredOutputError,
+    LLMTransportError,
     RawResult,
     extract_json,
 )
@@ -95,16 +96,26 @@ def propose_terms(
     input tokens even for a malformed reply, so those tokens are accumulated across all
     attempts and attached to the final `LLMStructuredOutputError` as `tokens_in`/
     `tokens_out`, letting the caller charge a failed page's real cost against the budget
-    ceiling instead of losing it when the exception discards the `RawResult`s. A
-    transport error (raised by `complete_raw` itself, before any `RawResult` exists) has
-    nothing to attach — 0 is correct there, not a gap.
+    ceiling instead of losing it when the exception discards the `RawResult`s. The same
+    totals ride out on the returned `RawResult` when a later attempt succeeds, and on a
+    transport error raised part-way through the retries. A transport error on the *first*
+    attempt is the one case with nothing to attach, and reports 0 — correctly, since
+    `complete_raw` raised before any `RawResult` existed.
     """
     prompt = build_scan_prompt(template, page)
     last: LLMStructuredOutputError | None = None
     tokens_in = 0
     tokens_out = 0
     for _ in range(retries + 1):
-        raw = client.complete_raw(prompt)
+        try:
+            raw = client.complete_raw(prompt)
+        except LLMTransportError as exc:
+            # Deliberately not retried — a ProviderChain has already exhausted its
+            # fallbacks — but earlier attempts in this loop were billed, and that spend
+            # must not leave with the exception.
+            exc.tokens_in = tokens_in
+            exc.tokens_out = tokens_out
+            raise
         tokens_in += raw.tokens_in
         tokens_out += raw.tokens_out
         try:
@@ -113,7 +124,12 @@ def propose_terms(
                     "reply was a JSON array, not an object with a 'terms' key"
                 )
             payload = _require_terms_shape(extract_json(raw.text))
-            return PageCandidates.model_validate(payload), raw
+            # Every attempt's spend, not just the winning one's — the caller charges this
+            # against the ceiling and writes it to an `ok` row that later runs reseed
+            # from. `model`/`text` stay the successful attempt's; only the totals change.
+            return PageCandidates.model_validate(payload), raw.model_copy(
+                update={"tokens_in": tokens_in, "tokens_out": tokens_out}
+            )
         except LLMStructuredOutputError as exc:
             last = exc
         except ValidationError as exc:

@@ -181,12 +181,41 @@ def execute(
         try:
             result = generate_entry(client, template, term, excerpts)
         except LLMError as exc:  # base class of LLMTransportError and LLMStructuredOutputError
-            ledger.append(LedgerRecord(**base, status="llm_error", error=str(exc)))
+            # A failed term still cost real, billed tokens: every attempt that reached a
+            # reply was a paid call, even though it ended in a schema error and got
+            # retried. `generate_entry` attaches the accumulated total to
+            # `LLMStructuredOutputError`. A bare `LLMTransportError` never gets that far
+            # (raised before any reply exists), so `getattr` with a 0 default is correct
+            # there, not a workaround. Both the running counters (ceiling correctness
+            # within THIS run) and the ledger row (ceiling correctness across a RESUMED
+            # run, whose seeding sums every record) must see this spend, or --budget-usd
+            # is blind to it.
+            failed_tokens_in = getattr(exc, "tokens_in", 0)
+            failed_tokens_out = getattr(exc, "tokens_out", 0)
+            tokens_in_spent += failed_tokens_in
+            tokens_out_spent += failed_tokens_out
+            ledger.append(
+                LedgerRecord(
+                    **base,
+                    status="llm_error",
+                    error=str(exc),
+                    tokens_in=failed_tokens_in,
+                    tokens_out=failed_tokens_out,
+                )
+            )
             summary.llm_error += 1
             consecutive_failures += 1
             if consecutive_failures >= max_consecutive_failures:
                 summary.aborted = True
                 break
+            # Mirrors the success branch's bottom-of-loop check. The next iteration's
+            # top-of-loop check would catch this spend — but only if there IS a next
+            # term, so without this a run whose final term blows the ceiling exits 0.
+            if budget_usd is not None:
+                spent = actual_cost(client.model, tokens_in_spent, tokens_out_spent, prices)
+                if spent is not None and spent > budget_usd:
+                    summary.aborted = True
+                    break
             continue
 
         consecutive_failures = 0
