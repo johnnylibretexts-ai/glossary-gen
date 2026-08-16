@@ -40,9 +40,18 @@ EXIT_OK = 0
 EXIT_INPUT_ERROR = 2
 EXIT_RUN_ABORTED = 3
 
-# Rough per-term shape used only for the pre-run estimate.
-EST_TOKENS_IN = 1200
-EST_TOKENS_OUT = 220
+# Per-term shape used only for the pre-run estimate, measured rather than guessed: 210
+# billed terms of Python Programming (OpenStax) on 2026-08-16 averaged 479 tokens in and
+# 130 out (input p90 585, output p90 157 — generation is remarkably uniform, because the
+# prompt is three excerpts under a fixed character budget and the reply is one entry).
+#
+# These are MEANS, deliberately. The estimate predicts a total across many terms, and the
+# total's expectation is the count times the mean; per-term spread averages out over a book
+# and a median or a p90 would bias the total. The previous 1200/220 were a guess, and ran
+# 2.1x high — safe for a gate, but high enough that someone sizing a book would decline a
+# run they could easily afford.
+EST_TOKENS_IN = 500
+EST_TOKENS_OUT = 130
 
 USER_AGENT = "glossary-gen/0.1 (+https://github.com/johnnylibretexts/glossary-gen)"
 

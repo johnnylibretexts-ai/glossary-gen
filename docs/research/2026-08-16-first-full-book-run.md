@@ -39,24 +39,29 @@ CSV shape checks, all clean: 21 columns; every row `x_status = needs-review` and
 no `addedBy` column; no cell required formula-injection escaping. **13 rows have
 `pages != x_source_pages`** — precisely the "worth a human's eye" signal the README describes.
 
-## Finding 1 — the estimator is ~2× high, from two different errors
+## Finding 1 — the estimator is ~2× high (FIXED 2026-08-16)
 
-`EST_TOKENS_IN = 1200` and `EST_TOKENS_OUT = 220` (`cli.py:44-45`) against measured reality:
+**Correction to this section as first written.** It claimed "one shared pair of constants serves
+two workloads." That was wrong: the two commands already had separate pairs — `EST_TOKENS_IN/OUT`
+in `cli.py` and `EST_SCAN_TOKENS_IN/OUT` in `scan_cli.py`. A first grep for `EST_TOKENS` missed
+the scan pair because it is named differently. The real story is duller: both pairs were guessed
+before any run existed, and both guessed high.
 
-| | Estimated | Measured | |
+| | Guessed | Measured | Ratio |
 |---|---|---|---|
-| Scan, per page | 1200 in / 220 out | **1035 in / 124 out** | output ~1.8× over |
-| Generation, per term | 1200 in / 220 out | **479 in / 130 out** | input ~2.5× over |
+| Scan, per page | 2000 in / 400 out | **1035 in / 124 out** | 1.9× / 3.2× over |
+| Generation, per term | 1200 in / 220 out | **479 in / 130 out** | 2.5× / 1.7× over |
 
-The scan's input guess is close; its *output* guess is nearly double. Generation is the reverse —
-its input guess is far too high, because the excerpt budget (~6,000 characters) is rarely filled.
-Two constants wrong at opposite ends, and because output is the expensive side the errors compound
-rather than cancel.
+Generation is remarkably uniform — input p90 585 against a mean of 479 — because the prompt is
+three excerpts under a fixed character budget and the reply is a single entry. Scanning is far more
+variable on output (median 91, mean 124, max 454), since a page may define one term or a dozen.
 
-The direction is benign — a gate that over-warns is safer than one that under-warns — but the
-figure shown at the confirmation prompt is about twice what will actually be charged, so someone
-sizing a large book off it may decline a run they could easily afford. One shared pair of constants
-serves two workloads with genuinely different shapes.
+Both pairs are now the measured **means**, rounded up: 1050/125 for the scan, 500/130 for
+generation. Means rather than medians because the estimate predicts a *total* across many units,
+and a total's expectation is the count times the mean — per-unit spread averages out over a book,
+while a median or p90 would bias the total. Whole-book estimates now land at **1.014×** and
+**1.034×** of the measured actuals, down from 2.1–2.4×, and both are pinned by a test against this
+run's token counts so a future edit that skews them fails CI.
 
 ## Finding 2 — the score ranks noise above signal
 
@@ -142,11 +147,20 @@ entirely** when stdin is not a terminal — an unattended invocation spends with
 
 ## Open, in the order they are worth taking
 
-1. **What the score is for** — Finding 2. A domain question about what the number means, not a
-   tuning exercise. Grill before touching `candidates.py`.
-2. **The estimator constants** — Finding 1. Measured; the only real decision is whether to keep
-   fixed constants or derive them from the ledger.
-3. **`prices.json` effective dates** — `gemini-3.7-flash` and `gemini-3.6-flash` double on
-   2027-01-01.
-4. **The default model** — `gemini-3.7-flash` is proven working unmodified and 2.15× cheaper than
-   the `gemini-3.5-flash` currently defaulted to in three places.
+1. **What genuinely helps a reviewer trim 212 terms.** Findings 2 and 3 between them establish
+   that neither the old score nor `x_excerpt_chars` predicts definition quality, and ADR-0004
+   removed the score rather than reweighting it. Nothing replaces it. This is the real open
+   question, and it should start from evidence rather than another plausible formula.
+2. **The default model** — `gemini-3.7-flash` is proven working with no client changes and is
+   2.15× cheaper than the `gemini-3.5-flash` still defaulted to in three places.
+
+**Closed since this note was written:**
+
+- ~~The estimator constants~~ — recalibrated to measured means; both estimates now within 3.5% of
+  actual and pinned by tests (Finding 1, updated above).
+- ~~`__init__()` / `super()` losing their definitions~~ — a trailing `\b` could never match after
+  a non-word character, so any term ending in punctuation was unmatchable. Fixing it also
+  recovered `Equality`, `Inequality` and `Copy method`, whose `==`, `!=` and `copy()` aliases had
+  been unmatchable too, leaving them starved below the excerpt floor.
+- ~~`prices.json` effective dates~~ — the owner accepted the 2027-01-01 liability; the file
+  carries a `_gemini_3_7_flash_expiry` key naming the date and the direction of the error.

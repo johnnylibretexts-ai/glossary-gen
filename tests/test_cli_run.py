@@ -538,3 +538,25 @@ def test_build_client_wraps_every_provider_in_the_retry_policy(monkeypatch):
     args = build_parser().parse_args(["--input", "index.json"])
     chain = build_client(args)
     assert [type(c).__name__ for c in chain._clients] == ["RetryingClient", "RetryingClient"]
+
+
+# Calibration is pinned against a real billed run so a future edit that skews it fails CI,
+# the same way tests/eval pins the measured recall floor. Python Programming (OpenStax),
+# 2026-08-16, gemini-3.7-flash: 210 billed terms cost 100,600 tokens in / 27,309 out.
+MEASURED_GEN_TERMS = 210
+MEASURED_GEN_TOKENS_IN = 100_600
+MEASURED_GEN_TOKENS_OUT = 27_309
+
+
+def test_generation_estimate_tracks_the_measured_run():
+    """The estimate predicts a TOTAL over many terms, so it should land near the actual.
+
+    Being high is the safer direction for a pre-flight gate, but a figure twice the truth
+    makes someone decline a book they could easily afford.
+    """
+    prices = {"m": {"input_per_mtok": 1.0, "output_per_mtok": 1.0}}
+    estimated = estimate_cost("m", MEASURED_GEN_TERMS, prices)
+    actual = (MEASURED_GEN_TOKENS_IN + MEASURED_GEN_TOKENS_OUT) / 1_000_000
+    # A band, not an upper bound: the estimator is calibrated on one book and cannot
+    # guarantee it exceeds the actual on another. This catches a skew, not a miss.
+    assert 0.9 * actual <= estimated <= 1.25 * actual, f"{estimated} vs {actual}"
