@@ -220,6 +220,43 @@ book**, caught by no single rule. Duplication is therefore not the reviewer's bu
 sentence that suggested it was over-read from a pre-pass that was never ground truth. The measured
 version now sits in `merge`'s docstring so the next reader does not re-derive it.
 
+## A second book: neither cut cluster survives
+
+*Introductory Statistics 1e (OpenStax)*, `stats/689`, 117 pages, $0.15, scanned 2026-08-16.
+Same publisher deliberately, so pedagogical style is held constant and **subject** is the only
+variable.
+
+| | Python (136pp) | Statistics (117pp) |
+|---|---|---|
+| terms | 212 | 123 |
+| terms per page | 1.56 | 1.05 |
+| spelled-out operator names | 6 | **0** |
+| exercise topics | 4 | **0** |
+| subset pairs per term | 0.34 | 0.33 |
+
+**Both clusters were programming-text artifacts.** Nothing among the 123 statistics terms is an
+English rendering of a symbol, and none is an exercise topic — the nearest candidates,
+*Institutional Review Board*, *Placebo treatment*, *Plus four method*, are genuine research-methods
+terms. The cut list this note offered as "two verifiable observations" does not generalise, and the
+finding is recorded rather than quietly dropped.
+
+There is a mechanism, which is why this is worth keeping rather than deleting. A programming text
+must define the puzzle before the reader can code it, so *Palindrome* and *Shift cipher* get
+definitions and the scanner correctly finds them. In a statistics text the exercise domain **is**
+the subject: the book defines *Sampling bias*, never "dice". So "the book stops to explain
+something that is not the subject" is a real phenomenon with a real cause — it is simply much rarer
+outside programming.
+
+The one quantity that replicated is the subset-pair rate, 0.34 against 0.33 per term. That is
+strong evidence for the earlier correction: the rate is a property of the string rule, not a defect
+in either book's merge.
+
+**Standing conclusion after two books.** The flag band holds, and the statistics book's cut rate
+looks lower still. But no cut *structure* has yet survived a change of subject, so there remains
+nothing a reviewer can be handed. That is the third time this question has been answered "no usable
+signal yet" — by ADR-0004, by the excerpt-chars finding, and now by cluster recurrence — which is
+itself worth weighing before a fourth attempt.
+
 ## What this pass cannot test
 
 - **`multipage` is compromised.** The term-fit sheet lists page URLs, so page count is countable.
