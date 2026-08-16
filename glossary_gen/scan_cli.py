@@ -83,11 +83,19 @@ def collect_pages(urls: Sequence[str], cache: PageCache, failed: list[str]) -> l
     return pages
 
 
-# A scan prompt carries a full page, not three excerpts. Measured against Python
-# Programming (OpenStax): ~12KB of HTML per page, ~2000 prompt tokens after parse_page
-# strips markup. Output is a short JSON list.
-EST_SCAN_TOKENS_IN = 2000
-EST_SCAN_TOKENS_OUT = 400
+# A scan prompt carries a full page, not three excerpts, so input runs roughly double a
+# generation call. Measured over the 136 pages of Python Programming (OpenStax) on
+# 2026-08-16: 1035 tokens in and 124 out per page on average. The earlier 2000/400 came
+# from estimating page size before any run existed and were 1.9x and 3.2x high.
+#
+# Means, for the same reason as `cli.EST_TOKENS_*`: this predicts a whole book's total.
+# Output is far more variable here than in generation (median 91, mean 124, max 454) since
+# a page may define one term or a dozen — but that spread averages out across a book, which
+# is the only quantity this is ever asked for. Rounded up from 1035.4 / 123.7, because for
+# a spend gate leaning marginally high is the safe direction; it is not an upper bound for
+# any other book, and cannot be.
+EST_SCAN_TOKENS_IN = 1050
+EST_SCAN_TOKENS_OUT = 125
 
 
 @dataclass

@@ -351,3 +351,19 @@ def test_a_final_page_that_crosses_the_ceiling_still_aborts(tmp_path):
 
 def test_estimate_scan_cost_returns_none_for_an_unpriced_model():
     assert estimate_scan_cost("no-such-model", 100, {}) is None
+
+
+# Same pinning as the generation estimate, from the same run: 136 pages cost 140,809
+# tokens in / 16,821 out on gemini-3.7-flash.
+MEASURED_SCAN_PAGES = 136
+MEASURED_SCAN_TOKENS_IN = 140_809
+MEASURED_SCAN_TOKENS_OUT = 16_821
+
+
+def test_scan_estimate_tracks_the_measured_run():
+    prices = {"m": {"input_per_mtok": 1.0, "output_per_mtok": 1.0}}
+    estimated = estimate_scan_cost("m", MEASURED_SCAN_PAGES, prices)
+    actual = (MEASURED_SCAN_TOKENS_IN + MEASURED_SCAN_TOKENS_OUT) / 1_000_000
+    # A band, not an upper bound: the estimator is calibrated on one book and cannot
+    # guarantee it exceeds the actual on another. This catches a skew, not a miss.
+    assert 0.9 * actual <= estimated <= 1.25 * actual, f"{estimated} vs {actual}"
