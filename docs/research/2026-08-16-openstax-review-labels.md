@@ -141,6 +141,43 @@ and left sealed, it is a held-out prediction rather than a post-hoc comparison �
 strongest of the two baselines, because if one sentence of audience is enough to match expert
 judgement, no page-derived signal needs building at all.
 
+## An agent pre-pass — not ground truth
+
+`2026-08-16-openstax-term-fit-agent-pass.csv` holds an assistant's judgement of all 212 terms
+against the audience sentence, made without opening the sealed baseline. It exists to say which
+band the cut rate probably falls in before anyone spends an afternoon, and to give the human pass
+something to disagree with.
+
+**It is not the ground truth and must never be copied into the term-fit sheet.** The sealed
+baseline is scored against *human* labels; score it against these and the comparison is
+model-versus-model, which measures agreement rather than correctness and quietly voids the
+pre-registration. Its second weakness is contamination: the terms *Computer*, *Palindrome*,
+*Object*, *Panel data* and *Ndarray* are discussed by name in ADR-0004 and in the run note,
+alongside remarks about which are noise — so those five judgements are not independent.
+
+    no 12 (5.7%)   borderline 26   yes 174
+
+Both readings land in the **under-20% flag band**: 5.7% counting only `no`, 17.9% counting
+borderlines as cuts. If the human pass agrees, this is a needle-in-a-haystack problem and the
+right shape is a flag on suspect rows.
+
+Two structures showed up in the 12 cuts, and both are observations a reviewer can verify rather
+than quantities:
+
+- **Spelled-out operator names** — *Greater than*, *Greater than or equal*, *Less than*, *Less
+  than or equal*, *Descending order*. English renderings of symbols the audience already reads.
+- **Exercise topics rather than language concepts** — *Mad lib*, *Palindrome*, *Prime number*,
+  *Shift cipher*, *Panel data*. The book stops to explain the puzzle, not Python, and the scanner
+  correctly observes a definition. This is ADR-0004's opposition in its clearest form.
+
+The borderline pile is the more interesting result, because most of it is not a fit problem at
+all: *Modulo*/*Modulus*, *Immutable*/*Immutable object*, *Mutable data type*/*Mutable object*,
+*Computer program*/*Program*, *Repetition*/*Repetition operator*, and *Boolean value*/*Boolean
+variable*/*Bool data type* are **near-duplicate entries that survived merge**. Slug identity keeps
+them apart by design, and no fit signal will ever fix them. If the human pass sees the same thing,
+the reviewer's real burden may be duplication rather than worthiness — which would be a different
+project from the one this note pre-registers, and worth knowing before building either.
+
 ## What this pass cannot test
 
 - **`multipage` is compromised.** The term-fit sheet lists page URLs, so page count is countable.
