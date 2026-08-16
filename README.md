@@ -222,7 +222,7 @@ adds a page-shaped ledger record and a second entry point, not a second copy of 
 | `--limit` | — | scan at most N pages (smoke runs) |
 | `--delay` | `0.3` | seconds between real page fetches |
 | `--budget-usd` | — | abort if spend exceeds this |
-| `--yes` | off | skip the cost confirmation prompt |
+| `--yes` | off | confirm the spend up front. **Required for a non-interactive run** — without a tty and without this flag, the run refuses and exits 2 before fetching anything, rather than spending unasked |
 | `--dry-run` | off | walk the book and report structural candidates; call no model, spend nothing |
 
 ## Install
@@ -428,7 +428,7 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 | `--library`, `--cover-id`, `--book-id` | — | override the input file's `book` block; required (from one source or the other) when the input is CSV, which never carries a book block |
 | `--max-terms` | — | process at most N terms (smoke runs); must be a positive integer |
 | `--budget-usd` | — | pre-run estimate gate **and** mid-run abort ceiling, see Cost control below |
-| `--yes` | off | skip the interactive `proceed? [y/N]` cost-confirmation prompt (needed for any non-interactive/CI invocation) |
+| `--yes` | off | confirm the spend up front, skipping the interactive `proceed? [y/N]` prompt. **Required for any non-interactive/CI invocation** — without a tty and without this flag, the run refuses and exits 2 before fetching anything, rather than spending unasked |
 | `--dry-run` | off | fetch and excerpt only; calls no model, needs no API key, costs nothing |
 
 ### Exit codes
@@ -436,7 +436,7 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 | Code | Meaning |
 |---|---|
 | `0` | success (including a user declining the confirmation prompt) |
-| `2` | input error — bad/missing input file, no provider configured, pre-run cost estimate exceeds `--budget-usd`, or `--budget-usd` was given for a model with no configured price |
+| `2` | input error — bad/missing input file, no provider configured, pre-run cost estimate exceeds `--budget-usd`, `--budget-usd` was given for a model with no configured price, or a non-interactive run was given no `--yes` to consent with. Nothing was spent and there is no ledger to resume |
 | `3` | the run started but aborted early — 5 consecutive provider failures, or actual spend crossed `--budget-usd` mid-run. Check the ledger for what happened; already-succeeded terms are safe and the run is resumable |
 
 ## Cost control

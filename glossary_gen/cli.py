@@ -93,6 +93,63 @@ def _now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _can_be_asked() -> bool:
+    """Whether there is a terminal to put a question to.
+
+    `sys.stdin` is `None` when fd 0 is closed (`nohup cmd 0<&- &`, some daemon launches)
+    and raises `ValueError` once closed in-process, so `sys.stdin.isatty()` alone turns
+    the very case this guard exists for into an uncaught traceback.
+    """
+    try:
+        return sys.stdin is not None and sys.stdin.isatty()
+    except ValueError:
+        return False
+
+
+def refuse_unattended(args: argparse.Namespace) -> int | None:
+    """Refuse a run whose consent can never be obtained. `None` means carry on.
+
+    Called immediately after parsing, before any fetching, because whether consent is
+    *possible* depends only on `--yes` and the terminal — never on the estimate. Deferring
+    it to where the estimate exists would make a forgotten `--yes` crawl an entire book,
+    minutes of traffic, before refusing; on a cron schedule it would do that every tick.
+
+    `EXIT_INPUT_ERROR`, not `EXIT_RUN_ABORTED`: nothing started and nothing was spent, so
+    this is a misconfigured invocation. Exit 3 promises a run that began and can be
+    resumed from its ledger, and there is no ledger here.
+
+    A dry run is never refused: it calls no model and spends nothing, so there is nothing
+    to consent to. Both CLIs define `--dry-run`, and the check lives here rather than at
+    the two call sites so they cannot drift on it.
+    """
+    if args.dry_run or args.yes or _can_be_asked():
+        return None
+    print(
+        "error: refusing to spend without confirmation; pass --yes for an unattended run",
+        file=sys.stderr,
+    )
+    return EXIT_INPUT_ERROR
+
+
+def confirm_spend(args: argparse.Namespace) -> int | None:
+    """Put the cost to the operator once it is known. `None` means proceed.
+
+    Shared by both CLIs rather than written twice: ADR-0002 records that the last pair of
+    copies of the spend logic drifted, and five of the eight fixes that followed were one
+    fix applied twice.
+
+    `input()` is never reached without a terminal — `refuse_unattended` has already
+    returned by then — so this cannot raise EOFError and exit undefined. Declining is not
+    a failure: it is a run that did exactly what was asked, hence `EXIT_OK`.
+    """
+    if args.yes or not _can_be_asked():
+        return None
+    if input("proceed? [y/N] ").strip().casefold() not in {"y", "yes"}:
+        print("aborted by user")
+        return EXIT_OK
+    return None
+
+
 def build_client(args: argparse.Namespace) -> LLMClient:
     """Gemini first when a key is present; an OpenAI-compatible endpoint as fallback."""
     clients: list[LLMClient] = []
@@ -307,7 +364,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--budget-usd", type=float, help="abort if the estimated spend exceeds this"
     )
-    parser.add_argument("--yes", action="store_true", help="skip the cost confirmation prompt")
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="confirm the spend up front; required for a non-interactive run",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -356,6 +417,8 @@ def _resolve_book(parsed_book: Book | None, args: argparse.Namespace) -> Book:
 
 def run(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if (refusal := refuse_unattended(args)) is not None:
+        return refusal
     try:
         parsed = load_input(args.input)
     except InputError as exc:
@@ -399,13 +462,8 @@ def run(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return EXIT_INPUT_ERROR
-    if (
-        not args.yes
-        and sys.stdin.isatty()
-        and input("proceed? [y/N] ").strip().casefold() not in {"y", "yes"}
-    ):
-        print("aborted by user")
-        return EXIT_OK
+    if (refusal := confirm_spend(args)) is not None:
+        return refusal
 
     ledger = Ledger(args.ledger)
     if ledger.skipped_lines:

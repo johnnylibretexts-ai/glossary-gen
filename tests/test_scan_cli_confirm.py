@@ -1,16 +1,26 @@
-"""The cost-confirmation prompt in `scan_cli.run`, mirrored from `cli.run` (FIX 2).
+"""The cost-confirmation prompt in `scan_cli.run`, now shared with `cli.run` (FIX 2).
 
 A run without `--yes` must never call `input()` in a non-interactive context (cron, CI,
 nohup, a pipe) -- that hits EOFError and dies with an undefined exit code. And declining
 an interactive prompt is not a failure: it must print an explicit message and return the
 same EXIT_OK that `cli.run` returns, not the silent EXIT_RUN_ABORTED this used to return.
+
+What changed since: not prompting is not the same as not asking. A non-interactive run is
+now refused rather than allowed through, because being allowed through meant spending
+without consent. That behaviour is covered in tests/test_spend_gate.py; this file keeps
+the interactive contract.
 """
 
 import httpx
 
 from glossary_gen import scan_cli
 from glossary_gen.scan.toc import API
-from glossary_gen.scan_cli import EXIT_INPUT_ERROR, EXIT_OK, build_parser, run
+from glossary_gen.scan_cli import (
+    EXIT_INPUT_ERROR,
+    EXIT_OK,
+    build_parser,
+    run,
+)
 
 BOOK = "https://eng.libretexts.org/Bookshelves/CS/Sample"
 
@@ -84,10 +94,15 @@ def test_non_interactive_run_without_yes_never_calls_input(tmp_path, monkeypatch
 
     exit_code = run(_base_args(tmp_path))
 
-    # A defined exit code (not an uncaught EOFError -> implicit exit 1), and it got far
-    # enough past the prompt to hit the next real failure (no provider configured).
+    # A defined exit code, not an uncaught EOFError -> implicit exit 1. The code is the
+    # same EXIT_INPUT_ERROR it always was, but it now means something different: the run
+    # is REFUSED for want of consent, where it used to walk past the gate and fail later
+    # on "no provider configured". Both are 2, so the message is what distinguishes them
+    # and the assertion below is load-bearing. See tests/test_spend_gate.py.
+    captured = capsys.readouterr()
     assert exit_code == EXIT_INPUT_ERROR
-    assert "aborted by user" not in capsys.readouterr().out
+    assert "refusing to spend" in captured.err
+    assert "aborted by user" not in captured.out
 
 
 def test_declining_the_prompt_prints_a_message_and_returns_exit_ok(tmp_path, monkeypatch, capsys):

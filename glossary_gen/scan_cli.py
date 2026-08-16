@@ -18,6 +18,8 @@ from glossary_gen.cli import (
     _positive_int,
     build_client,
     build_http_client,
+    confirm_spend,
+    refuse_unattended,
 )
 from glossary_gen.fetch import FetchError, PageCache, parse_page
 from glossary_gen.input import InputError
@@ -264,7 +266,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--delay", type=float, default=0.3, help="seconds between real page fetches"
     )
     parser.add_argument("--budget-usd", type=float, help="abort if spend exceeds this")
-    parser.add_argument("--yes", action="store_true", help="skip the cost confirmation prompt")
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="confirm the spend up front; required for a non-interactive run",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -275,6 +281,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if (refusal := refuse_unattended(args)) is not None:
+        return refusal
     client = build_http_client()
     try:
         book, urls = discover(args.book, client)
@@ -327,17 +335,11 @@ def run(argv: list[str] | None = None) -> int:
     if estimate is not None:
         print(f"estimated cost: ${estimate:.2f} for {len(pages)} pages")
         print("note: priced from prices.json, verified 2026-08-16 — re-check before a large run")
-    # Mirrors cli.py's confirmation gate exactly, so the two entry points behave
-    # identically for unattended runs (cron, CI, nohup, a pipe): only prompt when
-    # stdin is a tty, or a non-interactive run without --yes would hit input() and
-    # die with an uncaught EOFError instead of a defined exit code.
-    if (
-        not args.yes
-        and sys.stdin.isatty()
-        and input("proceed? [y/N] ").strip().casefold() not in {"y", "yes"}
-    ):
-        print("aborted by user")
-        return EXIT_OK
+    # Shared with cli.py rather than mirrored, so the two entry points cannot drift on
+    # the behaviour that controls spend. See `confirm_spend` for why a non-interactive
+    # run is refused rather than prompted.
+    if (refusal := confirm_spend(args)) is not None:
+        return refusal
 
     try:
         llm = build_client(args)
