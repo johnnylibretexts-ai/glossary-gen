@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
-from glossary_gen.excerpt import DEFINITIONAL
+from glossary_gen.excerpt import DEFINITIONAL, bounded
 from glossary_gen.models import Page
 from glossary_gen.scan.models import (
     Candidate,
@@ -55,8 +55,12 @@ def _needle_pattern(candidate: Candidate) -> re.Pattern[str] | None:
         # every word boundary, so `has_heading_match` would return True for any
         # heading-bearing page instead of False.
         return None
-    alternatives = "|".join(re.escape(n) for n in needles)
-    return re.compile(rf"\b({alternatives})\b", re.IGNORECASE)
+    # `bounded` rather than wrapping the group in `\b(...)\b`: a needle ending in `)` can
+    # never satisfy a trailing `\b`, so `super()` and `__init__()` could never match a
+    # heading here — losing a corroboration for exactly the terms `excerpt.py` was also
+    # failing to ground. Shared with `excerpt.py` so the two cannot drift apart again.
+    alternatives = "|".join(bounded(n) for n in needles)
+    return re.compile(f"({alternatives})", re.IGNORECASE)
 
 
 def has_heading_match(candidate: Candidate, page: Page) -> bool:

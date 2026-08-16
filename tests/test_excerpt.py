@@ -157,3 +157,28 @@ def test_the_floor_counts_total_grounding_not_each_passage():
     got = _excerpts_for_term([page], term)
     assert sum(len(e.text) for e in got) >= 100
     assert len(got) == 2
+
+
+def test_matches_a_term_that_ends_in_punctuation():
+    """A trailing `\\b` can never match after ')', so `super()` found nothing at all.
+
+    Measured on a real book: `super()` and `__init__()` reached the CSV with no definition,
+    while `count()` and `find()` survived only because they also carry a paren-free alias.
+    """
+    page = Page(
+        url="https://a",
+        blocks=(
+            para(
+                "super () is a special method that provides a temporary superclass "
+                "object instance for a subclass to use in its own methods."
+            ),
+        ),
+    )
+    term = Term(term="super()", slug="super", aliases=("super ()",), pages=("https://a",))
+    assert len(excerpts_for_term([page], term)) == 1
+
+
+def test_word_boundaries_still_protect_a_plain_term():
+    """The fix must not turn every term into a substring match."""
+    page = Page(url="https://a", blocks=(para("You should listen carefully to this."),))
+    assert excerpts_for_term([page], make_term(term="list")) == []
