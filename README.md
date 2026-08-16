@@ -439,6 +439,12 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 | `2` | input error — bad/missing input file, no provider configured, pre-run cost estimate exceeds `--budget-usd`, `--budget-usd` was given for a model with no configured price, or a non-interactive run was given no `--yes` to consent with. Nothing was spent and there is no ledger to resume |
 | `3` | the run started but aborted early — 5 consecutive provider failures, or actual spend crossed `--budget-usd` mid-run. Check the ledger for what happened; already-succeeded terms are safe and the run is resumable |
 
+> **Unattended runs need `--yes`, including ones that would cost nothing.** Consent is settled
+> before the ledger is read, so a re-run that is fully resumable — every subject already `ok`, so
+> nothing would be paid for — is still refused without `--yes`. The gate cannot know the ledger
+> state without doing the work first, and doing work before consent is the thing it exists to
+> prevent. Add `--yes` to any scheduled invocation.
+
 ## Cost control
 
 Per-token prices live in `glossary_gen/prices.json`, keyed by model name. It covers

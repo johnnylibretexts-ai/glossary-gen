@@ -101,8 +101,9 @@ def test_scan_refuses_to_spend_when_not_interactive_without_yes(tmp_path, monkey
 
 def test_generate_refuses_to_spend_when_not_interactive_without_yes(tmp_path, monkeypatch, capsys):
     # A provider must be configured, or the generate CLI fails on that first and never
-    # reaches the gate. The address is unroutable on purpose: if the gate lets the run
-    # through, it fails on the network rather than returning EXIT_RUN_ABORTED.
+    # reaches the gate. The base URL is never dialled — the HTTP client below is mocked —
+    # so what catches a regression here is the exit code, not the network: with the gate
+    # removed this run reaches the mock and returns 0.
     monkeypatch.setenv("GLOSSARY_GEN_OPENAI_BASE_URL", "http://127.0.0.1:1")
     monkeypatch.delenv("GLOSSARY_GEN_GEMINI_API_KEY", raising=False)
     monkeypatch.setattr(
@@ -145,6 +146,24 @@ def test_scan_refuses_before_fetching_anything(tmp_path, monkeypatch):
 
     assert scan_cli.run(_scan_args(tmp_path)) == EXIT_INPUT_ERROR
     assert requests == []
+
+
+def test_a_broken_input_is_reported_before_the_consent_refusal(tmp_path, monkeypatch, capsys):
+    """A misconfigured run should say what is actually wrong with it.
+
+    Both failures exit 2, so if consent is checked first the operator of a CI job with a
+    typo in `--input` is told to pass `--yes` — which fixes nothing. Reading the input
+    file touches no network, so it can be checked first without the run doing any work.
+    """
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    _explode_on_input(monkeypatch)
+
+    exit_code = cli.run(["--input", str(tmp_path / "nope.json")])
+
+    err = capsys.readouterr().err
+    assert exit_code == EXIT_INPUT_ERROR
+    assert "does not exist" in err
+    assert "refusing to spend" not in err
 
 
 def test_yes_flag_is_consent_for_an_unattended_scan(tmp_path, monkeypatch):

@@ -96,13 +96,18 @@ def _now() -> str:
 def _can_be_asked() -> bool:
     """Whether there is a terminal to put a question to.
 
-    `sys.stdin` is `None` when fd 0 is closed (`nohup cmd 0<&- &`, some daemon launches)
-    and raises `ValueError` once closed in-process, so `sys.stdin.isatty()` alone turns
-    the very case this guard exists for into an uncaught traceback.
+    `sys.stdin` is `None` when fd 0 is closed (`nohup cmd 0<&- &`, some daemon launches),
+    raises `ValueError` once closed in-process, and raises `OSError` (`EBADF`) when it is
+    bound to an already-detached descriptor — `isatty()` bottoms out in an ioctl on the
+    raw fd. All three are the daemonised launches this guard exists for, so `isatty()`
+    alone would turn exactly those into an uncaught traceback with an undefined exit code.
+
+    No terminal is not the same as no answer: the caller decides what a missing terminal
+    means, and both callers here treat it as "cannot consent", never as "proceed".
     """
     try:
         return sys.stdin is not None and sys.stdin.isatty()
-    except ValueError:
+    except (ValueError, OSError):
         return False
 
 
@@ -141,9 +146,16 @@ def confirm_spend(args: argparse.Namespace) -> int | None:
     `input()` is never reached without a terminal — `refuse_unattended` has already
     returned by then — so this cannot raise EOFError and exit undefined. Declining is not
     a failure: it is a run that did exactly what was asked, hence `EXIT_OK`.
+
+    Without a terminal it **refuses** rather than returning "proceed". That branch is
+    unreachable through either CLI today, and it is written this way so it stays harmless
+    if it ever becomes reachable: a helper whose money decision defaults to yes when it
+    cannot ask is one reordering away from being the defect this pair was written to fix.
     """
-    if args.yes or not _can_be_asked():
+    if args.yes:
         return None
+    if not _can_be_asked():
+        return refuse_unattended(args)
     if input("proceed? [y/N] ").strip().casefold() not in {"y", "yes"}:
         print("aborted by user")
         return EXIT_OK
@@ -417,13 +429,18 @@ def _resolve_book(parsed_book: Book | None, args: argparse.Namespace) -> Book:
 
 def run(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if (refusal := refuse_unattended(args)) is not None:
-        return refusal
     try:
         parsed = load_input(args.input)
     except InputError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_INPUT_ERROR
+
+    # After reading the input, before touching the network. Both failures exit 2, so
+    # refusing first would tell the operator of a CI job with a typo in --input to pass
+    # --yes, which fixes nothing. `load_input` does no I/O beyond the local file, so the
+    # run still does no work before consent is settled.
+    if (refusal := refuse_unattended(args)) is not None:
+        return refusal
 
     terms = parsed.terms[: args.max_terms] if args.max_terms else parsed.terms
     cache = PageCache(args.cache_dir, build_http_client())
