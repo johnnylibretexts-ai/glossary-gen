@@ -114,6 +114,22 @@ terms that no longer exist.
 Labels are one expert's judgement, recorded as such. They are not observed reviewer behaviour, and
 nothing downstream may describe them as measuring what a LibreTexts reviewer did.
 
+**A first attempt at sitting one was discarded, 2026-08-16.** The sheet was filled with a prior
+session's context still loaded, so the labels were not independent of the `agent-pass` sheet they
+would have been used to judge. The tell was arithmetic rather than suspicion: `agent-pass` flags 12
+terms `no` and *all 12* fell inside the sheet's 14 cuts — precision 100%, lift 15.3x — while the
+sealed `model-fit-baseline` managed 32.3% precision on the same task; overall agreement ran 90.9%
+against the agent pass and 76.6% against the model baseline, when the two machine passes agree with
+each other only 75.5% of the time. Independent raters do not produce a 100% subset. No cut rate or
+signal result from that pass has been reported or committed as a finding.
+
+It is preserved as `2026-08-16-openstax-term-fit-contaminated-pass.csv`, a **third machine pass**
+and never ground truth. Add it to the do-not-open list below.
+
+**Do not open while labelling:** `2026-08-16-openstax-definition-soundness.csv`,
+`2026-08-16-openstax-term-fit-agent-pass.csv`, `2026-08-16-openstax-model-fit-baseline.csv`,
+`2026-08-16-openstax-term-fit-contaminated-pass.csv`, `out/index-report.json`.
+
 ## Pre-registered: the bar a candidate signal must clear
 
 A signal ships only if all four hold.
