@@ -24,8 +24,8 @@ introductory one."
 
 | Sheet | Rows | Columns you fill |
 |---|---|---|
-| `2026-08-16-openstax-term-fit.csv` | 212 | `checked_page`, `term_fit`, `reason` |
-| `2026-08-16-openstax-definition-soundness.csv` | 202 | `definition_sound`, `reason` |
+| `2026-08-16-openstax-term-fit.csv` | **214** | `checked_page`, `term_fit`, `reason` |
+| `2026-08-16-openstax-definition-soundness.csv` | 202 | `definition_sound`, `reason` | (not yet rebuilt against the 207-row CSV — sitting one first)
 
 Both label columns take `yes`, `no`, or `borderline`. `reason` is free text, required on anything
 that is not `yes` — write a sentence, not a category. `checked_page` takes `y` when you had to open
@@ -37,7 +37,7 @@ disguise; codes get derived from the reasons afterwards.
 
 ## How to run it
 
-1. **Sitting one — term fit, 212 rows, roughly 55 minutes.** Do not open the soundness sheet. The
+1. **Sitting one — term fit, 214 rows, roughly 55 minutes.** Do not open the soundness sheet. The
    term-fit sheet has no `definition` column by construction, and reading a definition before
    judging fit turns "does this belong?" into "is this any good?" — the exact conflation ADR-0004
    removed, this time baked into the ground truth where nothing downstream can falsify it.
@@ -84,17 +84,32 @@ pages, `gemini-3.7-flash` throughout, $0.347 all in. `out/index.json` was writte
 22:54, `out/glossary.csv` at 23:03; both live in gitignored `out/`, which is why the sheets are
 committed here.
 
-Three staleness facts the labeller should know:
+**⚠️ Rewritten 2026-08-16 (later the same day). All three staleness facts previously listed here
+are now obsolete, and the term-fit sheet has been rebuilt.** What they said, and what is true now:
 
-- The soundness sheet carries **202 rows, not 210**. The run predates `MIN_EXCERPT_CHARS = 100`, so
-  eight rows beneath that floor — `Modulo` (14 chars of excerpt), `Equality` (17), `Repetition`
-  (18), `Inequality` (19), `Real division` (21), `Floor division` (23), `Copy method` (53),
-  `Line plot` (82) — would be reported `no_excerpt` today and are excluded.
-- `init` and `super` are on the term-fit sheet only. They never received a definition; both are
-  almost certainly mangled `__init__` and `super()`, and the punctuation fix (`d53e235`) landed
-  after this run.
-- The on-disk `out/index-report.json` still carries the **removed fused score**. Do not consult it
-  while labelling.
+- ~~The soundness sheet carries 202 rows because eight sit beneath `MIN_EXCERPT_CHARS`~~ — those
+  eight were re-attempted via `--regenerate` (ADR-0009). `Equality` and `Inequality` recovered real
+  grounding (17→132 and 19→134 characters) and carry proper definitions; the other six moved to the
+  unwritten sidecar. **The CSV is now 207 rows with nothing below the floor.**
+- ~~`init` and `super` never received a definition~~ — **both now have one.** The punctuation fix
+  `d53e235` made `__init__()` and `super()` matchable on their own pages.
+- ~~`out/index-report.json` still carries the removed fused score~~ — **it does not.** The book was
+  re-scanned, and the report now carries `confidence` and `corroborations` separately plus the
+  `rejected` block (ADR-0007). It is still a scanner diagnostic, so still do not consult it while
+  labelling — but the reason is now ADR-0004's, not staleness.
+
+**The term-fit sheet is 214 rows, not 212 — a deliberate, additive change to the pre-registration.**
+The re-scan moved the index from 212 slugs to 214: 5 new (`Delimiter`, `Fibonacci`, `Index method`,
+`Outer loop`, `Overriding`), 3 gone (`method-overriding`, `python-tutor`, `string-slicing`), 209
+shared. The sheet is built from the **current** index because term fit is keyed to slugs, survives
+every regeneration, and is worth the hours only if it describes the list that would actually ship.
+
+This does not weaken the pre-registered bar. Any comparison against the sealed
+`model-fit-baseline` and `agent-pass` sheets — both still 212 rows, both untouched — is computed on
+the **209-slug intersection**. The 5 new terms are labelled but excluded from that comparison; the 3
+departed ones keep their baseline labels and get no human label. Labelling a superset costs five
+extra rows and loses nothing; labelling the stale 212 would have spent the expensive input on three
+terms that no longer exist.
 
 Labels are one expert's judgement, recorded as such. They are not observed reviewer behaviour, and
 nothing downstream may describe them as measuring what a LibreTexts reviewer did.
