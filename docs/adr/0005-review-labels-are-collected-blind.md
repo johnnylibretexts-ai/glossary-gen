@@ -68,3 +68,17 @@ nothing downstream may describe them as measuring what a LibreTexts reviewer did
 Merging the two sheets, or adding a definition column to the first, destroys the meaning of every
 label on it while looking exactly like tidying up. That is the specific act this record exists to
 prevent.
+
+## Superseded in part, 2026-08-17
+
+**Neither sitting will happen** — there is no expert available to this project. The protocol above
+is sound and stays on record; what it needed was a labeller, and there is none.
+[ADR-0010](./0010-reference-sets-come-from-books-not-experts.md) records what replaces it: recall
+measured against the glossary a book's own authors wrote, which is published human judgement about
+which terms belong, harvested rather than solicited.
+
+Three things here are unaffected by that, and are the reason this record is amended rather than
+retired. The sheets stay split, because a definition column on the term-fit sheet would still
+destroy it. The labels, if they are ever collected, are still one person's judgement recorded as
+such. And a model still may not fill either sheet — more firmly than before, since with no human
+pass to compare against there would be nothing left that could falsify one.

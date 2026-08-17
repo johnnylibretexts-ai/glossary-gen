@@ -106,6 +106,26 @@ so a prompt or verification change that drops recall below the measured baseline
 0.579 is measured on **one book against a partial reference set** — read it as a baseline to
 regress against, not as a validated recall rate for the tool in general.
 
+A second eval scores recall against a reference set **nobody wrote by hand**. Some books publish
+their own glossary — LibreTexts renders author-written entries as definition lists under a
+`Glossary` or `Key Terms` heading — and `tools/harvest_glossary.py` harvests them from the page
+cache an earlier scan already filled, for free:
+
+```bash
+python3 tools/harvest_glossary.py --scan out/stats-scan.jsonl --index out/stats-index.json
+```
+
+Against *Introductory Statistics 1e (OpenStax)*, that is 101 author-written terms across 33 of 117
+pages, of which the scanner proposed 60. Replayed over the 33 recorded pages the figure is 55/101 =
+0.545, pinned at 0.50 in `tests/eval/test_recall_stats_author_glossary.py`.
+
+**Recall is all this measures.** 155 slugs the scanner proposed for that book are absent from the
+author glossary, and that is not a 73% over-proposal rate: only some pages carry glossary blocks,
+so absence is silence, not a judgement. `coverage` returns a report with no precision field and the
+tool prints the caveat on every run. Not every book has one to harvest — Python Programming
+(OpenStax) carries none, its back-matter page being the unfilled LibreTexts template. See
+[ADR-0010](docs/adr/0010-reference-sets-come-from-books-not-experts.md).
+
 A separate, real, billed run — a 20-page bounded scan of the same book — produced 39 verified
 terms, and `glossary-gen` grounded all 39 of them (0 without excerpts, 0 page failures). It
 reported $0.0135 actual against a $0.03 pre-flight estimate — but **both figures were computed
@@ -199,8 +219,16 @@ genuinely distinct terms. Near-duplicates are left for the human doing the revie
 | `scan/propose.py` | the scan prompt and one model call per page |
 | `scan/candidates.py` | `verify` / `corroborations_on_page` / `merge` — pure, no I/O, no LLM |
 | `scan/emit.py` | writing the index and the diagnostic sidecar |
-| `scan/evaluate.py` | the offline replay harness behind `tests/eval/` |
+| `scan/evaluate.py` | the offline replay harness behind `tests/eval/`, and the recorder that writes its fixtures |
+| `scan/reference.py` | harvesting a book's own author glossary as a reference set |
 | `scan_cli.py` | argument parsing, cost control, the orchestration loop |
+
+Three scripts sit outside the package in `tools/`, because they serve a reviewer or a maintainer
+rather than a run: `harvest_glossary.py` (above), `record_fixture.py` (records an eval fixture from
+the page cache — the only one that spends, and it refuses to without `--yes` or a terminal), and
+`label_sheet.py` (a keyboard labeller for the review sheets in `docs/research/`, which writes only
+what a human types — see [ADR-0005](docs/adr/0005-review-labels-are-collected-blind.md) and
+[ADR-0010](docs/adr/0010-reference-sets-come-from-books-not-experts.md)).
 
 The boundaries from [How it works](#how-it-works) still hold, and the scanner is on the far side of
 one of them: `input.py` remains the only file that knows the index format. The scanner conforms to

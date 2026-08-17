@@ -137,6 +137,18 @@ soundness rather than judged on its own: cut when the term does not fit, fix whe
 definition is unsound.
 _Avoid_: decision, disposition, outcome
 
+**Author glossary**:
+The glossary a book's own authors wrote, published in the book as definition lists under a
+`Glossary` or `Key Terms` heading. Harvested, never solicited — it is the authors' editorial
+judgement about their own book, and a book may carry none at all.
+_Avoid_: gold standard, ground truth, reference glossary
+
+**Reference set**:
+The terms a scan is measured against. Recall against it is a measurement; a term the scanner
+proposed that the set omits is **not** a cut, because a set covering only some of a book's pages is
+silent about the rest rather than negative.
+_Avoid_: expected terms, gold set, answer key
+
 ### Spend and resumption
 
 **Run**:
