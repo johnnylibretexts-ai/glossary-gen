@@ -284,7 +284,11 @@ version now sits in `merge`'s docstring so the next reader does not re-derive it
 
 ## A second book: neither cut cluster survives
 
-*Introductory Statistics 1e (OpenStax)*, `stats/689`, 117 pages, $0.15, scanned 2026-08-16.
+*Introductory Statistics 1e (OpenStax)*, `stats/689`, 117 pages, scanned 2026-08-16. ⚠️ **The
+$0.15 recorded here was the estimate, not the bill.** The ledger's own token counts put it at
+**$0.245**: `EST_SCAN_TOKENS_IN = 1,050` is measured from the Python book, and a statistics page
+runs 2,300. Detail in
+[2026-08-17-definition-comparison.md](./2026-08-17-definition-comparison.md).
 Same publisher deliberately, so pedagogical style is held constant and **subject** is the only
 variable.
 
