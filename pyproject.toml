@@ -21,6 +21,18 @@ glossary-scan = "glossary_gen.scan_cli:run"
 requires = ["setuptools>=77"]  # PEP 639 bare-SPDX `license` needs >=77
 build-backend = "setuptools.build_meta"
 
+# Without this, setuptools' flat-layout autodiscovery refuses to build as soon as a run has
+# created `out/` or `cache/`: it sees them as further top-level packages and errors with
+# "Multiple top-level packages discovered in a flat-layout". CI never hit it because it builds
+# from a clean checkout where both are absent (they are gitignored) — but anyone who runs the
+# tool and then reinstalls does.
+#
+# A `find` directive rather than an explicit `packages = ["glossary_gen"]`: an explicit list is
+# literal, so it would silently drop the `glossary_gen.scan` subpackage from a non-editable
+# install and break `glossary-scan` for everyone who installed rather than cloned.
+[tool.setuptools.packages.find]
+include = ["glossary_gen*"]
+
 [tool.setuptools.package-data]
 glossary_gen = ["prompts/*.md", "prompts/scan/*.md", "prices.json"]
 
