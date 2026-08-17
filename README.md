@@ -562,6 +562,15 @@ times what `--budget-usd` was set to allow.
   (exit code `2`) rather than silently ignoring the ceiling you asked for. Add the
   model's price to `glossary_gen/prices.json`, or drop `--budget-usd`.
 
+**The pre-flight estimate is calibrated to one book — treat it as an order of magnitude.**
+`EST_SCAN_TOKENS_IN = 1050` was measured against Python Programming (OpenStax), whose 272 scanned
+pages averaged 1,035 input tokens. Introductory Statistics averages **2,300**, so its scan was
+quoted at $0.15 and cost **$0.245**; a subset of that book's longest pages came in at 4,054 per
+page, 3.1× its estimate. The constant is not being re-fitted, because a constant averaged over two
+books is wrong for both. Quote an estimate as an estimate, and read actual spend off the ledger's
+`tokens_in`/`tokens_out`. `--budget-usd` is the thing that actually bounds a run. Measurements:
+[`docs/research/2026-08-17-definition-comparison.md`](docs/research/2026-08-17-definition-comparison.md).
+
 `--budget-usd` is a ceiling on **total spend recorded in the ledger**, not per-invocation:
 resuming a run seeds the running token counters from every `tokens_in`/`tokens_out`
 already in the ledger, so a resumed run cannot blow through the ceiling once per resume.
