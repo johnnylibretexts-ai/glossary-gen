@@ -54,9 +54,17 @@ _Avoid_: proposal, suggestion, hit
 
 **Evidence**:
 The span a model copied verbatim from a page to prove its candidate is defined there. A gate, not
-a hint: a candidate whose evidence cannot be found on the page is discarded outright, never merely
-penalised.
+a hint: a candidate whose evidence cannot be found on the page is refused outright, never merely
+penalised. Refused is not the same as forgotten — the refusal is recorded — but being recorded
+softens nothing about the gate.
 _Avoid_: quote, proof, snippet, excerpt
+
+**Rejected candidate**:
+A candidate whose evidence failed the gate, kept as a record of what the model did. Not a term:
+the book is not known to define it, and the span offered as proof may have been invented. This is
+what separates it from an unwritten term, which the book does define and which a person is asked
+to judge — a rejected candidate is never offered to anyone to rescue.
+_Avoid_: unwritten (a different thing), failed term, dropped term, discarded term
 
 **Confidence**:
 A model's own stated certainty about a candidate, recorded exactly as given. Nothing adjusts it,

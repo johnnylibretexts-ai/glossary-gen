@@ -208,6 +208,47 @@ that format rather than extending it, which is why the scanner's own observation
 in the index. `fetch.py`, `ledger.py` and `llm.py` are shared with `glossary-gen` — the scanner
 adds a page-shaped ledger record and a second entry point, not a second copy of the machinery.
 
+### What the `--report` sidecar holds
+
+`out/index-report.json` is written **first and unconditionally** — a scan that verified nothing
+cannot write an index at all, and that is exactly the run where you most need to see what the
+scanner observed. It records, per term, the model's `confidence` and each `corroboration` by name,
+never fused into one number (ADR-0004).
+
+It also records the candidates the **evidence gate refused**, with which of two reasons fired:
+
+```json
+"rejected": {
+  "count": 1,
+  "candidates": [
+    { "term": "Monad",
+      "reason": "evidence_not_on_page",
+      "page": "https://eng.libretexts.org/...",
+      "confidence": 0.9,
+      "evidence": "A monad is a monoid in the category of endofunctors." }
+  ]
+}
+```
+
+- **`evidence_not_on_page`** — the span the model offered as proof is not on the page. This is the
+  signature of a model inventing a term *and* the quotation for it. The invented text is kept
+  verbatim, because it is the whole reason to keep the row.
+- **`evidence_too_short`** — under `MIN_EVIDENCE_CHARS` (20). The model found the right page and
+  returned something useless. A prompt problem, not a hallucination.
+
+The block is always present, empty or not, so its absence never has to be read as "none were
+rejected".
+
+**This is a diagnostic, not a review aid.** A rejected candidate is not a term — the book is not
+known to define it, and its supporting quote may be fabricated — so it is never offered to a
+reviewer to rescue, unlike an [unwritten term](#the-unwritten-sidecar), which the book *does*
+define. That asymmetry is deliberate; see
+[ADR-0007](docs/adr/0007-rejected-candidates-are-a-diagnostic-not-a-review-artifact.md). The
+audience is whoever is tuning the prompt or the gate.
+
+One caveat: like every other observation in this file, the `rejected` block covers only the pages
+a run actually scanned. A page already `ok` in the ledger is skipped, so it contributes nothing.
+
 ### glossary-scan options
 
 | Flag | Default | Meaning |

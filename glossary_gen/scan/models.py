@@ -42,6 +42,38 @@ class Corroboration(StrEnum):
     MULTIPAGE = "multipage"
 
 
+class Rejection(StrEnum):
+    """Why a candidate failed the evidence gate.
+
+    Two reasons, never one bucket. `EVIDENCE_NOT_ON_PAGE` is a hallucination signal — a model
+    that invents a term invents the span that proves it — while `EVIDENCE_TOO_SHORT` is a
+    model that found the right page and returned something useless. They call for different
+    fixes, and fusing them into a bare "rejected" count is the move ADR-0004 and ADR-0005
+    both exist to prevent. A `StrEnum` for the same reason as `Corroboration`: it survives
+    the round trip into the diagnostic report as the word it is.
+    """
+
+    EVIDENCE_TOO_SHORT = "evidence_too_short"
+    EVIDENCE_NOT_ON_PAGE = "evidence_not_on_page"
+
+
+class RejectedCandidate(BaseModel):
+    """A candidate the evidence gate turned away, kept for the diagnostic report.
+
+    Recording one does not rescue it: it never reaches the index, and no reviewer is asked
+    to adjudicate it (ADR-0007). The audience is whoever tunes the prompt or the gate, and
+    the `evidence` is kept verbatim because when the reason is `EVIDENCE_NOT_ON_PAGE` the
+    invented span is the entire point of keeping the row.
+    """
+
+    term: str
+    aliases: list[str] = Field(default_factory=list)
+    evidence: str
+    page_url: str
+    confidence: float
+    reason: Rejection
+
+
 class VerifiedCandidate(BaseModel):
     """A candidate whose evidence checked out, with what the page corroborated.
 

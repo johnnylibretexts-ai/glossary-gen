@@ -9,6 +9,7 @@ from glossary_gen.scan.models import (
     Candidate,
     Corroboration,
     MergedTerm,
+    Rejection,
     VerifiedCandidate,
 )
 
@@ -28,17 +29,34 @@ def page_text(page: Page) -> str:
     return " ".join(block.text for block in page.blocks)
 
 
-def verify(candidate: Candidate, page: Page) -> bool:
-    """True when the claimed evidence occurs literally on the page.
+def rejection_of(candidate: Candidate, page: Page) -> Rejection | None:
+    """Why this candidate fails the evidence gate, or `None` when it passes.
 
     This is a hard gate, not a scoring signal. A model that invents a term also
     invents its evidence, and an invented span will not be found here. Comparison
     is whitespace- and case-insensitive because `parse_page` already reflows text.
+
+    The reason is returned rather than a bare bool because the two failures mean opposite
+    things — see `Rejection` — and the scanner's diagnostic report records which one fired
+    (ADR-0007). Order matters: the length check runs first, so a short span that IS on the
+    page reports as too-short rather than being mislabelled a hallucination.
     """
     evidence = _normalize(candidate.evidence)
     if len(evidence) < MIN_EVIDENCE_CHARS:
-        return False
-    return evidence in _normalize(page_text(page))
+        return Rejection.EVIDENCE_TOO_SHORT
+    if evidence not in _normalize(page_text(page)):
+        return Rejection.EVIDENCE_NOT_ON_PAGE
+    return None
+
+
+def verify(candidate: Candidate, page: Page) -> bool:
+    """True when the claimed evidence occurs literally on the page.
+
+    The readable predicate for callers that do not care WHY — `replay()` scores recall by
+    slug and has no report to write. Defined in terms of `rejection_of` so the two cannot
+    drift apart.
+    """
+    return rejection_of(candidate, page) is None
 
 
 # There are no weights here any more, and adding some back is the mistake ADR-0004 exists to

@@ -27,10 +27,10 @@ from glossary_gen.ledger import Ledger
 from glossary_gen.llm import LLMClient, LLMError
 from glossary_gen.models import Page, slugify
 from glossary_gen.run import PRICES_PATH, Attempt, ModelCall, execute_run, load_prices
-from glossary_gen.scan.candidates import corroborations_on_page, merge, verify
+from glossary_gen.scan.candidates import corroborations_on_page, merge, rejection_of
 from glossary_gen.scan.content import extract_content
 from glossary_gen.scan.emit import EmitError, index_payload, report_payload, write_json
-from glossary_gen.scan.models import ScanRecord, VerifiedCandidate
+from glossary_gen.scan.models import RejectedCandidate, ScanRecord, VerifiedCandidate
 from glossary_gen.scan.propose import load_scan_prompt, propose_terms, scan_prompt_versions
 from glossary_gen.scan.toc import TocError, discover
 
@@ -105,7 +105,6 @@ class ScanSummary:
     ok: int = 0
     llm_error: int = 0
     skipped: int = 0
-    unverified: int = 0
     aborted: bool = False
     # Pages whose extracted content had zero blocks (genuinely contentless front/back
     # matter — Index, Table of Contents, Detailed Licensing — see the measurement in
@@ -113,6 +112,17 @@ class ScanSummary:
     # a subset of `ok`, not an addition to it.
     empty_pages: int = 0
     candidates: list[VerifiedCandidate] = field(default_factory=list)
+    # Candidates the evidence gate turned away, with which reason fired (ADR-0007). Like
+    # `candidates`, this covers only the pages THIS run actually scanned — a skipped page
+    # is never re-attempted, so it contributes neither.
+    rejected: list[RejectedCandidate] = field(default_factory=list)
+
+    @property
+    def unverified(self) -> int:
+        """Derived, never tallied alongside `rejected`, so the printed count and the
+        diagnostic report cannot disagree about how many candidates were turned away.
+        """
+        return len(self.rejected)
 
 
 def estimate_scan_cost(
@@ -198,9 +208,24 @@ def execute(
                 model_call=ModelCall.FAILED,
             )
 
-        verified = [c for c in candidates.terms if verify(c, page)]
-        summary.unverified += len(candidates.terms) - len(verified)
-        for candidate in verified:
+        verified = []
+        for candidate in candidates.terms:
+            # The gate is unchanged — a rejected candidate still never reaches the index.
+            # What changes is that it is now written down instead of vanishing into a
+            # count, with which of the two reasons fired (ADR-0007).
+            if (reason := rejection_of(candidate, page)) is not None:
+                summary.rejected.append(
+                    RejectedCandidate(
+                        term=candidate.term,
+                        aliases=candidate.aliases,
+                        evidence=candidate.evidence,
+                        page_url=page.url,
+                        confidence=candidate.confidence,
+                        reason=reason,
+                    )
+                )
+                continue
+            verified.append(candidate)
             summary.candidates.append(
                 VerifiedCandidate(
                     term=candidate.term,
@@ -361,7 +386,7 @@ def run(argv: list[str] | None = None) -> int:
     # The REPORT is written first and unconditionally. A scan that verified nothing cannot
     # write an index at all (`load_input` requires a non-empty terms list) — and that is
     # exactly the run where someone most needs to see what the scanner did observe.
-    write_json(args.report, report_payload(terms))
+    write_json(args.report, report_payload(terms, summary.rejected))
 
     print(
         f"pages ok={summary.ok} skipped={summary.skipped} "

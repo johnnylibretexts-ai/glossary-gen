@@ -1,7 +1,7 @@
 from glossary_gen.ledger import Ledger
 from glossary_gen.llm import LLMTransportError, RawResult
 from glossary_gen.models import Block, Page
-from glossary_gen.scan.models import ScanRecord
+from glossary_gen.scan.models import Rejection, ScanRecord
 from glossary_gen.scan.propose import load_scan_prompt
 from glossary_gen.scan_cli import estimate_scan_cost, execute
 
@@ -367,3 +367,38 @@ def test_scan_estimate_tracks_the_measured_run():
     # A band, not an upper bound: the estimator is calibrated on one book and cannot
     # guarantee it exceeds the actual on another. This catches a skew, not a miss.
     assert 0.9 * actual <= estimated <= 1.25 * actual, f"{estimated} vs {actual}"
+
+
+def test_a_dropped_candidate_is_recorded_with_its_reason(tmp_path):
+    """Dropping it from the index is the gate working. Writing it nowhere is the part
+    ADR-0007 changes — the count alone cannot tell you the model started inventing spans.
+    """
+    summary = execute(
+        [PAGE], _FakeClient([HALLUCINATED]), _ledger(tmp_path), load_scan_prompt("v1"), "v1"
+    )
+
+    assert summary.candidates == []
+    assert len(summary.rejected) == 1
+    dropped = summary.rejected[0]
+    assert dropped.term == "Monad"
+    assert dropped.reason is Rejection.EVIDENCE_NOT_ON_PAGE
+    assert dropped.page_url == PAGE.url
+    # The invented span is kept verbatim — when the reason is a hallucination, the text the
+    # model fabricated is the whole reason to keep the row.
+    assert dropped.evidence == "A monad is a monoid in the category of endofunctors."
+
+
+def test_unverified_counts_exactly_the_recorded_rejections(tmp_path):
+    """One source of truth: the printed count is derived from the list, not tallied beside
+    it, so the summary line and the report cannot disagree about how many were rejected.
+    """
+    summary = execute(
+        [PAGE], _FakeClient([HALLUCINATED]), _ledger(tmp_path), load_scan_prompt("v1"), "v1"
+    )
+    assert summary.unverified == len(summary.rejected) == 1
+
+
+def test_a_verified_run_records_no_rejections(tmp_path):
+    summary = execute([PAGE], _FakeClient([GOOD]), _ledger(tmp_path), load_scan_prompt("v1"), "v1")
+    assert summary.rejected == []
+    assert summary.unverified == 0
