@@ -70,6 +70,16 @@ def parse_page(url: str, html: str) -> Page:
     return Page(url=url, blocks=tuple(blocks))
 
 
+def cache_path(cache_dir: Path, url: str) -> Path:
+    """Where a page's HTML lives on disk, for readers outside `PageCache`.
+
+    Module level rather than a method so a reader that never fetches — the author
+    glossary harvester walks an already-cached book with no client and no key —
+    derives the filename from the same rule instead of a second copy of it.
+    """
+    return Path(cache_dir) / f"{hashlib.sha256(url.encode('utf-8')).hexdigest()}.html"
+
+
 class PageCache:
     """Fetch pages once, then serve them from an on-disk HTML cache."""
 
@@ -88,7 +98,7 @@ class PageCache:
         self._delay = delay
 
     def _path_for(self, url: str) -> Path:
-        return self._cache_dir / f"{hashlib.sha256(url.encode('utf-8')).hexdigest()}.html"
+        return cache_path(self._cache_dir, url)
 
     def _download(self, url: str) -> str:
         # Politeness, on cache misses only: a book scan is 130+ requests against a public
