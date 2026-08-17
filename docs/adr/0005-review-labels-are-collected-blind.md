@@ -49,6 +49,19 @@ eight rows beneath that floor — `Modulo`, `Equality`, `Repetition`, `Inequalit
 the tool no longer emits spends the expensive input on nothing. `init` and `super` appear on the
 term-fit sheet and nowhere else, having never received a definition at all.
 
+**⚠️ The four counts in the two paragraphs above are obsolete as of 2026-08-16 (later the same
+day); the reasoning they support is not.** The book was re-scanned and the eight sub-floor rows
+re-attempted, so the sheets are now **214 rows (term fit)** and **207 rows (soundness)**, not 212
+and 202. Two of the eight recovered real grounding and now carry definitions (`Equality`,
+`Inequality`); the other six became the unwritten sidecar of ADR-0006. `init` and `super` are no
+longer definition-less either — the punctuation fix `d53e235` made `__init__()` and `super()`
+matchable — so the sentence about them appearing on one sheet only no longer describes anything.
+What survives unchanged is the reason the split exists: term fit is keyed to slugs and outlives
+every regeneration, soundness is bound to one `(prompt_version, model)` pair, and the sheets are
+built from the **current** index and CSV rather than from whichever ones were current when this
+record was written. Live numbers live in
+[the working note](../research/2026-08-16-openstax-review-labels.md), never here.
+
 Labels are one expert's judgement, recorded as such. They are not observed reviewer behaviour, and
 nothing downstream may describe them as measuring what a LibreTexts reviewer did.
 
