@@ -166,6 +166,9 @@ paying for work the first already finished.
 _Avoid_: log, cache, journal, history
 
 **Done**:
-A subject has a successful attempt for the current prompt and model. A failed attempt is history,
-not completion — it is retried on the next run, never skipped.
+A subject has a successful attempt for the current prompt and model, and that attempt recorded
+everything the output needs. A failed attempt is history, not completion — it is retried on the
+next run, never skipped. So is an attempt that succeeded but did not write down what it found:
+resuming past it would lose the work rather than reuse it, which is the opposite of what the
+ledger is for.
 _Avoid_: complete, finished, cached

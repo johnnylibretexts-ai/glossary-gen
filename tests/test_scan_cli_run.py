@@ -1,6 +1,9 @@
+import json
+
 from glossary_gen.ledger import Ledger
 from glossary_gen.llm import LLMTransportError, RawResult
-from glossary_gen.models import Block, Page
+from glossary_gen.models import Block, Page, slugify
+from glossary_gen.scan.candidates import is_rebuildable, terms_from_ledger
 from glossary_gen.scan.models import Rejection, ScanRecord
 from glossary_gen.scan.propose import load_scan_prompt
 from glossary_gen.scan_cli import estimate_scan_cost, execute
@@ -80,7 +83,8 @@ class _TransportFailClient:
 
 
 def _ledger(tmp_path):
-    return Ledger(tmp_path / "scan.jsonl", record_cls=ScanRecord)
+    # Same completion rule the CLI uses, so tests cannot pass under a laxer one.
+    return Ledger(tmp_path / "scan.jsonl", record_cls=ScanRecord, is_done=is_rebuildable)
 
 
 def test_execute_keeps_a_verified_candidate(tmp_path):
@@ -402,3 +406,112 @@ def test_a_verified_run_records_no_rejections(tmp_path):
     summary = execute([PAGE], _FakeClient([GOOD]), _ledger(tmp_path), load_scan_prompt("v1"), "v1")
     assert summary.rejected == []
     assert summary.unverified == 0
+
+
+# --- resume must not lose what the first run paid for -----------------------------------
+
+# Proposes a DIFFERENT term from `GOOD`, with a span that is genuinely on PAGE2, so a lost
+# page is visible as a missing term rather than hidden by a duplicate slug.
+GOOD_OTHER_TERM = (
+    '{"terms": [{"term": "Base case", "aliases": [], '
+    '"evidence": "Recursion is a technique where a function calls itself.", '
+    '"confidence": 0.7}]}'
+)
+
+
+def test_a_resumed_scan_still_indexes_the_page_the_first_run_paid_for(tmp_path):
+    """The silent half of the defect: a partial resume writes a partial index.
+
+    The ledger's job is "never pay twice". It is not "forget what the first payment bought".
+    A page already `ok` is skipped at run.py:111 before `attempt()` runs, so its verified
+    candidates never reach `summary.candidates` — and the index is built from that list.
+    """
+    ledger = _ledger(tmp_path)
+    first = execute([PAGE], _FakeClient([GOOD]), ledger, load_scan_prompt("v1"), "v1")
+    assert [c.term for c in first.candidates] == ["Recursion"]
+
+    resumed = execute(
+        [PAGE, PAGE2], _FakeClient([GOOD_OTHER_TERM]), ledger, load_scan_prompt("v1"), "v1"
+    )
+    assert resumed.skipped == 1  # PAGE was already paid for
+    assert resumed.ok == 1  # only PAGE2 was scanned
+
+    # Asserted on the rebuild path, not on `summary.candidates`: the summary is honestly
+    # a per-run accumulator. What must describe the whole book is the index.
+    rebuilt = terms_from_ledger(ledger.records())
+    assert sorted(t.term for t in rebuilt) == ["Base case", "Recursion"]
+
+
+def test_a_second_scan_is_free_and_reproduces_the_index(tmp_path):
+    """The loud half, and the guarantee the generator already has.
+
+    `glossary-gen` re-runs free and rebuilds the identical CSV because `write_csv` reads
+    `ledger.records()` — the durable, complete record. The scanner builds its index from an
+    in-memory per-run accumulator instead, so a fully-resumed scan produces nothing at all
+    and `index_payload` raises rather than writing a book's index.
+    """
+    ledger = _ledger(tmp_path)
+    first = execute(
+        [PAGE, PAGE2], _FakeClient([GOOD, GOOD_OTHER_TERM]), ledger, load_scan_prompt("v1"), "v1"
+    )
+    second = execute([PAGE, PAGE2], _FakeClient([]), ledger, load_scan_prompt("v1"), "v1")
+
+    assert second.skipped == 2  # free, as intended
+    assert first.ok == 2
+    assert [t.term for t in terms_from_ledger(ledger.records())] == ["Base case", "Recursion"]
+
+
+def test_a_row_from_before_candidate_storage_is_rescanned(tmp_path):
+    """The compatibility rule. An `ok` row that cannot say what its page yielded is not
+    done: re-paying for it once is the only way to rebuild a correct index, and the
+    alternative is emitting a partial one forever.
+    """
+    path = tmp_path / "scan.jsonl"
+    # Exactly what the pre-fix writer produced: no `candidates` key at all.
+    old_row = {
+        "subject": slugify(PAGE.url),
+        "page_url": PAGE.url,
+        "prompt_version": "v1",
+        "model": "fake-model",
+        "generated_at": "2026-08-16T00:00:00Z",
+        "status": "ok",
+        "n_proposed": 1,
+        "n_verified": 1,
+    }
+    path.write_text(json.dumps(old_row) + "\n", encoding="utf-8")
+
+    ledger = Ledger(path, record_cls=ScanRecord, is_done=is_rebuildable)
+    summary = execute([PAGE], _FakeClient([GOOD]), ledger, load_scan_prompt("v1"), "v1")
+
+    assert summary.skipped == 0  # re-scanned rather than trusted
+    assert summary.ok == 1
+    assert [t.term for t in terms_from_ledger(ledger.records())] == ["Recursion"]
+
+
+def test_a_page_that_genuinely_found_nothing_is_never_rescanned(tmp_path):
+    """The other side of the same rule, and why `None` and `[]` must stay distinct.
+
+    A page scanned to completion that defined no terms is a complete answer. Inferring
+    staleness from `n_verified == 0` instead would make it indistinguishable from a pre-fix
+    row and re-pay for every term-free page on every resume, forever.
+    """
+    path = tmp_path / "scan.jsonl"
+    first = Ledger(path, record_cls=ScanRecord, is_done=is_rebuildable)
+    execute([PAGE], _FakeClient(['{"terms": []}']), first, load_scan_prompt("v1"), "v1")
+
+    resumed = Ledger(path, record_cls=ScanRecord, is_done=is_rebuildable)
+    summary = execute([PAGE], _FakeClient([]), resumed, load_scan_prompt("v1"), "v1")
+    assert summary.skipped == 1  # free, and correctly so
+
+
+def test_an_empty_page_is_never_rescanned_either(tmp_path):
+    """A contentless page (Index, Licensing) is scanned without a model call and yields
+    nothing. That is also a complete answer, so its row stores `[]`, not `None`.
+    """
+    path = tmp_path / "scan.jsonl"
+    first = Ledger(path, record_cls=ScanRecord, is_done=is_rebuildable)
+    execute([EMPTY_PAGE], _FakeClient([]), first, load_scan_prompt("v1"), "v1")
+
+    resumed = Ledger(path, record_cls=ScanRecord, is_done=is_rebuildable)
+    summary = execute([EMPTY_PAGE], _FakeClient([]), resumed, load_scan_prompt("v1"), "v1")
+    assert summary.skipped == 1

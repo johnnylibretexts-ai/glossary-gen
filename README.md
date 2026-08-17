@@ -246,8 +246,19 @@ define. That asymmetry is deliberate; see
 [ADR-0007](docs/adr/0007-rejected-candidates-are-a-diagnostic-not-a-review-artifact.md). The
 audience is whoever is tuning the prompt or the gate.
 
-One caveat: like every other observation in this file, the `rejected` block covers only the pages
-a run actually scanned. A page already `ok` in the ledger is skipped, so it contributes nothing.
+Both this file and the index are rebuilt from the **ledger**, not from whatever one invocation
+happened to scan, so a resumed scan still describes the whole book.
+
+**If you have a scan ledger from before 2026-08-16**, its rows record how many terms each page
+yielded but not which, so they cannot rebuild an index. Those pages are treated as not-done and
+re-scanned once — the run says so up front, before the spend confirmation:
+
+    note: 136 page(s) in out/scan.jsonl predate candidate storage and must be
+          re-scanned to rebuild the index; the estimate below covers them
+
+That is a one-time re-pay (about $0.17 for a 136-page book). Every scan after it resumes correctly.
+Old ledgers are still read and never rewritten. See
+[ADR-0008](docs/adr/0008-the-scanners-output-is-rebuilt-from-the-ledger.md).
 
 ### glossary-scan options
 

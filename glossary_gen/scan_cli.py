@@ -27,7 +27,13 @@ from glossary_gen.ledger import Ledger
 from glossary_gen.llm import LLMClient, LLMError
 from glossary_gen.models import Page, slugify
 from glossary_gen.run import PRICES_PATH, Attempt, ModelCall, execute_run, load_prices
-from glossary_gen.scan.candidates import corroborations_on_page, merge, rejection_of
+from glossary_gen.scan.candidates import (
+    corroborations_on_page,
+    is_rebuildable,
+    rejection_of,
+    rejections_from_ledger,
+    terms_from_ledger,
+)
 from glossary_gen.scan.content import extract_content
 from glossary_gen.scan.emit import EmitError, index_payload, report_payload, write_json
 from glossary_gen.scan.models import RejectedCandidate, ScanRecord, VerifiedCandidate
@@ -112,10 +118,14 @@ class ScanSummary:
     # a subset of `ok`, not an addition to it.
     empty_pages: int = 0
     candidates: list[VerifiedCandidate] = field(default_factory=list)
-    # Candidates the evidence gate turned away, with which reason fired (ADR-0007). Like
-    # `candidates`, this covers only the pages THIS run actually scanned — a skipped page
-    # is never re-attempted, so it contributes neither.
+    # Candidates the evidence gate turned away, with which reason fired (ADR-0007).
     rejected: list[RejectedCandidate] = field(default_factory=list)
+
+    # Both lists are THIS RUN's view — what this invocation scanned — and are what the
+    # summary line reports. They are deliberately not what the index and report are built
+    # from: those are rebuilt from the ledger so a resumed scan still describes the whole
+    # book (ADR-0008). Two lists that look alike, meaning different things: an invocation
+    # against a book.
 
     @property
     def unverified(self) -> int:
@@ -181,7 +191,12 @@ def execute(
             summary.ok += 1
             summary.empty_pages += 1
             return Attempt(
-                record=ScanRecord(**base, status="ok", n_proposed=0, n_verified=0),
+                # `candidates=[]`, not the default `None`: this page was genuinely scanned
+                # and genuinely yielded nothing, which is a complete answer. `None` would
+                # mark the row unrebuildable and re-pay for every empty page forever.
+                record=ScanRecord(
+                    **base, status="ok", n_proposed=0, n_verified=0, candidates=[], rejected=[]
+                ),
                 model_call=ModelCall.NOT_MADE,
             )
 
@@ -208,13 +223,16 @@ def execute(
                 model_call=ModelCall.FAILED,
             )
 
-        verified = []
+        # Built per page and put on the row, because the row is what a later run reads back.
+        # The summary lists are this run's view; the ledger's are the book's (ADR-0008).
+        verified: list[VerifiedCandidate] = []
+        refused: list[RejectedCandidate] = []
         for candidate in candidates.terms:
             # The gate is unchanged — a rejected candidate still never reaches the index.
             # What changes is that it is now written down instead of vanishing into a
             # count, with which of the two reasons fired (ADR-0007).
             if (reason := rejection_of(candidate, page)) is not None:
-                summary.rejected.append(
+                refused.append(
                     RejectedCandidate(
                         term=candidate.term,
                         aliases=candidate.aliases,
@@ -225,8 +243,7 @@ def execute(
                     )
                 )
                 continue
-            verified.append(candidate)
-            summary.candidates.append(
+            verified.append(
                 VerifiedCandidate(
                     term=candidate.term,
                     aliases=candidate.aliases,
@@ -236,6 +253,8 @@ def execute(
                     corroborations=corroborations_on_page(candidate, page),
                 )
             )
+        summary.candidates.extend(verified)
+        summary.rejected.extend(refused)
 
         summary.ok += 1
         # A page that defines nothing is `ok` with n_proposed = 0, never its own status:
@@ -247,6 +266,8 @@ def execute(
                 status="ok",
                 n_proposed=len(candidates.terms),
                 n_verified=len(verified),
+                candidates=verified,
+                rejected=refused,
                 served_by_model=raw.model,
                 tokens_in=raw.tokens_in,
                 tokens_out=raw.tokens_out,
@@ -372,7 +393,14 @@ def run(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_INPUT_ERROR
 
-    ledger = Ledger(args.ledger, record_cls=ScanRecord)
+    # `is_rebuildable`, not the default `status == "ok"`: a row that cannot say what its
+    # page yielded cannot contribute to a rebuilt index, so its page is not done (ADR-0008).
+    ledger = Ledger(args.ledger, record_cls=ScanRecord, is_done=is_rebuildable)
+    if stale := sum(1 for r in ledger.records() if r.status == "ok" and r.candidates is None):
+        print(
+            f"note: {stale} page(s) in {args.ledger} predate candidate storage and must be "
+            "re-scanned to rebuild the index; the estimate below covers them"
+        )
     summary = execute(
         pages,
         llm,
@@ -381,12 +409,15 @@ def run(argv: list[str] | None = None) -> int:
         args.prompt_version,
         budget_usd=args.budget_usd,
     )
-    terms = merge(summary.candidates)
+    # Rebuilt from the LEDGER, not from this run's accumulator: a resumed scan skips pages
+    # it already paid for, and the index must still describe the whole book (ADR-0008).
+    records = ledger.records()
+    terms = terms_from_ledger(records)
 
     # The REPORT is written first and unconditionally. A scan that verified nothing cannot
     # write an index at all (`load_input` requires a non-empty terms list) — and that is
     # exactly the run where someone most needs to see what the scanner did observe.
-    write_json(args.report, report_payload(terms, summary.rejected))
+    write_json(args.report, report_payload(terms, rejections_from_ledger(records)))
 
     print(
         f"pages ok={summary.ok} skipped={summary.skipped} "
