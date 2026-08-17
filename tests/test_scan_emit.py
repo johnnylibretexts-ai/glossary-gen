@@ -10,7 +10,12 @@ from glossary_gen.scan.emit import (
     report_payload,
     write_json,
 )
-from glossary_gen.scan.models import Corroboration, MergedTerm
+from glossary_gen.scan.models import (
+    Corroboration,
+    MergedTerm,
+    RejectedCandidate,
+    Rejection,
+)
 
 BOOK = Book(
     library="eng",
@@ -78,3 +83,65 @@ def test_report_payload_unfiltered_even_when_index_would_fail():
 
     report = report_payload(TERMS)
     assert report["count"] == 2
+
+
+# --- rejected candidates in the diagnostic report (ADR-0007) -----------------------------
+
+REJECTED = [
+    RejectedCandidate(
+        term="Loop unrolling",
+        aliases=["unrolling"],
+        evidence="Recursion is a kind of loop unrolling optimisation.",
+        page_url="https://eng.libretexts.org/a",
+        confidence=0.95,
+        reason=Rejection.EVIDENCE_NOT_ON_PAGE,
+    ),
+    RejectedCandidate(
+        term="Stack",
+        evidence="a stack",
+        page_url="https://eng.libretexts.org/b",
+        confidence=0.4,
+        reason=Rejection.EVIDENCE_TOO_SHORT,
+    ),
+]
+
+
+def test_report_records_rejected_candidates_with_their_reason():
+    """The count alone was already printed. What the report adds is WHICH candidate and WHY,
+    which is what a prompt or verification change is actually compared on.
+    """
+    report = report_payload(TERMS, REJECTED)
+    assert report["rejected"]["count"] == 2
+    first = report["rejected"]["candidates"][0]
+    assert first["term"] == "Loop unrolling"
+    assert first["reason"] == "evidence_not_on_page"
+    assert first["page"] == "https://eng.libretexts.org/a"
+    assert first["confidence"] == 0.95
+    # The claimed span is kept verbatim: when the reason is a hallucination, the invented
+    # text is the entire point of recording it.
+    assert first["evidence"] == "Recursion is a kind of loop unrolling optimisation."
+
+
+def test_rejection_reasons_survive_the_json_round_trip_as_words(tmp_path):
+    """A `StrEnum` for the same reason as `Corroboration` — the report is read by a human."""
+    path = tmp_path / "report.json"
+    write_json(path, report_payload(TERMS, REJECTED))
+    report = json.loads(path.read_text(encoding="utf-8"))
+    assert [c["reason"] for c in report["rejected"]["candidates"]] == [
+        "evidence_not_on_page",
+        "evidence_too_short",
+    ]
+
+
+def test_the_rejected_block_is_present_even_when_nothing_was_rejected():
+    """Same rule as the unwritten sidecar: a block that appears only when non-empty makes
+    its absence ambiguous between "none" and "this run predates the feature".
+    """
+    assert report_payload(TERMS)["rejected"] == {"count": 0, "candidates": []}
+
+
+def test_rejected_candidates_never_reach_the_index():
+    """The gate stays a gate. ADR-0007 records them; it does not rescue them."""
+    payload = index_payload(BOOK, TERMS)
+    assert "Loop unrolling" not in [t["term"] for t in payload["terms"]]
+    assert "rejected" not in payload

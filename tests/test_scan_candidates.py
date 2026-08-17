@@ -4,9 +4,10 @@ from glossary_gen.scan.candidates import (
     corroborations_on_page,
     has_heading_match,
     merge,
+    rejection_of,
     verify,
 )
-from glossary_gen.scan.models import Candidate, Corroboration, VerifiedCandidate
+from glossary_gen.scan.models import Candidate, Corroboration, Rejection, VerifiedCandidate
 
 PAGE = Page(
     url="https://eng.libretexts.org/x",
@@ -205,3 +206,48 @@ def test_has_heading_match_still_requires_a_word_boundary():
     page = Page(url="https://x", blocks=(Block(kind="heading", text="Listen carefully"),))
     candidate = Candidate(term="list", evidence="e" * 30, confidence=0.9)
     assert has_heading_match(candidate, page) is False
+
+
+# --- why a candidate was rejected (ADR-0007) --------------------------------------------
+
+
+def test_a_verified_candidate_has_no_rejection():
+    good = _candidate("Recursion is a technique where a function calls itself.")
+    assert rejection_of(good, PAGE) is None
+
+
+def test_an_invented_span_is_rejected_as_not_on_the_page():
+    """The interesting half: a model that invents a term invents its evidence too, so this
+    reason is a hallucination signal and must not read the same as a formatting miss.
+    """
+    candidate = _candidate("Recursion is a kind of loop unrolling optimisation.")
+    assert rejection_of(candidate, PAGE) is Rejection.EVIDENCE_NOT_ON_PAGE
+
+
+def test_a_too_short_span_is_rejected_for_being_too_short():
+    """A different failure entirely: the model pointed at the right page and returned a
+    useless span. Collapsing the two into one "rejected" bucket is the fusion ADR-0004 and
+    ADR-0005 both exist to prevent.
+    """
+    short = "x" * (MIN_EVIDENCE_CHARS - 1)
+    page = Page(url="https://x", blocks=(Block(kind="paragraph", text=short),))
+    assert rejection_of(_candidate(short), page) is Rejection.EVIDENCE_TOO_SHORT
+
+
+def test_the_short_check_runs_before_the_page_check():
+    """A short span that IS on the page is still rejected, and reported as too-short rather
+    than as a hallucination — it is not one.
+    """
+    on_page_but_short = "Recursion is"
+    assert rejection_of(_candidate(on_page_but_short), PAGE) is Rejection.EVIDENCE_TOO_SHORT
+
+
+def test_verify_stays_the_predicate_over_the_same_rule():
+    """One source of truth: `verify` must not drift from `rejection_of`."""
+    for evidence in (
+        "Recursion is a technique where a function calls itself.",
+        "Recursion is a kind of loop unrolling optimisation.",
+        "x" * (MIN_EVIDENCE_CHARS - 1),
+    ):
+        candidate = _candidate(evidence)
+        assert verify(candidate, PAGE) == (rejection_of(candidate, PAGE) is None)

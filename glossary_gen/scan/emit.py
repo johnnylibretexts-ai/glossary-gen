@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from glossary_gen.models import Book
-from glossary_gen.scan.models import MergedTerm
+from glossary_gen.scan.models import MergedTerm, RejectedCandidate
 
 
 class EmitError(Exception):
@@ -43,7 +43,10 @@ def index_payload(book: Book, terms: Sequence[MergedTerm]) -> dict[str, Any]:
     }
 
 
-def report_payload(terms: Sequence[MergedTerm]) -> dict[str, Any]:
+def report_payload(
+    terms: Sequence[MergedTerm],
+    rejected: Sequence[RejectedCandidate] = (),
+) -> dict[str, Any]:
     """The scanner's diagnostic sidecar.
 
     Deliberately NOT a review aid: it records what the scanner observed, so a prompt or
@@ -53,9 +56,29 @@ def report_payload(terms: Sequence[MergedTerm]) -> dict[str, Any]:
     `confidence` and `corroborations` are reported separately and never combined. A fused
     number told you only that it had saturated; "heading fired, cue did not" tells you what
     the scanner actually saw.
+
+    `rejected` records the candidates the evidence gate turned away, with which of the two
+    reasons fired (ADR-0007). This file is where they belong precisely because it is a
+    diagnostic: a rejected candidate is an observation about the model's behaviour, not a
+    term the book defines, and it is never offered to a reviewer to rescue. The block is
+    always present, empty or not, so its absence cannot be read as "none were rejected".
     """
     return {
         "count": len(terms),
+        "rejected": {
+            "count": len(rejected),
+            "candidates": [
+                {
+                    "term": candidate.term,
+                    "aliases": list(candidate.aliases),
+                    "reason": str(candidate.reason),
+                    "page": candidate.page_url,
+                    "confidence": round(candidate.confidence, 4),
+                    "evidence": candidate.evidence,
+                }
+                for candidate in rejected
+            ],
+        },
         "terms": [
             {
                 "slug": term.slug,

@@ -281,8 +281,13 @@ itself worth weighing before a fourth attempt.
    sub-floor rows named above are now visible output rather than terms the tool emits nothing
    about, so a future labelling pass can reach them from an artifact instead of by diffing the
    index against the CSV.
-4. Whether the **scanner** should do the same for candidates it rejects on evidence. It discards
-   them outright (see `CONTEXT.md`, Evidence) and writes them nowhere, which is the shape ADR-0006
-   just ruled against one stage downstream. Deliberately not acted on: this run rejected 0 of 236,
-   so there is no measured harm, and building a second sidecar on principle alone is the move
-   ADR-0004 closes by asking for evidence first.
+4. ~~Whether the **scanner** should do the same for candidates it rejects on evidence~~ —
+   **closed 2026-08-16 by
+   [ADR-0007](../adr/0007-rejected-candidates-are-a-diagnostic-not-a-review-artifact.md), and not
+   the way this question assumed.** Rejections are recorded in the existing `out/index-report.json`
+   with which of the two reasons fired, as an operator diagnostic. They are deliberately *not*
+   given ADR-0006's treatment: an unwritten term is one the book demonstrably defines, while a
+   rejected candidate may be a model inventing both a term and the quotation that proves it, and
+   asking a reviewer to adjudicate that turns a gate into a hint. The "wait for evidence" objection
+   was overridden because the cost collapsed — the report already existed and the reason was
+   already computed — but it stays the right objection to a *new* artifact.
