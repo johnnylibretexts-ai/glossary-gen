@@ -32,6 +32,9 @@ HEADING_TAGS = ("h1", "h2", "h3", "h4")
 # these, and counting them would invent a reference set out of page chrome.
 _TEMPLATE_TERM = re.compile(r"^sample word\s*\d*$", re.I)
 
+# "Confidence Interval (CI)", "Degrees of Freedom (\(df\))" — see `GlossaryEntry.slug`.
+_TRAILING_PARENTHETICAL = re.compile(r"\s*\(.*\)\s*$", re.S)
+
 
 @dataclass(frozen=True)
 class GlossaryEntry:
@@ -43,7 +46,16 @@ class GlossaryEntry:
 
     @property
     def slug(self) -> str:
-        return slugify(self.term)
+        """The matching key, with the author's notation gloss removed.
+
+        "Confidence Interval (CI)" is one term and the symbol the chapter will use
+        for it, so the whole string slugs to a key no scanner will ever produce.
+        Greedy to the last `)` because the parenthetical often holds LaTeX with
+        parens of its own: "Degrees of Freedom (\\(df\\))". A term that is nothing
+        but a parenthetical keeps it, or every such entry collapses onto one key.
+        """
+        stripped = _TRAILING_PARENTHETICAL.sub("", self.term).strip()
+        return slugify(stripped or self.term)
 
 
 def _text(node) -> str:

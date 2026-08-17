@@ -91,6 +91,35 @@ def test_the_same_term_defined_on_two_pages_is_one_entry():
     assert entry.definition == "the first definition the book gives"
 
 
+def test_a_trailing_parenthetical_is_notation_not_part_of_the_term():
+    """Authors write "Confidence Interval (CI)" — the term plus the symbol they will
+    use for it. Slugging that whole string produces a key no scanner will ever
+    match, so three real hits scored as misses on the statistics book.
+
+    The term text stays verbatim: only the matching key is normalised.
+    """
+    html = GLOSSARY_OF % ("Confidence Interval (CI)", "an interval estimate for a parameter")
+
+    (entry,) = author_glossary(html)
+    assert (entry.term, entry.slug) == ("Confidence Interval (CI)", "confidence-interval")
+
+
+def test_a_parenthetical_holding_markup_is_stripped_too():
+    """LibreTexts renders notation as LaTeX, so the nested parens are real:
+    "Degrees of Freedom (\\(df\\))".
+    """
+    (entry,) = author_glossary(GLOSSARY_OF % (r"Degrees of Freedom (\(df\))", "how many vary"))
+
+    assert entry.slug == "degrees-of-freedom"
+
+
+def test_a_term_that_is_only_a_parenthetical_keeps_it():
+    """Stripping to nothing would collapse every such entry onto one empty key."""
+    (entry,) = author_glossary(GLOSSARY_OF % ("(RV)", "a random variable"))
+
+    assert entry.slug == "rv"
+
+
 def test_page_chrome_outside_the_content_container_is_not_the_book():
     """LibreTexts renders the page-info footer as a definition list too. On the
     stats book's back-matter glossary page it follows the heading with no further
