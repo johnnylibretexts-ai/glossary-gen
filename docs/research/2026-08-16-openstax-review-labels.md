@@ -25,7 +25,7 @@ introductory one."
 | Sheet | Rows | Columns you fill |
 |---|---|---|
 | `2026-08-16-openstax-term-fit.csv` | **214** | `checked_page`, `term_fit`, `reason` |
-| `2026-08-16-openstax-definition-soundness.csv` | 202 | `definition_sound`, `reason` | (not yet rebuilt against the 207-row CSV — sitting one first)
+| `2026-08-16-openstax-definition-soundness.csv` | **207** | `definition_sound`, `reason` |
 
 Both label columns take `yes`, `no`, or `borderline`. `reason` is free text, required on anything
 that is not `yes` — write a sentence, not a category. `checked_page` takes `y` when you had to open
@@ -41,7 +41,7 @@ disguise; codes get derived from the reasons afterwards.
    term-fit sheet has no `definition` column by construction, and reading a definition before
    judging fit turns "does this belong?" into "is this any good?" — the exact conflation ADR-0004
    removed, this time baked into the ground truth where nothing downstream can falsify it.
-2. **Sitting two — definition soundness, 202 rows, roughly 100 minutes.** The whole row is visible
+2. **Sitting two — definition soundness, 207 rows, roughly 105 minutes.** The whole row is visible
    here; that is intended.
 
 Sitting one is worth doing even if sitting two never happens: it alone answers how much of the list
@@ -97,6 +97,22 @@ are now obsolete, and the term-fit sheet has been rebuilt.** What they said, and
   re-scanned, and the report now carries `confidence` and `corroborations` separately plus the
   `rejected` block (ADR-0007). It is still a scanner diagnostic, so still do not consult it while
   labelling — but the reason is now ADR-0004's, not staleness.
+
+**The soundness sheet was rebuilt to 207 rows on 2026-08-16, and the rebuild disturbed nothing.**
+It is generated from the same `out/glossary.csv` the run produced (207 rows, written 18:28), one
+row per term the tool actually writes, slug from `slugify(term)`, sorted by slug. Against the old
+202-row sheet: **8 added** — `Delimiter`, `Fibonacci`, `Outer loop` and `Overriding` from the
+re-scan, plus `Equality`, `Inequality`, `init` and `super`, which now carry definitions for the two
+reasons named above — and **3 removed** (`method-overriding`, `python-tutor`, `string-slicing`,
+gone from the index). Every one of the 199 rows the two sheets share carries a **byte-identical**
+definition, so no row that existed before has moved or changed, and no label would have been
+invalidated had any existed.
+
+Its 207 slugs are a strict subset of the term-fit sheet's 214. The 7 that are absent —
+`copy-method`, `floor-division`, `index-method`, `line-plot`, `modulo`, `real-division`,
+`repetition` — are exactly the unwritten sidecar `out/glossary.unwritten.csv` (ADR-0006). Term fit
+covers them; soundness cannot, because there is no definition to judge. That is the intended
+relationship between the two sheets, not a gap.
 
 **The term-fit sheet is 214 rows, not 212 — a deliberate, additive change to the pre-registration.**
 The re-scan moved the index from 212 slugs to 214: 5 new (`Delimiter`, `Fibonacci`, `Index method`,
