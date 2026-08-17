@@ -37,6 +37,28 @@ def _page(raw: dict[str, Any]) -> Page:
     )
 
 
+def fixture_payload(
+    recorded: Sequence[tuple[Page, PageCandidates]], expected: Sequence[str]
+) -> dict[str, Any]:
+    """Build a replay fixture from pages and the candidates a model proposed for them.
+
+    The inverse of `replay`, and deliberately adjacent to it: the two share one JSON
+    shape, and a fixture recorded against a drifted shape would replay as an empty
+    pipeline — an eval that passes by measuring nothing.
+    """
+    return {
+        "expected_slugs": list(expected),
+        "pages": [
+            {
+                "url": page.url,
+                "blocks": [{"kind": block.kind, "text": block.text} for block in page.blocks],
+                "reply": candidates.model_dump(),
+            }
+            for page, candidates in recorded
+        ],
+    }
+
+
 def replay(fixture: dict[str, Any]) -> list[MergedTerm]:
     """Re-run stages 4-7 over recorded stage-3 output. No network, no key, no
     cost.
