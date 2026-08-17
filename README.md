@@ -459,6 +459,20 @@ in the current input file. So running `v1` then `v2` from the same `--ledger` ne
 both definitions into one CSV. If you want a side-by-side comparison of two prompt versions
 or two models, run each to a different `--out` path.
 
+**To redo specific terms without touching the prompt, use `--regenerate`.** It re-attempts named
+subjects even though the ledger says they are done, and it is per-subject on purpose — there is no
+blanket `--force`, because one would re-pay for a whole book. Where a term ends up with several
+attempts, both CSVs use its **latest**: a term regenerated into a failure leaves the import CSV for
+the unwritten sidecar, and a term regenerated into a success stays.
+
+**What the ledger key does and does not claim.** It is `(subject, prompt_version, model)`, and it
+claims *"the same prompt and model were used"* — not *"re-running today would produce this row"*.
+Constants that shape output but are not in the key (`MIN_EXCERPT_CHARS`, `max_excerpts`, the
+excerpt ranking order, the term-matching rules) can change without invalidating anything, by
+design: a tool built around never paying twice should not acquire a mechanism whose whole purpose
+is to make it pay twice. When such a change matters for a specific term, name it to `--regenerate`.
+See [ADR-0009](docs/adr/0009-the-resume-key-does-not-version-generation-policy.md).
+
 **Give every book its own `--ledger` path.** Pointing `--ledger` at a file that already
 holds another book's terms keeps that book's rows out of this CSV — *unless the two books
 share a term*. The ledger key is `(subject, prompt_version, model)` — where the subject is
@@ -479,6 +493,7 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 | `--model` | `gemini-3.7-flash` | model name passed to the Gemini client only; the OpenAI-compatible fallback's model comes from `GLOSSARY_GEN_OPENAI_MODEL`. **Changing it re-runs the whole book** — the ledger is keyed on it |
 | `--library`, `--cover-id`, `--book-id` | — | override the input file's `book` block; required (from one source or the other) when the input is CSV, which never carries a book block |
 | `--max-terms` | — | process at most N terms (smoke runs); must be a positive integer |
+| `--regenerate` | — | comma-separated terms to re-attempt even though the ledger says they are done. Accepts either spelling — `--regenerate 'Equality,__init__()'` or `--regenerate equality,init`. A value matching no term in `--input` refuses the run (exit 2) rather than quietly doing nothing. Per-subject on purpose: there is no blanket `--force`, because one would re-pay for a whole book |
 | `--budget-usd` | — | pre-run estimate gate **and** mid-run abort ceiling, see Cost control below |
 | `--yes` | off | confirm the spend up front, skipping the interactive `proceed? [y/N]` prompt. **Required for any non-interactive/CI invocation** — without a tty and without this flag, the run refuses and exits 2 before fetching anything, rather than spending unasked |
 | `--dry-run` | off | fetch and excerpt only; calls no model, needs no API key, costs nothing |
@@ -488,7 +503,7 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 | Code | Meaning |
 |---|---|
 | `0` | success (including a user declining the confirmation prompt) |
-| `2` | input error — bad/missing input file, no provider configured, pre-run cost estimate exceeds `--budget-usd`, `--budget-usd` was given for a model with no configured price, or a non-interactive run was given no `--yes` to consent with. Nothing was spent and there is no ledger to resume |
+| `2` | input error — bad/missing input file, no provider configured, pre-run cost estimate exceeds `--budget-usd`, `--budget-usd` was given for a model with no configured price, `--regenerate` named a term absent from the input, or a non-interactive run was given no `--yes` to consent with. Nothing was spent and there is no ledger to resume |
 | `3` | the run started but aborted early — 5 consecutive provider failures, or actual spend crossed `--budget-usd` mid-run. Check the ledger for what happened; already-succeeded terms are safe and the run is resumable |
 
 > **Unattended runs need `--yes`, including ones that would cost nothing.** Consent is settled

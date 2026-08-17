@@ -122,6 +122,25 @@ def _scoped(
     ]
 
 
+def _latest_per_subject(records: Sequence[LedgerRecord]) -> list[LedgerRecord]:
+    """One record per subject: the last one in the ledger, which is its current state.
+
+    The ledger is append-only history, so a subject may hold several attempts. Ordinarily
+    at most one is `ok` and this is a formality — but `--regenerate` re-attempts a subject
+    that already succeeded, and then the older row is superseded rather than equal. Emitting
+    both put a duplicate term in the CSV, which `load_input` rejects on duplicate slugs, so
+    it would have failed at the very consumer the file targets.
+
+    Ordered by ledger position, never by `generated_at`: the timestamp is what a producer
+    wrote down, while position is what actually happened, and only one of those is a fact
+    about this file. A regenerated subject keeps its original place in the output.
+    """
+    latest: dict[str, LedgerRecord] = {}
+    for record in records:
+        latest[record.subject] = record
+    return list(latest.values())
+
+
 def _write(path: Path, rows: Sequence[dict[str, str]]) -> int:
     """Write `rows` under the fixed header. Always writes the file, even with no rows:
     a header-only file has exactly one meaning, while a conditionally-written one leaves
@@ -152,7 +171,8 @@ def write_csv(
     every row has a definition and `x_status` is always `needs-review`. Terms this run
     failed to define are reported by `write_unwritten_csv` instead — see ADR-0006.
     """
-    usable = [r for r in _scoped(records, prompt_version, model, slugs) if r.status == "ok"]
+    scoped = _latest_per_subject(_scoped(records, prompt_version, model, slugs))
+    usable = [r for r in scoped if r.status == "ok"]
     return _write(path, [_row(record, book, status=NEEDS_REVIEW) for record in usable])
 
 
@@ -169,9 +189,13 @@ def write_unwritten_csv(
     for, whether because its pages grounded too little, would not fetch, or the model
     failed. Returns the number of data rows written.
 
-    Membership is "has no `ok` row", not "has a non-ok row". With a shared ledger a term
-    that failed in one run and succeeded in the next carries both records, and the later
-    run must not report it unwritten. Where a term accumulated several failed attempts the
+    Membership is decided by a subject's LATEST attempt, which generalises ADR-0006's
+    original "has no `ok` row" without contradicting it. That rule assumed success was
+    terminal; `--regenerate` breaks the assumption, since a term written before
+    `MIN_EXCERPT_CHARS` existed can be re-attempted under it and correctly refused. Its
+    stale `ok` row must not keep a definition in the import CSV that the tool would no
+    longer write. A failure followed by a success still belongs in the CSV, exactly as
+    before — the latest attempt is the `ok` one. Where a term accumulated several attempts the
     latest is emitted, since the earlier ones are history the ledger already keeps.
 
     `x_status` carries the ledger status verbatim rather than `needs-review`, which would
@@ -181,10 +205,8 @@ def write_unwritten_csv(
     construction on every failure path, and forcing it would hide a broken invariant
     instead of surfacing it.
     """
-    scoped = _scoped(records, prompt_version, model, slugs)
-    done = {record.subject for record in scoped if record.status == "ok"}
-    latest: dict[str, LedgerRecord] = {}
-    for record in scoped:
-        if record.subject not in done:
-            latest[record.subject] = record  # last write wins: the most recent attempt
-    return _write(path, [_row(record, book, status=record.status) for record in latest.values()])
+    scoped = _latest_per_subject(_scoped(records, prompt_version, model, slugs))
+    return _write(
+        path,
+        [_row(r, book, status=r.status) for r in scoped if r.status != "ok"],
+    )

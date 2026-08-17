@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -24,7 +25,7 @@ from glossary_gen.llm import (
     ProviderChain,
     RetryingClient,
 )
-from glossary_gen.models import Book, Page, Term
+from glossary_gen.models import Book, Page, Term, slugify
 
 from glossary_gen.run import (
     Attempt,
@@ -320,6 +321,32 @@ def collect_pages(term: Term, cache: PageCache, failed: list[str]) -> list[Page]
     return pages
 
 
+def forced_subjects(values: Sequence[str]) -> set[str]:
+    """Normalise `--regenerate` values to subjects.
+
+    Slugified rather than matched literally, so a reviewer can name what the CSV shows them
+    — `Equality`, `__init__()` — instead of deriving the slug. `slugify` is idempotent, so
+    passing a slug already works and both spellings resolve to the same subject.
+    """
+    return {slugify(value) for value in values if value.strip()}
+
+
+def regeneration_rule(forced: Collection[str]) -> Callable[[Any], bool]:
+    """A completion rule that treats named subjects as not-done, so they are re-attempted.
+
+    Reuses the `is_done` hook ADR-0008 added for the scanner rather than inventing a second
+    way to say "not finished". Deliberately per-subject: a blanket `--force` would re-pay
+    for a whole book, which is the one thing this tool is built to avoid. It does not
+    version generation policy (ADR-0009) — it re-attempts work someone named.
+    """
+    subjects = set(forced)
+
+    def is_done(record: Any) -> bool:
+        return record.status == "ok" and record.subject not in subjects
+
+    return is_done
+
+
 def unwritten_path(out: Path) -> Path:
     """`out/glossary.csv` -> `out/glossary.unwritten.csv`.
 
@@ -396,6 +423,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="confirm the spend up front; required for a non-interactive run",
     )
     parser.add_argument(
+        "--regenerate",
+        type=lambda v: [p.strip() for p in v.split(",") if p.strip()],
+        default=[],
+        help="re-attempt these terms even if already done (comma-separated; term or slug)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="fetch and excerpt only; call no model, spend nothing, need no API key",
@@ -457,6 +490,20 @@ def run(argv: list[str] | None = None) -> int:
         return refusal
 
     terms = parsed.terms[: args.max_terms] if args.max_terms else parsed.terms
+
+    # Refuse a --regenerate value that matches nothing, rather than doing nothing quietly.
+    # A typo's only other symptom is a definition that did not change, discovered after the
+    # run has already been paid for. Values are slugified, so a misspelling becomes a
+    # plausible-looking subject that simply never matches — which is why this check exists.
+    forced = forced_subjects(args.regenerate)
+    if unknown := sorted(forced - {term.slug for term in terms}):
+        print(
+            f"error: --regenerate named {len(unknown)} term(s) not in {args.input}: "
+            f"{', '.join(unknown)}",
+            file=sys.stderr,
+        )
+        return EXIT_INPUT_ERROR
+
     cache = PageCache(args.cache_dir, build_http_client())
 
     if args.dry_run:
@@ -496,7 +543,7 @@ def run(argv: list[str] | None = None) -> int:
     if (refusal := confirm_spend(args)) is not None:
         return refusal
 
-    ledger = Ledger(args.ledger)
+    ledger = Ledger(args.ledger, is_done=regeneration_rule(forced))
     if ledger.skipped_lines:
         print(f"note: skipped {ledger.skipped_lines} unreadable ledger line(s)")
 

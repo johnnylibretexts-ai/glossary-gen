@@ -381,3 +381,68 @@ def test_the_sidecar_has_the_same_columns_as_the_import_csv(tmp_path):
     write_unwritten(path, [make_record("modulo", status="no_excerpt", definition="")])
     with path.open(encoding="utf-8", newline="") as handle:
         assert next(csv.reader(handle)) == COLUMNS
+
+
+# --- --regenerate makes a subject's LATEST attempt the one that counts (ADR-0009) --------
+
+
+def test_a_regenerated_term_appears_once_not_twice(tmp_path):
+    """`--regenerate` re-attempts a subject that already has an `ok` row, so the ledger ends
+    up holding two. Emitting both puts a duplicate term in the CSV — which `load_input`
+    rejects outright on duplicate slugs, so it would fail at the very consumer it targets.
+    """
+    path = tmp_path / "out.csv"
+    written = write(
+        path,
+        [
+            make_record("equality", definition="thin, from 17 chars"),
+            make_record("equality", definition="grounded, from 132 chars"),
+        ],
+        slugs={"equality"},
+    )
+    assert written == 1
+    assert read(path)[0]["definition"] == "grounded, from 132 chars"
+
+
+def test_a_term_that_regenerated_into_a_failure_leaves_the_csv(tmp_path):
+    """The case that made this necessary: a term written before `MIN_EXCERPT_CHARS` existed,
+    re-attempted under it, now correctly refused. Its stale `ok` row must not keep it in the
+    import CSV — the definition it carries is one the tool would no longer write.
+    """
+    path = tmp_path / "out.csv"
+    written = write(
+        path,
+        [
+            make_record("modulo", definition="written before the floor existed"),
+            make_record("modulo", status="no_excerpt", definition=""),
+        ],
+        slugs={"modulo"},
+    )
+    assert written == 0
+    assert read(path) == []
+
+
+def test_that_same_term_becomes_unwritten(tmp_path):
+    """The other half: it does not vanish, it moves. Every term stays accounted for."""
+    path = tmp_path / "unwritten.csv"
+    written = write_unwritten(
+        path,
+        [
+            make_record("modulo", definition="written before the floor existed"),
+            make_record("modulo", status="no_excerpt", definition=""),
+        ],
+        slugs={"modulo"},
+    )
+    assert written == 1
+    assert read(path)[0]["x_status"] == "no_excerpt"
+
+
+def test_a_failure_followed_by_success_is_still_not_unwritten(tmp_path):
+    """ADR-0006's original rule, which the latest-attempt rule must keep satisfying."""
+    path = tmp_path / "unwritten.csv"
+    records = [
+        make_record("modulo", status="no_excerpt", definition=""),
+        make_record("modulo", status="ok"),
+    ]
+    assert write_unwritten(path, records, slugs={"modulo"}) == 0
+    assert write(tmp_path / "out.csv", records, slugs={"modulo"}) == 1
