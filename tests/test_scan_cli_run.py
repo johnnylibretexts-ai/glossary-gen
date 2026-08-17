@@ -3,7 +3,11 @@ import json
 from glossary_gen.ledger import Ledger
 from glossary_gen.llm import LLMTransportError, RawResult
 from glossary_gen.models import Block, Page, slugify
-from glossary_gen.scan.candidates import is_rebuildable, terms_from_ledger
+from glossary_gen.scan.candidates import (
+    is_rebuildable,
+    stale_page_count,
+    terms_from_ledger,
+)
 from glossary_gen.scan.models import Rejection, ScanRecord
 from glossary_gen.scan.propose import load_scan_prompt
 from glossary_gen.scan_cli import estimate_scan_cost, execute
@@ -515,3 +519,31 @@ def test_an_empty_page_is_never_rescanned_either(tmp_path):
     resumed = Ledger(path, record_cls=ScanRecord, is_done=is_rebuildable)
     summary = execute([EMPTY_PAGE], _FakeClient([]), resumed, load_scan_prompt("v1"), "v1")
     assert summary.skipped == 1
+
+
+def test_the_stale_note_stops_firing_once_a_page_has_been_rescanned(tmp_path):
+    """The ledger is append-only, so a re-scanned page keeps its old row beside the new one.
+    Counting rows would announce "N pages must be re-scanned" forever on a ledger where
+    nothing needs it — the note would outlive the condition it reports.
+    """
+    path = tmp_path / "scan.jsonl"
+    old_row = {
+        "subject": slugify(PAGE.url),
+        "page_url": PAGE.url,
+        "prompt_version": "v1",
+        "model": "fake-model",
+        "generated_at": "2026-08-16T00:00:00Z",
+        "status": "ok",
+        "n_proposed": 1,
+        "n_verified": 1,
+    }
+    path.write_text(json.dumps(old_row) + "\n", encoding="utf-8")
+
+    ledger = Ledger(path, record_cls=ScanRecord, is_done=is_rebuildable)
+    assert stale_page_count(ledger.records()) == 1  # before: one page to re-scan
+
+    execute([PAGE], _FakeClient([GOOD]), ledger, load_scan_prompt("v1"), "v1")
+
+    after = Ledger(path, record_cls=ScanRecord, is_done=is_rebuildable)
+    assert len(after.records()) == 2  # the old row is still there
+    assert stale_page_count(after.records()) == 0  # but the page no longer needs scanning

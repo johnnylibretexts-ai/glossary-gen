@@ -124,6 +124,20 @@ def is_rebuildable(record: ScanRecord) -> bool:
     return record.status == "ok" and record.candidates is not None
 
 
+def stale_page_count(records: Sequence[ScanRecord]) -> int:
+    """How many pages will actually be re-scanned because no row can rebuild them.
+
+    Counts SUBJECTS, not rows. The ledger is append-only, so once a stale page has been
+    re-scanned its old row stays on disk forever beside the new one. Counting rows would
+    keep announcing "136 pages must be re-scanned" on every future run of a ledger where
+    nothing needs re-scanning at all — the note would outlive the condition it reports.
+    """
+    keys = lambda r: (r.subject, r.prompt_version, r.model)  # noqa: E731
+    rebuildable = {keys(r) for r in records if is_rebuildable(r)}
+    stale = {keys(r) for r in records if r.status == "ok" and r.candidates is None}
+    return len(stale - rebuildable)
+
+
 def terms_from_ledger(records: Sequence[ScanRecord]) -> list[MergedTerm]:
     """The book's terms, rebuilt from every page the ledger has ever scanned.
 
