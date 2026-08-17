@@ -9,7 +9,9 @@ from glossary_gen.scan.models import (
     Candidate,
     Corroboration,
     MergedTerm,
+    RejectedCandidate,
     Rejection,
+    ScanRecord,
     VerifiedCandidate,
 )
 
@@ -106,6 +108,42 @@ def corroborations_on_page(candidate: Candidate, page: Page) -> list[Corroborati
     if DEFINITIONAL.search(candidate.evidence):
         found.append(Corroboration.CUE)
     return found
+
+
+def is_rebuildable(record: ScanRecord) -> bool:
+    """True when this row can contribute what it found to a rebuilt index.
+
+    A row written before candidates were stored says `candidates is None`: it knows a page
+    was scanned and how many terms it verified, but not which, so the page has to be scanned
+    again. A row that stored `[]` is complete — the page defined nothing — and re-paying for
+    it would be paying twice for a known answer.
+
+    Only `ok` rows carry candidates at all; a `fetch_error` or `llm_error` row was never
+    done in the first place and `Ledger.has` already refuses it.
+    """
+    return record.status == "ok" and record.candidates is not None
+
+
+def terms_from_ledger(records: Sequence[ScanRecord]) -> list[MergedTerm]:
+    """The book's terms, rebuilt from every page the ledger has ever scanned.
+
+    This is what makes a resumed scan produce a whole book instead of whichever pages that
+    invocation happened to pay for. `glossary-gen` has had the equivalent all along by
+    writing its CSV from `ledger.records()`; the scanner could not, because its rows stored
+    counts rather than candidates (ADR-0008).
+    """
+    return merge(
+        [c for record in records if is_rebuildable(record) for c in record.candidates or []]
+    )
+
+
+def rejections_from_ledger(records: Sequence[ScanRecord]) -> list[RejectedCandidate]:
+    """Every candidate the gate refused, across every page the ledger has scanned.
+
+    Same rebuild rule as `terms_from_ledger` so the diagnostic report and the index always
+    describe the same set of pages (ADR-0007 records what the block is for).
+    """
+    return [r for record in records if is_rebuildable(record) for r in record.rejected or []]
 
 
 def merge(verified: Sequence[VerifiedCandidate]) -> list[MergedTerm]:

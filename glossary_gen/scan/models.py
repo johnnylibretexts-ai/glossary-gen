@@ -133,6 +133,17 @@ class ScanRecord(BaseModel):
     status: ScanStatus
     n_proposed: int = 0
     n_verified: int = 0
+    # What the page actually yielded, not just how much of it. The index and the diagnostic
+    # report are rebuilt from these, so a resumed scan describes the whole book rather than
+    # only the pages that run happened to pay for (ADR-0008).
+    #
+    # `None` means "this row predates candidate storage", which is NOT the same as `[]`,
+    # "this page was scanned and yielded nothing". The distinction has to be exact: a row
+    # that verified terms but cannot say which is unusable and its page must be re-scanned,
+    # while a page that genuinely defined nothing is complete and must never be re-paid for.
+    # Inferring staleness from `n_verified` instead would conflate the two.
+    candidates: list[VerifiedCandidate] | None = None
+    rejected: list[RejectedCandidate] | None = None
     tokens_in: int = 0
     tokens_out: int = 0
     error: str | None = None
