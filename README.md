@@ -9,7 +9,8 @@ each term appears on) and emits a CSV of AI-generated definitions for review and
 > It takes you from `git clone` to a CSV, and the first real step needs no API key and costs
 > nothing. Everything below the walkthrough is reference material.
 
-- Step 1 (build the index) and step 3 (import into Conductor) are out of scope.
+- Step 1 (build the index) ships here too, as a separate command: `glossary-scan`.
+- Step 3 (import into Conductor) is out of scope.
 - Every row ships as `x_status = needs-review`. Nothing here is reviewed or approved content.
 
 License: [MIT](LICENSE).
@@ -22,10 +23,14 @@ License: [MIT](LICENSE).
 | 2 | **This tool.** AI reads those pages and writes a definition per term | — |
 | 3 | Import the CSV into Conductor, where terms are centralised | Conductor side |
 
-Steps 1 and 3 are deliberately out of scope. This tool consumes an index and emits a file;
-it does not build an index and it does not talk to Conductor. The two contracts it does own
-are the [input format](#input-format) and the [output columns](#output-columns) — those are
-the integration surface, and both are specified below.
+Step 3 is deliberately out of scope: nothing here talks to Conductor. Steps 1 and 2 are two
+separate commands from the same package, and the boundary between them is real — `glossary-scan`
+emits an index, `glossary-gen` consumes one and emits a CSV. Neither knows about the other
+beyond that file, so you can hand-write the index and skip step 1 entirely.
+
+The two contracts this package owns are the [input format](#input-format) and the
+[output columns](#output-columns) — those are the integration surface, and both are specified
+below.
 
 ## Building an index (glossary-scan)
 
@@ -395,11 +400,18 @@ well, scale up; if they don't, edit the prompt (see [below](#usage)) rather than
 
 ### Pointing it at your own book
 
-The one thing this tool does **not** do is build the index — that is deliberately upstream
-of it. You supply a file in the [input format](#input-format): each term plus the page URLs
-where that term is discussed.
+`glossary-gen` — the step 2 command the walkthrough above uses — does not build the index, it
+consumes one. Either way you get there, the file is in the same
+[input format](#input-format): each term plus the page URLs where that term is discussed.
 
-Practical sources for that list, in rough order of effort:
+**Build one with `glossary-scan`.** It ships in this package and is step 1 of the pipeline:
+point it at a book and it writes an index ready to feed straight into `glossary-gen`. Start
+with the free `--dry-run` — no key, no cost — and see
+[Building an index](#building-an-index-glossary-scan) for the cost guards before a real run:
+
+    glossary-scan --book "<book url>" --dry-run
+
+**Or supply your own.** Practical sources for that list, in rough order of effort:
 
 - A book's back-matter **Index** page, which already pairs keywords with the pages they
   appear on — this is what `examples/openstax-python-index.json` was built from.
