@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import httpx
@@ -10,9 +11,12 @@ from glossary_gen.cli import (
     build_parser,
     estimate_cost,
     execute,
+    forced_subjects,
     load_prices,
+    regeneration_rule,
     unwritten_path,
 )
+from glossary_gen.cli import run as cli_run
 from glossary_gen.excerpt import MIN_EXCERPT_CHARS
 from glossary_gen.fetch import PageCache
 from glossary_gen.generate import load_prompt
@@ -606,3 +610,70 @@ def test_an_unwritten_term_records_grounding_that_fell_just_under_the_floor(tmp_
     records = Ledger(tmp_path / "run.jsonl").records()
     assert records[0].status == "no_excerpt"
     assert 0 < records[0].excerpt_chars < MIN_EXCERPT_CHARS
+
+
+# --- --regenerate: re-attempt named subjects (ADR-0009) ----------------------------------
+
+
+def test_regenerate_accepts_a_comma_separated_list():
+    args = build_parser().parse_args(["--input", "x.json", "--regenerate", "equality,init"])
+    assert args.regenerate == ["equality", "init"]
+
+
+def test_regenerate_accepts_a_term_spelling_as_well_as_its_slug():
+    """A reviewer works from the CSV, where they see `Equality` and `__init__()`, not the
+    slugs. `slugify` is idempotent on both, so accepting either costs nothing.
+    """
+    assert forced_subjects(["Equality", "equality", "__init__()"]) == {"equality", "init"}
+
+
+def test_a_forced_subject_is_not_done_even_with_an_ok_row():
+    """The whole mechanism, and it reuses ADR-0008's `is_done` hook rather than inventing
+    a second way to say "not finished".
+    """
+    done = regeneration_rule({"equality"})
+    ok_row = LedgerRecord(
+        subject="equality",
+        term="Equality",
+        prompt_version="v1",
+        model="m",
+        generated_at="2026-08-16T00:00:00Z",
+        status="ok",
+    )
+    other = ok_row.model_copy(update={"subject": "modulo"})
+    assert done(ok_row) is False  # forced: re-attempted
+    assert done(other) is True  # untouched: still skipped
+
+
+def test_regeneration_rule_still_refuses_a_failed_row():
+    """Forcing changes which `ok` rows count, never which failures do."""
+    done = regeneration_rule(set())
+    failed = LedgerRecord(
+        subject="modulo",
+        term="Modulo",
+        prompt_version="v1",
+        model="m",
+        generated_at="2026-08-16T00:00:00Z",
+        status="no_excerpt",
+    )
+    assert done(failed) is False
+
+
+def test_regenerate_refuses_a_term_that_is_not_in_the_input(tmp_path, capsys):
+    """Exits before the network. A typo's only other symptom is a definition that did not
+    change, noticed after the run has already been paid for.
+    """
+    payload = {
+        "book": {"library": "eng", "coverID": "1", "bookId": "b", "title": "T", "index_url": "u"},
+        "terms": [{"term": "Recursion", "pages": ["https://a"]}],
+    }
+    path = tmp_path / "in.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    code = cli_run(["--input", str(path), "--regenerate", "Equalty,Recursion", "--yes"])
+
+    assert code == 2
+    err = capsys.readouterr().err
+    assert "--regenerate named 1 term(s) not in" in err
+    assert "equalty" in err  # the slug it resolved to, so the typo is visible
+    assert "recursion" not in err  # the one that DID match is not blamed

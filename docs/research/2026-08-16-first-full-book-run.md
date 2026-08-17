@@ -197,3 +197,35 @@ consents. Copying the block above into a script without it will exit 2 rather th
   been unmatchable too, leaving them starved below the excerpt floor.
 - ~~`prices.json` effective dates~~ — the owner accepted the 2027-01-01 liability; the file
   carries a `_gemini_3_7_flash_expiry` key naming the date and the direction of the error.
+
+
+## Correction, 2026-08-16 — `d53e235`'s recovery count, and where the eight thin rows went
+
+`d53e235`'s commit message states that fixing the word-boundary bug recovers three of the eight
+sub-floor terms: "Equality, Inequality and Copy method recover too: their aliases are `==`, `!=`
+and `copy()`". Re-excerpting all eight against current code, no model calls, shows **two**:
+
+| term | grounding then | grounding now | |
+|---|---|---|---|
+| Equality | 17 | **132** | clears the floor |
+| Inequality | 19 | **134** | clears the floor |
+| Copy method | 53 | 53 | still below |
+| Line plot | 82 | 82 | still below |
+| Floor division | 23 | 23 | still below |
+| Real division | 21 | 21 | still below |
+| Repetition | 18 | 18 | still below |
+| Modulo | 14 | 14 | still below |
+
+`Copy method`'s alias is `copy() method`, not `copy()`, and that longer string does not occur on
+the page — so the boundary fix could not help it. A commit message cannot be edited without a
+rebase, so the correction lives here.
+
+All eight were re-attempted on 2026-08-16 via the new `--regenerate` flag ([ADR-0009](../adr/0009-the-resume-key-does-not-version-generation-policy.md)),
+costing $0.0064 — six never reached a model. `Equality` and `Inequality` got definitions grounded
+in real page text; the other six moved to the unwritten sidecar with their true shortfalls (7 to
+82 characters). ADR-0005's note that these rows "would be reported `no_excerpt` today" was accurate
+about the rule and misleading about the artifact: they were still in the shipping CSV until now.
+
+**Current artifact state**, superseding the counts earlier in this document: the scan finds **214**
+terms (was 212), the CSV holds **207** rows with `x_excerpt_chars` ranging 107–1459 and nothing
+below the floor, and **7** terms are unwritten. 207 + 7 = 214, every term accounted for.
