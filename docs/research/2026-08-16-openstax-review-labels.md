@@ -1,5 +1,20 @@
 # Review labels — protocol and pre-registration
 
+> **⛔ CLOSED 2026-08-17. Neither sitting will happen: this project has no expert, and the one
+> person who could sit for it is not going to.** Everything below stands as the design it was —
+> nothing has been retracted, and the sheets are still committed, still 0 of 214 and 0 of 207
+> labelled. What replaces it is
+> [ADR-0010](../adr/0010-reference-sets-come-from-books-not-experts.md): reference sets are
+> harvested from books that already carry an author-written glossary, which answers **recall**
+> against published human judgement and deliberately answers nothing about term fit. Read the
+> pre-registered bar below as history. Read its clause 2 as unrunnable — it asked for a comparison
+> against human labels that now cannot exist, on top of a seal that was already broken.
+>
+> **The sheets were never filled.** A first machine pass was discarded as contaminated (below), and
+> on 2026-08-16 a run of `tools/label_sheet.py` produced 214 `yes` in 98 seconds — a held-down key,
+> not a pass — and was reset before it reached a commit. No label has ever been recorded on either
+> sheet by anyone.
+
 The open question ADR-0004 left behind is *what genuinely helps a reviewer trim 212 terms*, and it
 asked that the answer start from evidence rather than another plausible formula. This is that
 evidence being collected. Nothing has been labelled yet at the time of writing: everything below —
