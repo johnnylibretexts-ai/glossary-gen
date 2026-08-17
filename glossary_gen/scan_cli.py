@@ -32,6 +32,7 @@ from glossary_gen.scan.candidates import (
     is_rebuildable,
     rejection_of,
     rejections_from_ledger,
+    stale_page_count,
     terms_from_ledger,
 )
 from glossary_gen.scan.content import extract_content
@@ -396,7 +397,7 @@ def run(argv: list[str] | None = None) -> int:
     # `is_rebuildable`, not the default `status == "ok"`: a row that cannot say what its
     # page yielded cannot contribute to a rebuilt index, so its page is not done (ADR-0008).
     ledger = Ledger(args.ledger, record_cls=ScanRecord, is_done=is_rebuildable)
-    if stale := sum(1 for r in ledger.records() if r.status == "ok" and r.candidates is None):
+    if stale := stale_page_count(ledger.records()):
         print(
             f"note: {stale} page(s) in {args.ledger} predate candidate storage and must be "
             "re-scanned to rebuild the index; the estimate below covers them"
