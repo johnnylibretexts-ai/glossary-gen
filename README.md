@@ -174,6 +174,50 @@ Only the model call costs money. Verification, corroboration, merging and writin
 over data — which is why the eval harness under `tests/eval/` can replay a recorded scan through
 all of them offline, with no key and no spend.
 
+**Discovery is the book's own table of contents, and on Pressbooks it takes two passes.**
+LibreTexts answers `getTOC` with the whole tree. Pressbooks has an API this tool may not use — the
+platform's default `robots.txt` disallows the entire `/*/wp-json/` tree — so a Pressbooks book's
+rendered front page is its table of contents, read in document order, because that is reading order
+and reading order is what makes "the first page to define a term" mean anything.
+
+The front page is not taken as the whole of it. A book's **parts** are usually dividers whose own
+page is a heading and nothing else, which is why they used to be skipped outright — but a part may
+carry an authored introduction to the chapters under it, and those pages define terms. Measured
+across 18 books on `ecampusontario.pressbooks.pub`: 3 have parts carrying 1,200 to 6,200 characters
+of prose apiece, 27 pages in all that discovery dropped. So every part the front page links is
+fetched, and kept only if its article still holds a paragraph once links to the book's own pages are
+taken out of it. That last clause is doing real work: a part's third shape is `Chapter Outline` over
+a list of links to its own chapters, which is a contents list in the exact shape of "terms this page
+defines" — the same thing `article.py` strips out of the chrome, rendered this time inside the
+article where narrowing cannot reach it.
+
+That fetch is also the cross-check, and the failure it guards against is not hypothetical. The
+front page is read as the whole table of contents, and a book that comes back with 8 pages instead
+of 30 reads as a small book rather than as a failure — so the part's own table of contents is read
+from the same request and the union taken. It comes from the part page's *chrome*, where the theme
+repeats the book's contents, never from its article: prose carries cross-references, some of them
+stale, and one measured on *Communication at Work* pointed at a redirect to a chapter already in
+the list — which would have been fetched, scanned and paid for twice under two URLs.
+
+Those reads go through the run's page cache, like every other page: they follow redirects, retry a
+5xx, obey `--delay`, and a part that turns out to be a page is not downloaded again when the scan
+reaches it. Cost is one request per part, and none at all for a book whose parts are empty, since
+Pressbooks links a part from the front page exactly when it has content (89 parts surveyed: none
+linked was empty, none unlinked carried anything). Measured effect:
+
+| Book | pages before | after | |
+|---|---|---|---|
+| *Business Communication* | **1** | **20** | 19 parts and no chapters at all — a whole book that read as one page |
+| *University Success* | 72 | 84 | |
+| *Communication at Work* | 48 | 59 | |
+| *Knowing Home* | 21 | 24 | |
+| *BEAR Guide Workshop* | 24 | 26 | a glossary carrier **with** content-bearing parts: 2 harvested terms before and after |
+| *Language Foundations Handbook* | 23 | 23 | no part carries content — unchanged, and its 26 harvested terms with it |
+
+The last row is the check [#38](https://github.com/johnnylibretexts/glossary-gen/issues/38) asks
+for and the LibreTexts side has no equivalent of: harvest a Pressbooks book's own glossary before
+and after widening discovery, and the count must not fall. If it rises, discovery was missing pages.
+
 **It reads the article, not the page.** A page as served carries the site's chrome — the reader's
 display-settings menu, navigation, footer. On one measured LibreTexts page that was 54% of the text
 and 8 of its 11 headings ("Search", "Text Color", "Margin Size", "Recommended articles", …). Both
@@ -227,7 +271,7 @@ genuinely distinct terms. Near-duplicates are left for the human doing the revie
 
 | Module | Responsibility |
 |---|---|
-| `scan/toc.py` | discovery — book metadata and page URLs, via LibreTexts' public `getTOC` endpoint or a Pressbooks book's own front page |
+| `scan/toc.py` | discovery — book metadata and page URLs, via LibreTexts' public `getTOC` endpoint or a Pressbooks book's own front page and parts |
 | `scan/propose.py` | the scan prompt and one model call per page |
 | `scan/candidates.py` | `verify` / `corroborations_on_page` / `merge` — pure, no I/O, no LLM |
 | `scan/emit.py` | writing the index and the diagnostic sidecar |

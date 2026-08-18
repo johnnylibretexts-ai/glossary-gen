@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 
 # One selector per PLATFORM, tried in order, first match wins. Each is the template
 # wrapper its platform puts every article inside — not a book- or publisher-specific
@@ -29,6 +30,29 @@ from bs4 import BeautifulSoup
 CONTENT_SELECTORS = (".mt-content-container", "#content.site-content")
 
 
+def content_element(html_or_soup: str | BeautifulSoup) -> Tag | None:
+    """The first element matching a known platform wrapper, or None if none matches.
+
+    The same choice `extract_content` makes, exposed as the element rather than as its
+    inner HTML, for the one caller that needs to tell an article from the chrome around
+    it instead of just keeping the article. `scan/toc.py` reads a part page twice over:
+    the article says whether the part is a page or a divider, and the chrome carries the
+    theme's copy of the book's table of contents. Detaching the element splits the
+    document into exactly those two halves, from one parse and one definition of where
+    the line falls.
+    """
+    soup = (
+        html_or_soup
+        if isinstance(html_or_soup, BeautifulSoup)
+        else BeautifulSoup(html_or_soup, "html.parser")
+    )
+    for selector in CONTENT_SELECTORS:
+        container = soup.select_one(selector)
+        if container is not None:
+            return container
+    return None
+
+
 def extract_content(html: str) -> str:
     """Return the inner HTML of the first element matching a known platform wrapper.
 
@@ -53,9 +77,5 @@ def extract_content(html: str) -> str:
     The caller (`scan_cli.execute`) is responsible for skipping zero-block pages cheaply,
     not this function for papering over them with chrome.
     """
-    soup = BeautifulSoup(html, "html.parser")
-    for selector in CONTENT_SELECTORS:
-        container = soup.select_one(selector)
-        if container is not None:
-            return container.decode_contents()
-    return html
+    container = content_element(html)
+    return html if container is None else container.decode_contents()

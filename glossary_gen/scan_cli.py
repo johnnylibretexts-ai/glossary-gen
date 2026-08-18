@@ -311,7 +311,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ledger", type=Path, default=Path("out/scan.jsonl"), help="ledger path")
     parser.add_argument("--prompt-version", default="v1", choices=scan_prompt_versions())
     parser.add_argument("--model", default="gemini-3.7-flash", help="Gemini model name")
-    parser.add_argument("--limit", type=_positive_int, help="scan at most N pages (smoke runs)")
+    parser.add_argument(
+        "--limit",
+        type=_positive_int,
+        # Bounds SCANNING, which is what costs money, not discovery. Discovery still reads
+        # the whole table of contents — and on Pressbooks each of the book's parts — before
+        # the list is cut, so a smoke run on a 19-part book still makes those requests once.
+        help="scan at most N pages (smoke runs)",
+    )
     parser.add_argument(
         "--delay", type=float, default=0.3, help="seconds between real page fetches"
     )
@@ -334,15 +341,12 @@ def run(argv: list[str] | None = None) -> int:
     if (refusal := refuse_unattended(args)) is not None:
         return refusal
     client = build_http_client()
-    try:
-        book, urls = discover(args.book, client)
-    except TocError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return EXIT_INPUT_ERROR
-
-    if args.limit:
-        urls = urls[: args.limit]
-
+    # Built BEFORE discovery, and lent to it. Discovery reads pages of its own on
+    # Pressbooks — each part, to ask whether it is a page or a divider — and those
+    # requests belong under the same politeness delay, retries, redirect validation and
+    # size cap as every other page. A part that turns out to be a page is then already
+    # cached when `collect_pages` reaches it, instead of being downloaded twice.
+    #
     # The book URL a person typed is the run's authorisation for its own host —
     # `fetch.is_allowed_url` widens by exactly that host and no further.
     cache = PageCache(
@@ -351,6 +355,15 @@ def run(argv: list[str] | None = None) -> int:
         delay=args.delay,
         source_host=urlsplit(args.book).hostname or "",
     )
+    try:
+        book, urls = discover(args.book, client, cache)
+    except TocError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+
+    if args.limit:
+        urls = urls[: args.limit]
+
     failed: list[str] = []
     pages = collect_pages(urls, cache, failed)
 

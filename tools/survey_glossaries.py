@@ -70,7 +70,7 @@ def main() -> int:
     rows = []
     for title, url in books:
         try:
-            book, urls = discover(url, client)
+            book, urls = discover(url, client, cache)
         except TocError as exc:
             print(f"  skipped {title or url}: {exc}", file=sys.stderr)
             continue

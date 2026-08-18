@@ -220,3 +220,77 @@ tool consumes as input, free as a side effect of the harvest.
 
 **So the revised position:** asking eCampusOntario for API access is still worth doing, but it is an
 optimisation now, not the unblock. Nothing here requires fetching a disallowed path.
+
+## Follow-up: what the front page actually leaves out (2026-08-17, [#38](https://github.com/johnnylibretexts/glossary-gen/issues/38))
+
+Discovery read a Pressbooks book's front page and kept links under `front-matter/`, `chapter/` and
+`back-matter/`. Parts were excluded on the reasoning that a part is a divider whose page is a
+heading and nothing else. This measures both halves of that.
+
+Everything below used the package's own User-Agent against `ecampusontario.pressbooks.pub`, on
+allowed paths only. **The per-book sitemap at `<book>/?feed=sitemap.xml` is allowed** — no
+`Disallow` line matches it — and it enumerates every part, chapter, front- and back-matter page.
+It was used here as an independent ground truth to check discovery against; it is deliberately NOT
+what the tool reads, because it carries no reading order and lists non-book pages (`about`, `buy`,
+`authors`, `h5p-listing`).
+
+### A part is linked from the front page exactly when it has content
+
+18 books, 89 parts. Compared the parts the front page *links* against the parts the sitemap *lists*,
+and fetched every one of them:
+
+| | |
+|---|---|
+| parts that were linked and turned out empty | **0** |
+| parts that were unlinked and turned out to carry content | **0** |
+
+So the front page already offers every part worth reading, and the section filter was throwing them
+away. 3 of the 18 books have parts carrying content — 27 pages, 1,200 to 6,200 characters of prose
+each. Note the linking rule is a *theme's* behaviour, not a platform guarantee: `toc.py` fetches
+each linked part and judges the page rather than trusting the link.
+
+**Trap:** part links are rendered with **single-quoted** `href='…'` where chapter links are
+double-quoted. A regex probe over the raw HTML reported "0 parts" for every book and read as a clean
+negative. BeautifulSoup — what the package uses — sees them.
+
+### Three shapes of part page, and only one is a page
+
+- **authored introduction** to the chapters below it (*Communication at Work*, 11 of 12 parts). A
+  real page that defines terms.
+- **empty** — the heading Pressbooks renders for every part, and nothing else (*Introductory
+  Chemistry*, *Language Foundations Handbook*).
+- **`Chapter Outline` over a list of links to its own chapters** (*Introductory Statistics*, 13 of
+  13). This one is why "has any text" is the wrong test: every line is a chapter title, which is the
+  exact shape of "a term this page defines", and the evidence gate cannot refuse it because the text
+  really is on the page. It is the same hazard `article.py` strips out of the site chrome, rendered
+  this time *inside* the article where narrowing cannot reach it.
+
+### The front page really can be the whole book minus most of it
+
+**`businesscommunication`: 19 parts, one front-matter page, and zero chapters.** The entire book is
+written in its part pages. Front-page sections alone returned **1 page** for it and reported no
+error. The sitemap confirms the shape rather than contradicting it — there are no chapters to miss.
+
+Widening discovery to parts, per book (before → after):
+
+| book | before | after | |
+|---|---|---|---|
+| `businesscommunication` | 1 | 20 | |
+| `unisuccess2ed` | 72 | 84 | |
+| `communicationatwork` | 48 | 59 | |
+| `knowinghome2` | 21 | 24 | |
+| `bearguideworkshop` | 24 | 26 | the only book found that is BOTH a glossary carrier and has content-bearing parts: 2 harvested terms before and after |
+| `languagefoundationshandbook` | 23 | 23 | no part carries content; its 26 harvested terms are also unchanged |
+
+The last row is the check #38 names: harvest the book's own glossary before and after, and the count
+must not fall.
+
+### Do not take the union from a part's article
+
+The cross-check reads the part page's **chrome** — the document with its article detached — because
+that is where the theme repeats the book's table of contents. Reading the whole document instead
+looks equivalent and is not. On *Communication at Work* it turned up one URL the front page had
+never listed, `chapter/6-1-1-email-address/`, which **301s to a chapter already in the list**: a
+stale cross-reference in the part's prose. Kept, it would be fetched, scanned and paid for a second
+time under a second URL, and that URL would be attached to every term found there. A book's own
+prose links to its own pages freely, and some of those links are wrong.
