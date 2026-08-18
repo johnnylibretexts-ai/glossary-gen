@@ -272,3 +272,24 @@ def test_a_pressbooks_term_met_on_two_pages_is_a_single_entry():
 
     assert [e.term for e in entries] == ["milestone"]
     assert entries[0].page.endswith("/chapter/anticipating/")
+
+
+def test_harvests_every_pair_in_a_single_combined_definition_list():
+    """One `<dl>` holding the whole glossary — how Pressbooks renders it, and how a
+    LibreTexts author would too if they wrote one list instead of one per term. Reading
+    only the first pair returned **1 term** from a live 59-term page, silently: a
+    glossary that parses and is almost entirely missing.
+    """
+    html = """
+    <h2>Glossary</h2>
+    <dl>
+      <dt>adjective</dt><dd>A word that describes a noun or pronoun.</dd>
+      <dt>adverb</dt><dd>A word that describes a verb.</dd>
+      <dt>antonym</dt><dd>A word opposite in meaning to another.</dd>
+    </dl>
+    """
+
+    entries = author_glossary(html)
+
+    assert [e.term for e in entries] == ["adjective", "adverb", "antonym"]
+    assert entries[1].definition == "A word that describes a verb."

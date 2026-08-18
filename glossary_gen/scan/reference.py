@@ -87,16 +87,21 @@ def author_glossary(html: str) -> tuple[GlossaryEntry, ...]:
                 break
             if element.name != "dl":
                 continue
-            term_node, definition_node = element.find("dt"), element.find("dd")
-            if term_node is None:
-                continue
-            term = _text(term_node)
-            if not term or _TEMPLATE_TERM.match(term):
-                continue
-            # First definition wins: a term restated in a later chapter's glossary
-            # is the same entry, and the book introduces it where it introduces it.
-            definition = _text(definition_node) if definition_node else ""
-            entries.setdefault(slugify(term), GlossaryEntry(term=term, definition=definition))
+            for term_node in element.find_all("dt"):
+                term = _text(term_node)
+                if not term or _TEMPLATE_TERM.match(term):
+                    continue
+                # Every pair in the list, not just the first. LibreTexts books tend to
+                # wrap each term in its own `<dl>`, which made `find("dt")` look right;
+                # a single list holding the whole glossary is equally valid HTML and is
+                # what Pressbooks emits, and reading one pair of it lost 58 of 59 terms.
+                definition_node = term_node.find_next_sibling(["dd", "dt"])
+                if definition_node is not None and definition_node.name != "dd":
+                    definition_node = None
+                # First definition wins: a term restated in a later chapter's glossary
+                # is the same entry, and the book introduces it where it introduces it.
+                definition = _text(definition_node) if definition_node else ""
+                entries.setdefault(slugify(term), GlossaryEntry(term=term, definition=definition))
 
     return tuple(entries.values())
 
