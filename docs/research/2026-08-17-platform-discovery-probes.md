@@ -317,6 +317,13 @@ So the glossary page is not merely a shortcut past the walk — on this book the
 the one request did not, and the inline route alone finds 26 of the 59. (The API reports 64, which
 neither HTML route reaches; five terms are defined and never used.)
 
+**One book is not the rule, and the next one measured broke it.** *Research Methods in Psychology*
+settles at 100 from its glossary page and has **243** terms across its 83 pages — the other 143
+linked inline and never listed on that page. A glossary page is the authors' list; it is not always
+the book's. Both books are consistent with what the screen claims, because a carrier's term count
+is only ever a floor — but "the glossary page is the more complete route" is true of *Language
+Foundations Handbook* and false here.
+
 It stays an optimisation and never the only route. A glossary page titled anything else — the
 `Glossaire` and `Glossary of Key Terms for Online Learning` recorded above — 404s that URL, and the
 walk reads the book's back matter like any other page. There is a test for exactly that.
@@ -402,3 +409,40 @@ first real outing.
   a standing allowlist widened by exactly one host — on a sweep, the network URL that was typed.
   Taking the widening from each book's own `link` instead would let the listing choose what the run
   fetches, including a host that is not the network's. Entries off the network host are dropped.
+
+## The first Pressbooks reference set (2026-08-18)
+
+*Research Methods in Psychology*, the densest carrier the sweep found, harvested whole:
+[`2026-08-18-psychmethods-author-glossary.csv`](./2026-08-18-psychmethods-author-glossary.csv).
+83 pages, no model call, nothing paid.
+
+| | |
+|---|---|
+| terms | **243** |
+| from the back-matter glossary page | 100 |
+| linked inline in chapters | 143 |
+| **carrying a definition** | **178** |
+| pages carrying at least one term | 44 of 83 |
+
+`tools/harvest_glossary.py` grew a `--book` route to make this possible at all. It could only read
+a book someone had already paid to scan, which had the dependency backwards: harvesting an author
+glossary is parsing rather than inference, so it is what you do to decide whether a scan is worth
+paying for. `--scan` still reads the cache a scan filled.
+
+**65 terms arrive with no definition, and that is the book rather than the parser.** Pressbooks
+serves an empty `<template>` for a term whose definition the authors never wrote:
+
+```html
+<template id="term_30_345"><div class="glossary__definition" role="dialog">
+  <div tabindex="-1"></div><button>…</button></div></template>
+```
+
+Not the `TemplateString` trap recorded further up — that one is handled, and 78 inline terms on the
+same pages come back with their text. 19 pages carry both kinds, so it is per-term, not per-page.
+Those 65 still belong in the set: the book marks them as terms it defines, and recall is scored on
+slugs. Only the 178 can be compared against as definitions, and the harvester now prints both
+counts rather than leaving the difference to be found in the CSV.
+
+**What this set has that the API's would not:** the page each term appears on. That is the index
+format this tool consumes, produced as a side effect of the harvest — and the reason the disallowed
+`glossary` endpoint would not have been better even if it were allowed.

@@ -272,6 +272,12 @@ def _screen_pressbooks(book_url: str, client: httpx.Client, cache: PageCache) ->
     anything else 404s it, and the walk reads the book's back matter like any other
     page. Measured on *Language Foundations Handbook*: 59 terms from one request, the
     same 59 the 23-page walk finds. The inline terms in its chapters are 26 of those.
+
+    That book is not the general case, and the term count is a floor for a second
+    reason because of it. *Research Methods in Psychology* settles here at 100 — its
+    glossary page, in full — while a harvest of all 83 pages finds 243, the other 143
+    linked inline and never listed on that page. A glossary page is the authors' list;
+    it is not always the book's.
     """
     page = glossary_page_url(book_url)
     try:

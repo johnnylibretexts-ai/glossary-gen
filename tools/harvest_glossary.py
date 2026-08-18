@@ -1,10 +1,14 @@
-"""Harvest a scanned book's own author glossary and score the scan against it.
+"""Harvest a book's own author glossary, and score a scan against it.
 
     python3 tools/harvest_glossary.py --scan out/stats-scan.jsonl --index out/stats-index.json
+    python3 tools/harvest_glossary.py --book https://ecampusontario.pressbooks.pub/<slug>/
 
-Reads only the on-disk HTML cache the scan already populated: no network, no API
-key, no cost. Writes the reference set to `--out` when asked, and prints what the
-scanner did against it.
+Two ways in, and neither spends anything. `--scan` reads only the on-disk HTML cache a
+scan already populated: no network, no API key. `--book` reads a book nobody has
+scanned, fetching its pages once through the same cache — harvesting an author glossary
+is parsing rather than inference, so a book that publishes one is worth harvesting
+BEFORE deciding whether to pay to scan it, not only after. Writes the reference set to
+`--out` when asked, and prints what a scanner did against it when given `--index`.
 
 Recall against this set is a real measurement. The terms the scanner proposed that
 are *absent* from it are NOT cuts — only some pages of a book carry glossary blocks,
@@ -19,9 +23,13 @@ import csv
 import json
 from pathlib import Path
 
-from glossary_gen.fetch import cache_path
+from urllib.parse import urlsplit
+
+from glossary_gen.cli import build_http_client
+from glossary_gen.fetch import FetchError, PageCache, cache_path
 from glossary_gen.models import slugify
 from glossary_gen.scan.reference import book_glossary, coverage
+from glossary_gen.scan.toc import discover
 
 
 def page_urls(scan_jsonl: Path) -> list[str]:
@@ -47,6 +55,29 @@ def cached_pages(urls: list[str], cache_dir: Path) -> tuple[list[tuple[str, str]
     return pages, absent
 
 
+def book_pages(
+    book_url: str, cache_dir: Path, delay: float
+) -> tuple[list[tuple[str, str]], list[str]]:
+    """Every page of a book, fetched once and thereafter served from the cache.
+
+    Through `PageCache`, so the harvest inherits the politeness delay, the retries, the
+    size cap and the allowlist — widened, as everywhere else, by the one host the person
+    running this named. A page that will not load is reported rather than skipped
+    silently: an author glossary harvested from a book read short is a reference set with
+    a hole in it, and every recall figure measured against it would be wrong downward.
+    """
+    client = build_http_client()
+    cache = PageCache(cache_dir, client, delay=delay, source_host=urlsplit(book_url).hostname or "")
+    _, urls = discover(book_url, client, cache)
+    pages, absent = [], []
+    for url in urls:
+        try:
+            pages.append((url, cache.get_html(url)))
+        except FetchError:
+            absent.append(url)
+    return pages, absent
+
+
 def scanned_slugs(index_json: Path) -> set[str]:
     """Index slugs plus alias slugs — an author term the scanner recorded as an
     alias was still found, and scoring it as missing would understate recall.
@@ -62,23 +93,40 @@ def scanned_slugs(index_json: Path) -> set[str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--scan", type=Path, required=True, help="the run's scan.jsonl")
+    source = ap.add_mutually_exclusive_group(required=True)
+    source.add_argument("--scan", type=Path, help="the run's scan.jsonl, read from the cache")
+    source.add_argument("--book", help="a book URL, fetched (free) instead of scanned")
     ap.add_argument("--cache", type=Path, default=Path("cache"))
+    ap.add_argument("--delay", type=float, default=0.5, help="politeness delay, --book only")
     ap.add_argument("--index", type=Path, help="index.json to score against")
     ap.add_argument("--out", type=Path, help="write the reference set here as CSV")
     ap.add_argument("--show", type=int, default=15, help="how many missing terms to print")
     args = ap.parse_args()
 
-    urls = page_urls(args.scan)
-    pages, absent = cached_pages(urls, args.cache)
+    if args.book:
+        pages, absent = book_pages(args.book, args.cache, args.delay)
+        shortfall = "would not load"
+    else:
+        urls = page_urls(args.scan)
+        pages, absent = cached_pages(urls, args.cache)
+        shortfall = "not in cache (re-run the scan to refill)"
     entries = book_glossary(pages)
     with_glossary = sum(1 for url, html in pages if book_glossary([(url, html)]))
 
-    print(f"pages scanned      {len(urls)}")
+    print(f"pages read         {len(pages) + len(absent)}")
     if absent:
-        print(f"  not in cache     {len(absent)} (re-run the scan to refill)")
+        print(f"  {len(absent)} {shortfall}")
     print(f"pages with an author glossary  {with_glossary}")
     print(f"author glossary terms          {len(entries)}")
+    # Not every term arrives with words attached. Pressbooks serves an EMPTY
+    # `<template>` for a term whose definition the authors never wrote, and 65 of
+    # *Research Methods in Psychology*'s 243 terms are that. They still belong in the
+    # set — the book marks them as terms it defines, and recall is scored on slugs —
+    # but a set a quarter of which cannot be compared against is a fact the person
+    # reading the count above should be given, not one they discover in the CSV.
+    defined = sum(1 for entry in entries if entry.definition.strip())
+    if defined != len(entries):
+        print(f"  of those, with a definition  {defined}")
 
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
