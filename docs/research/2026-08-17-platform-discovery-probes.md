@@ -345,6 +345,38 @@ Non-carriers are what costs: every one of them is a complete walk, and 87% of bo
 non-carriers. The fast path saves a whole book walk per carrier-with-a-glossary-page and costs one
 404 per book that has none — roughly a wash across a sweep, and decisive on the books being hunted.
 
+### The wider run: 10 carriers in 80 books
+
+Run at the probe's own scale the next day, output in
+[`2026-08-18-pressbooks-glossary-survey.csv`](./2026-08-18-pressbooks-glossary-survey.csv):
+
+| | |
+|---|---|
+| books | 80 |
+| pages read | 1,650 |
+| **carriers** | **10 (12.5%)** |
+| settled by one request | 2 of the 10 |
+| inconclusive | 1 |
+
+12.5% against the API probe's 11 of 83 (13.3%) — measured a different way, on a different sample of
+the same network, and they agree.
+
+**The two books settled by their glossary page were 21 and 100 terms, for one request each.** The
+other eight were settled by a walk that stopped at the first page carrying a term. Between them the
+ten carriers cost **39 page fetches**; the seventy non-carriers cost **1,611**. That is where a
+sweep's time goes and there is no way around it: proving absence means reading the book.
+
+**Carrier term counts on these rows are floors, not totals** — except the two from a glossary page,
+which are that page's whole list. They are not comparable to the probe's per-book API counts
+(median 13, max 64), which were complete.
+
+**29 minutes at `--delay 0.5`**, with roughly a quarter of the books already cached. The 20-book run
+below, at the 0.3 s default, was throttled from ~25 pages/minute to 3; at 0.5 s nothing throttled.
+Being politer was faster.
+
+One book came back inconclusive — *H5P Library*, 6 of 7 pages, one page lost to a transient
+failure. It says `no evidence`, not `no glossary`.
+
 **Two books came back inconclusive on the cold run and settled on the warm one.** Both are 28-page
 program handbooks that lost a single page to a transient failure while the network was visibly
 throttling (the run's fetch rate fell from ~25 pages/minute to 3). 27 of 28 pages is not a book
