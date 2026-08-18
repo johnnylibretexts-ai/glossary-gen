@@ -5,6 +5,7 @@ from glossary_gen.scan.reference import (
     author_glossary,
     book_glossary,
     coverage,
+    pressbooks_book_glossary,
     pressbooks_glossary,
 )
 
@@ -240,3 +241,34 @@ def test_two_surface_forms_of_one_pressbooks_term_are_a_single_entry():
 
     assert [e.term for e in entries] == ["milestone"]
     assert entries[0].definition == "A marker of progress toward a longer goal."
+
+
+def test_a_pressbooks_term_met_on_two_pages_is_a_single_entry():
+    """Pressbooks renumbers the *prefix* of a term's id per page — `term_27_452` in
+    one chapter, `term_31_452` in the next — so only the suffix identifies the term.
+    Keyed on the whole id, a term mentioned in ten chapters is harvested ten times;
+    one surveyed book showed 44 distinct ids for its 19 terms. The page kept is the
+    first one, which for a book harvested in reading order is where it introduces
+    the term — the rule `book_glossary` already follows.
+    """
+    anticipating = """
+    <p>Set a <a class="glossary-term" href="#term_27_452">milestone</a>.</p>
+    <template id="term_27_452"><div class="glossary__definition"><div tabindex="-1">
+      <p>A marker of progress toward a longer goal.</p>
+    </div><button>Close definition</button></div></template>
+    """
+    arriving = """
+    <p>Review your <a class="glossary-term" href="#term_31_452">milestones</a>.</p>
+    <template id="term_31_452"><div class="glossary__definition"><div tabindex="-1">
+      <p>A marker of progress toward a longer goal.</p>
+    </div><button>Close definition</button></div></template>
+    """
+    pages = [
+        ("https://example.pressbooks.pub/b/chapter/anticipating/", anticipating),
+        ("https://example.pressbooks.pub/b/chapter/arriving/", arriving),
+    ]
+
+    entries = pressbooks_book_glossary(pages)
+
+    assert [e.term for e in entries] == ["milestone"]
+    assert entries[0].page.endswith("/chapter/anticipating/")
