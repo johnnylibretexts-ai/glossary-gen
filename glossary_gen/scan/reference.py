@@ -15,7 +15,7 @@ rather than a judgement.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
@@ -144,28 +144,55 @@ def _definition(block) -> str:
     return _text(inner)
 
 
+# Ids read `term_<page>_<term>`. Only the suffix survives a page change, so that is
+# the term; the whole id identifies one mention of it.
+_PRESSBOOKS_TERM_ID = re.compile(r"^term_\d+_(\d+)$")
+
+
+def _pressbooks_entries(html: str) -> Iterator[tuple[str, GlossaryEntry]]:
+    """`(identity, entry)` for every glossary term mentioned on one page.
+
+    Identity is the term's own id, never the words in the sentence: Pressbooks points
+    every inflection at one definition, so "milestone" and "milestones" are one term.
+    An id of an unrecognised shape keeps the whole of itself rather than risk
+    collapsing onto a neighbour.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    for anchor in soup.select("a.glossary-term"):
+        target = (anchor.get("href") or "").lstrip("#")
+        node = soup.find(id=target)
+        if node is None:
+            continue
+        term = _text(anchor).rstrip(".")
+        if not term:
+            continue
+        block = node.select_one(".glossary__definition") or node
+        match = _PRESSBOOKS_TERM_ID.match(target)
+        identity = match.group(1) if match else target
+        yield identity, GlossaryEntry(term=term, definition=_definition(block))
+
+
 def pressbooks_glossary(html: str) -> tuple[GlossaryEntry, ...]:
     """Term/definition pairs from one rendered Pressbooks page.
 
     Pressbooks makes glossary terms a post type rather than markup, and renders each
     inline mention as an anchor plus a `<template>` holding the definition.
     """
-    soup = BeautifulSoup(html, "html.parser")
     entries: dict[str, GlossaryEntry] = {}
+    for identity, entry in _pressbooks_entries(html):
+        entries.setdefault(identity, entry)
+    return tuple(entries.values())
 
-    for anchor in soup.select("a.glossary-term"):
-        target = (anchor.get("href") or "").lstrip("#")
-        node = soup.find(id=target)
-        if node is None:
-            continue
-        block = node.select_one(".glossary__definition") or node
-        term = _text(anchor).rstrip(".")
-        if not term:
-            continue
-        # Keyed by the term's id, never by the words in the sentence: Pressbooks
-        # points every inflection at one definition, so "milestone" and "milestones"
-        # are one term. Ids read `term_<page>_<term>`; across pages only the suffix
-        # is stable, so a caller harvesting a whole book must dedupe on that.
-        entries.setdefault(target, GlossaryEntry(term=term, definition=_definition(block)))
 
+def pressbooks_book_glossary(pages: Iterable[tuple[str, str]]) -> tuple[GlossaryEntry, ...]:
+    """Harvest `(url, html)` pairs from one Pressbooks book into a reference set.
+
+    Terms keep the first page that mentions them, in the order the pages arrive —
+    which for a book harvested in reading order is where the book introduces them.
+    The rule, and the reason for it, are `book_glossary`'s.
+    """
+    entries: dict[str, GlossaryEntry] = {}
+    for url, html in pages:
+        for identity, entry in _pressbooks_entries(html):
+            entries.setdefault(identity, GlossaryEntry(entry.term, entry.definition, url))
     return tuple(entries.values())
