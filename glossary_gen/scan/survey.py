@@ -190,6 +190,11 @@ def _listing_pages(limit: int, total_pages: int, total: int) -> int:
     """
     if limit <= 0:
         return total_pages
+    # One book cannot span a catalogue, and the trim would hand back the first book of
+    # page 1 whatever else was read. Spreading for it spends a request to reach the same
+    # oldest book — so `--books 1` is a smoke test, and says so by costing one request.
+    if limit == 1:
+        return 1
     last = total - (total_pages - 1) * BOOKS_PER_PAGE if total else BOOKS_PER_PAGE
     needed = 1 if limit <= last else math.ceil((limit - last) / BOOKS_PER_PAGE) + 1
     # Never one page, which is page 1 — the oldest books on the network, and the sample
@@ -222,9 +227,21 @@ def network_books(network_url: str, client: httpx.Client, limit: int = 0) -> lis
     numbers = evenly_spaced(range(1, total_pages + 1), _listing_pages(limit, total_pages, total))
 
     books: list[tuple[str, str]] = []
+    listed = 0
     for number in numbers:
         response = first if number == 1 else _books_listing(root, client, number)
-        books.extend(_listed_books(_books_payload(response), host))
+        payload = _books_payload(response)
+        listed += len(payload) if isinstance(payload, list) else 0
+        books.extend(_listed_books(payload, host))
+    # A network that gives each book its own subdomain drops to zero books here, and
+    # "screening 0 books" reads as an empty catalogue rather than as a guard that
+    # refused every entry. Said once, at the only point where it is unambiguous.
+    # Partial drops stay silent: some entries being elsewhere is ordinary.
+    if listed and not books:
+        raise TocError(
+            f"{root}{PRESSBOOKS_BOOKS_PATH}: all {listed} listed books are on another host, "
+            f"so none is reachable from a run pointed at {host}"
+        )
     # Trimmed by spreading again, not by slicing the front. The extra listing page was
     # read precisely to reach the catalogue's newest books, and `books[:limit]` throws
     # away that page and nothing else — leaving the count right and the reason for it

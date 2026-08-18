@@ -384,6 +384,49 @@ Being politer was faster.
 One book came back inconclusive — *H5P Library*, 6 of 7 pages, one page lost to a transient
 failure. It says `no evidence`, not `no glossary`.
 
+### The same sweep, four hours later, is not the same 80 books
+
+Re-run the same evening to pick up a forecast fix (below), and **32 of the 80 books were
+different**. Not a bug, and worth knowing before anyone treats a limited sweep as a fixed sample:
+
+- eCampusOntario's catalogue went from **3,033 books to 3,046** in those four hours, so
+  `x-wp-totalpages` went 304 → 305.
+- The spread is computed over that page count, so four of its nine listing pages moved
+  (190→191, 228→229, 266→267, 304→305), and a listing page holds ten entirely different books.
+
+Listing order itself is stable — page 153 returns the same ten ids read twice a minute apart. It is
+catalogue *growth* that reshuffles which pages an even spread lands on. A sweep that must be
+reproducible would have to pin book ids from a first pass rather than re-derive them from the
+catalogue's shape.
+
+| | run 1 | run 2 |
+|---|---|---|
+| books | 80 | 80 |
+| pages read | 1,650 | 1,874 |
+| carriers | 10 | 9 |
+| unsettled | 1 | 3 |
+
+**Together they cover 112 distinct books and 12 carriers — 10.7%**, still close to the 13.3% the
+API probe measured. Run 1's per-book rows are in git history at `4f0fcc9`; the committed CSV is
+run 2, which is the one with corrected forecasts.
+
+*H5P Library*, run 1's single inconclusive row, settled at 7 of 7 pages in run 2 — the transient
+failure did not recur, which is what a re-run is for. Run 2 collected three inconclusive rows of
+its own.
+
+### The forecast column was measuring the chrome
+
+`forecast_usd` parsed each sampled page's **whole document** where a scan parses its **article**.
+On Pressbooks that difference is most of the page: the theme repeats every chapter title on every
+page as its own `<p>`, so a 77-page book was forecast as though a scan would pay for a 77-line
+table of contents 77 times over. Corrected to `parse_page(url, extract_content(html))`, which is
+what `scan_cli.collect_pages` does before it parses.
+
+Across the 43 books with a forecast in both runs the total falls from **$2.08 to $1.62**, and the
+worst single book was inflated **1.7x**. Nothing in docs/research ever quoted the column, so no
+conclusion rests on it — but it was wrong in the direction that makes a book look too expensive to
+scan.
+
 **Two books came back inconclusive on the cold run and settled on the warm one.** Both are 28-page
 program handbooks that lost a single page to a transient failure while the network was visibly
 throttling (the run's fetch rate fell from ~25 pages/minute to 3). 27 of 28 pages is not a book

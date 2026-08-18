@@ -407,3 +407,37 @@ def test_a_moved_network_says_so_rather_than_looking_missing():
 
     with pytest.raises(TocError, match="elsewhere.example"):
         network_books(NETWORK, client)
+
+
+def test_a_one_book_sweep_does_not_pay_for_a_spread_it_cannot_use():
+    """`--books 1` is a smoke test, not a sample: one book cannot span a catalogue, and
+    `evenly_spaced` gives the first of whatever it collected either way. Reading a
+    second listing page to reach the same book is a request spent for nothing.
+    """
+    pages = [_listing(*[f"b{n}" for n in range(i * 10, i * 10 + 10)]) for i in range(9)]
+    pages.append(_listing("b90", "b91", "b92"))
+    seen = []
+
+    def handler(request):
+        seen.append(int(request.url.params.get("page", 1)))
+        return _pressbooks_network(pages)(request)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    assert len(network_books(NETWORK, client, limit=1)) == 1
+    assert seen == [1]
+
+
+def test_a_listing_whose_every_book_is_off_host_says_so():
+    """The host filter is silent by design — but a network that puts each book on its
+    own subdomain drops to zero books, and "screening 0 books" reads as an empty
+    catalogue rather than as a guard that refused all of them.
+    """
+    listed = [
+        {"id": i, "link": f"https://book{i}.pressbooks.pub/", "metadata": {"name": f"B{i}"}}
+        for i in range(3)
+    ]
+    client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network([listed])))
+
+    with pytest.raises(TocError, match="off-host|another host"):
+        network_books(NETWORK, client)

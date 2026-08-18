@@ -29,6 +29,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from glossary_gen.article import extract_content
 from glossary_gen.cli import build_http_client
 from glossary_gen.fetch import PageCache, parse_page
 from glossary_gen.run import PRICES_PATH, load_prices
@@ -62,9 +63,13 @@ def book_forecast(found: Screen, model: str) -> float | None:
     """
     if not (found.spans_book and found.pages):
         return None
-    # Page text, not raw HTML: the scanner sends blocks, and chrome is most of a page.
+    # Narrowed to the article first, exactly as `scan_cli.collect_pages` does before it
+    # parses. Counting the whole document instead measures the chrome as though a scan
+    # would pay for it, and on Pressbooks the chrome is the whole book: the theme
+    # repeats every chapter title on every page, one `<p>` each, so a 77-page book
+    # forecasts a 77-line table of contents 77 times over.
     text_chars = [
-        sum(len(block.text) for block in parse_page(url, html).blocks)
+        sum(len(block.text) for block in parse_page(url, extract_content(html)).blocks)
         for url, html in found.fetched
     ]
     if not text_chars:

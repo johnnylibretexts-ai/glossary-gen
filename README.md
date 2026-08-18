@@ -131,6 +131,15 @@ tool prints the caveat on every run. Not every book has one to harvest — Pytho
 (OpenStax) carries none, its back-matter page being the unfilled LibreTexts template. See
 [ADR-0010](docs/adr/0010-reference-sets-come-from-books-not-experts.md).
 
+A separate, real, billed run — a 20-page bounded scan of the same book — produced 39 verified
+terms, and `glossary-gen` grounded all 39 of them (0 without excerpts, 0 page failures). It
+reported $0.0135 actual against a $0.03 pre-flight estimate — but **both figures were computed
+with a rate since found to be wrong**, the one belonging to `gemini-3.5-flash-lite` rather than
+`gemini-3.5-flash`. Real spend was 3.6–5× those numbers depending on the token split, and the
+ledger that would settle it exactly is long gone. What survives the correction is the ratio: the
+estimate and the actual were computed the same way, so estimate-vs-actual agreement still holds
+even though neither absolute figure does.
+
 ### Which books publish a glossary at all
 
 `tools/survey_glossaries.py` screens books for one without calling a model. Fetching costs nothing
@@ -175,15 +184,6 @@ an exact term count in one request — but the network-level listing has no path
 A sweep builds **one page cache per book**, because
 [the widening](#which-books-these-commands-will-fetch) is one exact host and a sweep names a
 different one per book.
-
-A separate, real, billed run — a 20-page bounded scan of the same book — produced 39 verified
-terms, and `glossary-gen` grounded all 39 of them (0 without excerpts, 0 page failures). It
-reported $0.0135 actual against a $0.03 pre-flight estimate — but **both figures were computed
-with a rate since found to be wrong**, the one belonging to `gemini-3.5-flash-lite` rather than
-`gemini-3.5-flash`. Real spend was 3.6–5× those numbers depending on the token split, and the
-ledger that would settle it exactly is long gone. What survives the correction is the ratio: the
-estimate and the actual were computed the same way, so estimate-vs-actual agreement still holds
-even though neither absolute figure does.
 
 **Rate limiting.** A refused model request is waited out and retried, up to three requests per
 refusal. When the provider says *when* to come back — a `Retry-After` header, or the `RetryInfo`

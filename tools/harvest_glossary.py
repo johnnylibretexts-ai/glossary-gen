@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
 
 from urllib.parse import urlsplit
@@ -29,7 +30,7 @@ from glossary_gen.cli import build_http_client
 from glossary_gen.fetch import FetchError, PageCache, cache_path
 from glossary_gen.models import slugify
 from glossary_gen.scan.reference import book_glossary, coverage
-from glossary_gen.scan.toc import discover
+from glossary_gen.scan.toc import TocError, discover
 
 
 def page_urls(scan_jsonl: Path) -> list[str]:
@@ -104,7 +105,15 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.book:
-        pages, absent = book_pages(args.book, args.cache, args.delay)
+        try:
+            pages, absent = book_pages(args.book, args.cache, args.delay)
+        except TocError as exc:
+            # A URL that is not a readable book — a stale slug, a page that is not a
+            # book, a host with no table of contents this tool understands. The other
+            # two callers of `discover` report it; a traceback here would read as a bug
+            # in the harvester rather than as a wrong URL.
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
         shortfall = "would not load"
     else:
         urls = page_urls(args.scan)
