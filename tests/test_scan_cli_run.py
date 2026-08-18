@@ -547,3 +547,54 @@ def test_the_stale_note_stops_firing_once_a_page_has_been_rescanned(tmp_path):
     after = Ledger(path, record_cls=ScanRecord, is_done=is_rebuildable)
     assert len(after.records()) == 2  # the old row is still there
     assert stale_page_count(after.records()) == 0  # but the page no longer needs scanning
+
+
+# --- the book's own glossary page -------------------------------------------
+
+GLOSSARY_PAGE = Page(
+    url="https://eng.libretexts.org/back-matter/glossary",
+    blocks=(
+        Block(kind="heading", text="Glossary"),
+        Block(kind="paragraph", text="A technique where a function calls itself."),
+    ),
+)
+
+
+def test_the_books_own_glossary_page_is_recorded_without_paying_for_it(tmp_path):
+    """It has blocks, so the empty-page path does not catch it, and every one of them
+    is a definition whose term `parse_page` dropped. Measured: 100 such paragraphs cost
+    2,580 input tokens and returned 0 candidates. The row is still written, and `ok`,
+    for two reasons — a resumed run must not re-pay for it, and `harvest_glossary
+    --scan` reads its page list to find the very page the glossary is on.
+    """
+    client = _FakeClient([])
+    ledger = _ledger(tmp_path)
+
+    summary = execute(
+        [GLOSSARY_PAGE],
+        client,
+        ledger,
+        load_scan_prompt("v1"),
+        "v1",
+        glossary_pages={GLOSSARY_PAGE.url},
+    )
+
+    assert client.calls == 0
+    assert (summary.ok, summary.glossary_pages, summary.empty_pages) == (1, 1, 0)
+    record = ledger.records()[0]
+    assert (record.status, record.n_proposed, record.tokens_in) == ("ok", 0, 0)
+    assert [r.page_url for r in ledger.records()] == [GLOSSARY_PAGE.url]
+
+
+def test_a_page_not_named_a_glossary_is_still_scanned(tmp_path):
+    """The skip is by URL, and only the URLs `collect_pages` recognised."""
+    summary = execute(
+        [PAGE],
+        _FakeClient([GOOD]),
+        _ledger(tmp_path),
+        load_scan_prompt("v1"),
+        "v1",
+        glossary_pages={GLOSSARY_PAGE.url},
+    )
+
+    assert (summary.ok, summary.glossary_pages) == (1, 0)

@@ -106,6 +106,46 @@ def author_glossary(html: str) -> tuple[GlossaryEntry, ...]:
     return tuple(entries.values())
 
 
+def is_author_glossary_page(html: str) -> bool:
+    """Whether a page's article is the authors' own glossary and nothing else.
+
+    A page like that has nothing for a scan to find. Every paragraph on it is a
+    definition the harvester reads for free, and the terms those definitions belong to
+    are `<dt>` — which `fetch.parse_page` drops, since it collects headings and `<p>`.
+    So the model is handed definitions with no terms attached and proposes nothing.
+    Measured on *Research Methods in Psychology*: its 100-entry glossary page was sent
+    to the model, cost 2,580 input tokens, and returned 0 candidates. See
+    docs/research/2026-08-18-psychmethods-scan-vs-author-glossary.md.
+
+    Narrow on purpose, and the narrowness is the whole design. A chapter that ENDS in a
+    glossary block is a chapter: LibreTexts books carry those blocks inside chapters
+    whose prose is exactly what a scan is for, and treating them as glossaries would
+    stop paying for most of a book. What this matches is a page with no paragraph left
+    once its glossary is taken out — which is also why a contentless page is not one.
+    That page is empty, the scan already knows it, and saying "glossary" about it would
+    report a glossary the book does not have.
+    """
+    if not author_glossary(html):
+        return False
+    soup = BeautifulSoup(extract_content(html), "html.parser")
+    for heading in soup.find_all(HEADING_TAGS):
+        if heading.get_text(strip=True).casefold() not in GLOSSARY_HEADINGS:
+            continue
+        level = int(heading.name[1])
+        # Collected first and removed after: decomposing during the walk would pull
+        # nodes out from under `find_all_next`'s own iteration.
+        lists = []
+        for element in heading.find_all_next():
+            if element.name in HEADING_TAGS and int(element.name[1]) <= level:
+                break
+            if element.name == "dl":
+                lists.append(element)
+        for element in lists:
+            element.decompose()
+        heading.decompose()
+    return not any(_text(paragraph) for paragraph in soup.find_all("p"))
+
+
 def book_glossary(pages: Iterable[tuple[str, str]]) -> tuple[GlossaryEntry, ...]:
     """Harvest `(url, html)` pairs into one reference set, tagged with provenance.
 

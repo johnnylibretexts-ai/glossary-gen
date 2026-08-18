@@ -4,7 +4,7 @@ import argparse
 import re
 import sys
 from urllib.parse import urlsplit
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -41,6 +41,7 @@ from glossary_gen.scan.candidates import (
 from glossary_gen.scan.emit import EmitError, index_payload, report_payload, write_json
 from glossary_gen.scan.models import RejectedCandidate, ScanRecord, VerifiedCandidate
 from glossary_gen.scan.propose import load_scan_prompt, propose_terms, scan_prompt_versions
+from glossary_gen.scan.reference import is_author_glossary_page
 from glossary_gen.scan.toc import TocError, discover
 
 # Preview-only. These are OpenStax template artifacts, so they must never reach the scoring
@@ -75,7 +76,12 @@ def structural_preview(pages: Sequence[Page]) -> PreviewReport:
     return report
 
 
-def collect_pages(urls: Sequence[str], cache: PageCache, failed: list[str]) -> list[Page]:
+def collect_pages(
+    urls: Sequence[str],
+    cache: PageCache,
+    failed: list[str],
+    glossary: list[str] | None = None,
+) -> list[Page]:
     """Fetch each page's HTML, narrow it to article content, then parse.
 
     The scanner must not see the rendered page's chrome (nav, display-settings menu,
@@ -91,6 +97,12 @@ def collect_pages(urls: Sequence[str], cache: PageCache, failed: list[str]) -> l
         except FetchError as exc:
             failed.append(f"{url}: {exc}")
             continue
+        # Judged from the HTML, which is the only place the answer is: `parse_page`
+        # drops the `<dt>` terms that make a definition list recognisable, so by the
+        # time a `Page` exists the evidence is gone. Reported out rather than dropped
+        # here — the page still becomes a scan record, see `execute`.
+        if glossary is not None and is_author_glossary_page(html):
+            glossary.append(url)
         pages.append(parse_page(url, extract_content(html)))
     return pages
 
@@ -121,6 +133,11 @@ class ScanSummary:
     # article.py). These are recorded `ok` but never sent to the model, so they are
     # a subset of `ok`, not an addition to it.
     empty_pages: int = 0
+    # Pages that ARE the authors' own glossary. Also recorded `ok` and never sent to a
+    # model, and also a subset of `ok` — but counted apart from `empty_pages`, because
+    # one is a page with nothing on it and the other is a page whose every paragraph is
+    # a definition the harvester already reads for free.
+    glossary_pages: int = 0
     candidates: list[VerifiedCandidate] = field(default_factory=list)
     # Candidates the evidence gate turned away, with which reason fired (ADR-0007).
     rejected: list[RejectedCandidate] = field(default_factory=list)
@@ -162,6 +179,7 @@ def execute(
     *,
     budget_usd: float | None = None,
     max_consecutive_failures: int = 5,
+    glossary_pages: Collection[str] = (),
 ) -> ScanSummary:
     """Propose, verify, and corroborate one page at a time, recording every outcome.
 
@@ -198,6 +216,24 @@ def execute(
                 # `candidates=[]`, not the default `None`: this page was genuinely scanned
                 # and genuinely yielded nothing, which is a complete answer. `None` would
                 # mark the row unrebuildable and re-pay for every empty page forever.
+                record=ScanRecord(
+                    **base, status="ok", n_proposed=0, n_verified=0, candidates=[], rejected=[]
+                ),
+                model_call=ModelCall.NOT_MADE,
+            )
+
+        # The book's own glossary page, recognised from its HTML by `collect_pages`.
+        # Every paragraph on it is a definition whose term `parse_page` dropped, so the
+        # model is handed definitions with nothing to name and proposes nothing —
+        # measured at 2,580 input tokens for 0 candidates on a 100-entry page. The row
+        # is still written, and `ok`: a resumed run must not re-pay for it, and
+        # `harvest_glossary --scan` reads the scan's page list to find the page the
+        # glossary is on. Skipping it out of the record would cost the reference set
+        # every term the authors listed there.
+        if page.url in glossary_pages:
+            summary.ok += 1
+            summary.glossary_pages += 1
+            return Attempt(
                 record=ScanRecord(
                     **base, status="ok", n_proposed=0, n_verified=0, candidates=[], rejected=[]
                 ),
@@ -365,7 +401,8 @@ def run(argv: list[str] | None = None) -> int:
         urls = urls[: args.limit]
 
     failed: list[str] = []
-    pages = collect_pages(urls, cache, failed)
+    glossary: list[str] = []
+    pages = collect_pages(urls, cache, failed, glossary)
 
     # A paid run with zero pages is equally meaningless as a dry run with zero pages — it
     # must not proceed to spend money or write an index. Hoisted above the dry-run branch
@@ -394,7 +431,10 @@ def run(argv: list[str] | None = None) -> int:
         return EXIT_OK
 
     prices = load_prices(PRICES_PATH)
-    estimate = estimate_scan_cost(args.model, len(pages), prices)
+    # Priced on the pages that will actually be sent. The book's own glossary pages are
+    # recorded without a model call, so counting them would quote for work not done.
+    billable = len(pages) - len(glossary)
+    estimate = estimate_scan_cost(args.model, billable, prices)
     if args.budget_usd is not None and estimate is None:
         print(
             f"error: --budget-usd was given but {args.model!r} has no entry in prices.json, "
@@ -403,8 +443,13 @@ def run(argv: list[str] | None = None) -> int:
         )
         return EXIT_INPUT_ERROR
     if estimate is not None:
-        print(f"estimated cost: ${estimate:.2f} for {len(pages)} pages")
+        print(f"estimated cost: ${estimate:.2f} for {billable} pages")
         print("note: priced from prices.json, verified 2026-08-16 — re-check before a large run")
+    if glossary:
+        print(
+            f"note: {len(glossary)} page(s) are the book's own glossary and will not be sent "
+            "to a model — harvest them for free with tools/harvest_glossary.py"
+        )
     # Shared with cli.py rather than mirrored, so the two entry points cannot drift on
     # the behaviour that controls spend. See `confirm_spend` for why a non-interactive
     # run is refused rather than prompted.
@@ -432,6 +477,7 @@ def run(argv: list[str] | None = None) -> int:
         load_scan_prompt(args.prompt_version),
         args.prompt_version,
         budget_usd=args.budget_usd,
+        glossary_pages=frozenset(glossary),
     )
     # Rebuilt from the LEDGER, not from this run's accumulator: a resumed scan skips pages
     # it already paid for, and the index must still describe the whole book (ADR-0008).
@@ -446,7 +492,7 @@ def run(argv: list[str] | None = None) -> int:
     print(
         f"pages ok={summary.ok} skipped={summary.skipped} "
         f"fetch_error={len(failed)} llm_error={summary.llm_error} "
-        f"empty={summary.empty_pages}"
+        f"empty={summary.empty_pages} glossary={summary.glossary_pages}"
     )
     print(f"candidates: {len(summary.candidates)} verified, {summary.unverified} rejected")
 

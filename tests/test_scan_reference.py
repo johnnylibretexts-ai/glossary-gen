@@ -5,6 +5,7 @@ from glossary_gen.scan.reference import (
     author_glossary,
     book_glossary,
     coverage,
+    is_author_glossary_page,
     pressbooks_book_glossary,
     pressbooks_glossary,
 )
@@ -345,3 +346,36 @@ def test_book_glossary_does_not_list_a_term_twice_when_a_book_carries_both_shape
     )
 
     assert [e.term for e in entries] == ["base"]
+
+
+# --- pages that are nothing but a glossary ----------------------------------
+
+GLOSSARY_ONLY = "<h2>Glossary</h2><dl><dt>Anonymity</dt><dd><p>Not collected at all.</p></dd></dl>"
+
+
+def test_a_page_that_is_only_the_authors_glossary_is_recognised():
+    """The book's own back-matter glossary page. Every paragraph on it is a definition
+    the harvester already reads for free, so there is nothing left for a model to find.
+    """
+    assert is_author_glossary_page(GLOSSARY_ONLY)
+
+
+def test_a_chapter_that_ends_in_a_glossary_block_is_still_a_chapter():
+    """The narrow half of the test, and the one that matters. LibreTexts books carry
+    glossary blocks INSIDE chapters — that prose is exactly what a scan is for, and
+    calling those pages glossaries would stop paying for the book.
+    """
+    page = "<h2>Sampling</h2><p>A sample is drawn from a population.</p>" + GLOSSARY_ONLY
+
+    assert not is_author_glossary_page(page)
+
+
+def test_a_page_with_no_glossary_at_all_is_not_one():
+    assert not is_author_glossary_page("<h2>Sampling</h2><p>A sample is drawn.</p>")
+
+
+def test_a_contentless_page_is_not_called_a_glossary():
+    """It is an empty page, which the scan already recognises and records as such.
+    Conflating the two would report front matter as a glossary the book does not have.
+    """
+    assert not is_author_glossary_page("<h2>Index</h2>")
