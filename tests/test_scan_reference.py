@@ -293,3 +293,55 @@ def test_harvests_every_pair_in_a_single_combined_definition_list():
 
     assert [e.term for e in entries] == ["adjective", "adverb", "antonym"]
     assert entries[1].definition == "A word that describes a verb."
+
+
+def test_book_glossary_also_harvests_terms_that_only_exist_inline():
+    """`tools/harvest_glossary.py` and the reference-set comparison both go through
+    `book_glossary`, so a book whose glossary is inline rather than on a glossary page
+    is invisible to them unless this function covers both shapes. 7 of the 11 Pressbooks
+    carriers surveyed have no glossary page at all — their terms exist only as
+    `<template>` blocks beside the word in the chapter.
+    """
+    chapter = """
+    <p>Set a <a class="glossary-term" href="#term_27_452">milestone</a>.</p>
+    <template id="term_27_452"><div class="glossary__definition"><div tabindex="-1">
+      <p>A marker of progress toward a longer goal.</p>
+    </div><button>Close definition</button></div></template>
+    """
+
+    entries = book_glossary([("https://example.pressbooks.pub/b/chapter/one/", chapter)])
+
+    assert [e.term for e in entries] == ["milestone"]
+    assert entries[0].page.endswith("/chapter/one/")
+
+
+def test_book_glossary_does_not_list_a_term_twice_when_a_book_carries_both_shapes():
+    """A book can do both: write a term up on a glossary page, and define it inline
+    where it is used. That is one term, and the surface forms need not match — a live
+    book lists `base` on its glossary page and links `base words` in a chapter. The two
+    renderings come from one glossary entry, so their definitions are byte-identical,
+    and that is what identifies them as the same term when the words do not.
+
+    Counting it twice would inflate the reference set and quietly deflate every recall
+    figure measured against it.
+    """
+    chapter = """
+    <p>Affixes attach to <a class="glossary-term" href="#term_21_96">base words</a>.</p>
+    <template id="term_21_96"><div class="glossary__definition"><div tabindex="-1">
+      <p>A structural element that forms the foundation of a written word.</p>
+    </div><button>Close definition</button></div></template>
+    """
+    glossary_page = """
+    <h2>Glossary</h2>
+    <dl><dt>base</dt>
+    <dd>A structural element that forms the foundation of a written word.</dd></dl>
+    """
+
+    entries = book_glossary(
+        [
+            ("https://example.pressbooks.pub/b/back-matter/glossary/", glossary_page),
+            ("https://example.pressbooks.pub/b/chapter/one/", chapter),
+        ]
+    )
+
+    assert [e.term for e in entries] == ["base"]

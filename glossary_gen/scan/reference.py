@@ -111,11 +111,30 @@ def book_glossary(pages: Iterable[tuple[str, str]]) -> tuple[GlossaryEntry, ...]
 
     Terms keep the first page that defines them, in the order the pages arrive —
     which for a book scanned in reading order is where the book introduces them.
+
+    Both shapes a book can publish, merged: definition lists under a glossary heading,
+    and terms defined inline beside the word (`pressbooks_glossary`). A book may carry
+    either or both, and callers — `tools/harvest_glossary.py`, the reference-set
+    comparison — should not have to know which. 7 of the 11 Pressbooks carriers
+    surveyed have no glossary page at all, so a harvester that reads only the first
+    shape reports those books as having no glossary.
     """
+    pages = list(pages)
     entries: dict[str, GlossaryEntry] = {}
     for url, html in pages:
         for entry in author_glossary(html):
             entries.setdefault(entry.slug, GlossaryEntry(entry.term, entry.definition, url))
+    # Merged on the definition, not the term. A book that does both renders one glossary
+    # entry two ways, and the words need not match: a live book lists `base` on its
+    # glossary page and links `base words` in a chapter. What is identical is the
+    # definition, byte for byte, because both come from the same entry. Slug alone would
+    # list that term twice, inflating the reference set and deflating every recall
+    # figure measured against it. The glossary page wins, being the authors' own list.
+    written = {e.definition.strip() for e in entries.values() if e.definition.strip()}
+    for entry in pressbooks_book_glossary(pages):
+        if entry.definition.strip() in written:
+            continue
+        entries.setdefault(entry.slug, entry)
     return tuple(entries.values())
 
 
