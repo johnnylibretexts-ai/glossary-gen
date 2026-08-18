@@ -12,6 +12,14 @@ from bs4 import BeautifulSoup
 from glossary_gen.models import Block, Page
 
 ALLOWED_HOST_SUFFIX = ".libretexts.org"
+
+# Matched exactly, never as a suffix. Every LibreTexts library is a subdomain of one
+# host, so a suffix is right for it; Pressbooks is thousands of independent installs
+# under a shared name, so a suffix there would admit every other install on the
+# network — and anyone who registers a name ending in this one. Each entry is a host
+# whose operator was considered on its own; see
+# `docs/research/2026-08-17-platform-discovery-probes.md`.
+ALLOWED_HOSTS = frozenset({"ecampusontario.pressbooks.pub"})
 HEADING_TAGS = ("h1", "h2", "h3", "h4")
 RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 MAX_ATTEMPTS = 3
@@ -46,13 +54,19 @@ def _decode(url: str, body: bytes) -> str:
         raise FetchError(f"{url}: could not decode response body ({exc})") from exc
 
 
+def _allowed_sources() -> str:
+    """The allowlist, as a refusal can state it — built from the constants so it
+    cannot drift out of step with what the guard actually permits."""
+    return ", ".join([f"*{ALLOWED_HOST_SUFFIX}", *sorted(ALLOWED_HOSTS)])
+
+
 def is_allowed_url(url: str) -> bool:
-    """Only https on a *.libretexts.org host. Everything else is refused."""
+    """Only https on an allowed host. Everything else is refused."""
     parts = urlsplit(url)
     if parts.scheme != "https":
         return False
-    host = parts.hostname or ""
-    return host.casefold().endswith(ALLOWED_HOST_SUFFIX)
+    host = (parts.hostname or "").casefold()
+    return host.endswith(ALLOWED_HOST_SUFFIX) or host in ALLOWED_HOSTS
 
 
 def parse_page(url: str, html: str) -> Page:
@@ -129,8 +143,8 @@ class PageCache:
         for hop in range(MAX_REDIRECTS + 1):
             if hop > 0 and not is_allowed_url(current_url):
                 raise FetchError(
-                    f"{url}: redirect to {current_url} is not allowed (not https on "
-                    "*.libretexts.org)"
+                    f"{url}: redirect to {current_url} is not allowed "
+                    f"(not https on {_allowed_sources()})"
                 )
             with self._client.stream("GET", current_url, timeout=30.0) as response:
                 if response.status_code in RETRYABLE_STATUS:
@@ -159,7 +173,7 @@ class PageCache:
         for "download or read cache" so there is one download/caching path, not two.
         """
         if not is_allowed_url(url):
-            raise FetchError(f"{url}: not an allowed source URL (https on *.libretexts.org only)")
+            raise FetchError(f"{url}: not an allowed source URL (https on {_allowed_sources()})")
         cached = self._path_for(url)
         if cached.exists():
             try:

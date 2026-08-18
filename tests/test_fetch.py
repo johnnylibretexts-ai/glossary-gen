@@ -23,6 +23,25 @@ def test_is_allowed_url_accepts_libretexts_https():
     assert is_allowed_url("https://chem.libretexts.org/b")
 
 
+def test_is_allowed_url_accepts_the_named_pressbooks_network():
+    """One Pressbooks network was allowed by name (see
+    `docs/research/2026-08-17-platform-discovery-probes.md`). Pressbooks is thousands
+    of independent installs, so the entry is a host, never the platform.
+    """
+    assert is_allowed_url("https://ecampusontario.pressbooks.pub/languagefoundationshandbook/")
+
+
+def test_is_allowed_url_rejects_hosts_that_merely_end_in_the_allowed_one():
+    """The libretexts entry is a suffix because every library is a subdomain of it.
+    The Pressbooks entry is one host on a network of thousands, so reusing the suffix
+    mechanism hands the allowlist to anyone who registers a name ending in it —
+    `notecampusontario.pressbooks.pub` — and to every other install on the network.
+    """
+    assert not is_allowed_url("https://notecampusontario.pressbooks.pub/a")
+    assert not is_allowed_url("https://opentextbc.pressbooks.pub/a")
+    assert not is_allowed_url("https://ecampusontario.pressbooks.pub.evil.com/a")
+
+
 def test_is_allowed_url_rejects_other_hosts_and_schemes():
     assert not is_allowed_url("https://evil.example.com/a")
     assert not is_allowed_url("http://eng.libretexts.org/a")
@@ -57,6 +76,16 @@ def test_get_fetches_then_serves_from_cache(tmp_path):
 def test_get_rejects_disallowed_url(tmp_path):
     cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(200, text=HTML)))
     with pytest.raises(FetchError, match="not an allowed"):
+        cache.get("https://evil.example.com/a")
+
+
+def test_refusal_message_names_the_hosts_that_are_actually_allowed(tmp_path):
+    """The refusal is the only place an operator learns what the guard permits.
+    Hard-coded as "*.libretexts.org only" it stopped being true the moment a second
+    host was allowed, and then described neither of them.
+    """
+    cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(200, text=HTML)))
+    with pytest.raises(FetchError, match="ecampusontario.pressbooks.pub"):
         cache.get("https://evil.example.com/a")
 
 
