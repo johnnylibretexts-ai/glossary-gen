@@ -128,3 +128,44 @@ def coverage(author: Sequence[GlossaryEntry], found: Iterable[str]) -> RecallRep
         candidates=len(found_slugs),
         missing=missing,
     )
+
+
+def _definition(block) -> str:
+    """The text inside a `<template>`, which `get_text()` alone will not give you.
+
+    BeautifulSoup wraps template contents in `TemplateString`, a type `get_text()`
+    skips by default — it returns "" with no error while `str(block)` plainly shows
+    the text. Re-parsing the inner HTML brings the strings back as ordinary ones.
+    The dismiss button is chrome, not definition.
+    """
+    inner = BeautifulSoup(block.decode_contents(), "html.parser")
+    for chrome in inner.find_all("button"):
+        chrome.decompose()
+    return _text(inner)
+
+
+def pressbooks_glossary(html: str) -> tuple[GlossaryEntry, ...]:
+    """Term/definition pairs from one rendered Pressbooks page.
+
+    Pressbooks makes glossary terms a post type rather than markup, and renders each
+    inline mention as an anchor plus a `<template>` holding the definition.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    entries: dict[str, GlossaryEntry] = {}
+
+    for anchor in soup.select("a.glossary-term"):
+        target = (anchor.get("href") or "").lstrip("#")
+        node = soup.find(id=target)
+        if node is None:
+            continue
+        block = node.select_one(".glossary__definition") or node
+        term = _text(anchor).rstrip(".")
+        if not term:
+            continue
+        # Keyed by the term's id, never by the words in the sentence: Pressbooks
+        # points every inflection at one definition, so "milestone" and "milestones"
+        # are one term. Ids read `term_<page>_<term>`; across pages only the suffix
+        # is stable, so a caller harvesting a whole book must dedupe on that.
+        entries.setdefault(target, GlossaryEntry(term=term, definition=_definition(block)))
+
+    return tuple(entries.values())

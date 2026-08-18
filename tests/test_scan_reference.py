@@ -1,7 +1,12 @@
 """The author glossary a book already carries, harvested as a reference set."""
 
 from glossary_gen.scan.evaluate import RecallReport
-from glossary_gen.scan.reference import author_glossary, book_glossary, coverage
+from glossary_gen.scan.reference import (
+    author_glossary,
+    book_glossary,
+    coverage,
+    pressbooks_glossary,
+)
 
 GLOSSARY_OF = "<h2>Glossary</h2><dl><dt>%s</dt><dd>%s</dd></dl>"
 
@@ -177,3 +182,61 @@ def test_coverage_counts_which_author_terms_the_scanner_found():
     assert (report.found, report.total) == (1, 2)
     assert report.missing == ["degrees-of-freedom"]
     assert report.rate == 0.5
+
+
+# --- Pressbooks -------------------------------------------------------------
+#
+# A different platform renders its glossary differently: terms are a first-class
+# post type, and each inline mention carries its own definition in a `<template>`
+# beside it. Markup below is copied from a live page — see
+# `docs/research/2026-08-17-platform-discovery-probes.md`.
+
+PRESSBOOKS_CHAPTER = """
+<div class="entry-content">
+  <p>Look for the
+    <a class="glossary-term" aria-haspopup="dialog" href="#term_27_447">welcome booth.</a>
+    when you land.</p>
+  <template id="term_27_447"><div class="glossary__definition" role="dialog"><div tabindex="-1">
+    <p>A kiosk setup at the airport to welcome arriving international students.</p>
+  </div><button><span aria-hidden="true">&times;</span>
+  <span class="screen-reader-text">Close definition</span></button></div></template>
+</div>
+"""
+
+
+def test_reads_a_pressbooks_definition_out_of_its_template_block():
+    """BeautifulSoup wraps `<template>` contents in `TemplateString`, which
+    `get_text()` skips by default: it returns "" with no error while `str(node)`
+    plainly shows the text. A harvester that reaches for `get_text()` reports every
+    Pressbooks book as having no glossary, forever, without ever failing loudly.
+    This test is here to fail when that happens.
+    """
+    entries = pressbooks_glossary(PRESSBOOKS_CHAPTER)
+
+    assert [e.term for e in entries] == ["welcome booth"]
+    assert entries[0].definition == (
+        "A kiosk setup at the airport to welcome arriving international students."
+    )
+
+
+def test_two_surface_forms_of_one_pressbooks_term_are_a_single_entry():
+    """Pressbooks points every inflection of a term at the same definition, so the
+    surface form is not the term's identity — the id in the anchor's href is. One
+    surveyed book carried 44 anchors, 30 distinct surface forms and 19 distinct term
+    ids, against the 19 its API reported. A harvester keyed to what the sentence says
+    over-reports that book by 58% while looking like it works.
+    """
+    html = """
+    <div class="entry-content">
+      <p>Set a <a class="glossary-term" href="#term_27_452">milestone</a>, then
+         review your <a class="glossary-term" href="#term_27_452">milestones</a>.</p>
+      <template id="term_27_452"><div class="glossary__definition"><div tabindex="-1">
+        <p>A marker of progress toward a longer goal.</p>
+      </div><button>Close definition</button></div></template>
+    </div>
+    """
+
+    entries = pressbooks_glossary(html)
+
+    assert [e.term for e in entries] == ["milestone"]
+    assert entries[0].definition == "A marker of progress toward a longer goal."
