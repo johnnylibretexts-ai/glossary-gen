@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from urllib.parse import urlsplit
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -296,7 +297,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="glossary-scan",
         description="Build a term index for a LibreTexts book, for glossary-gen to consume.",
     )
-    parser.add_argument("--book", required=True, help="book root URL on *.libretexts.org")
+    parser.add_argument("--book", required=True, help="book root URL")
     parser.add_argument("--out", type=Path, default=Path("out/index.json"), help="index path")
     parser.add_argument(
         "--report",
@@ -340,7 +341,14 @@ def run(argv: list[str] | None = None) -> int:
     if args.limit:
         urls = urls[: args.limit]
 
-    cache = PageCache(args.cache_dir, client, delay=args.delay)
+    # The book URL a person typed is the run's authorisation for its own host —
+    # `fetch.is_allowed_url` widens by exactly that host and no further.
+    cache = PageCache(
+        args.cache_dir,
+        client,
+        delay=args.delay,
+        source_host=urlsplit(args.book).hostname or "",
+    )
     failed: list[str] = []
     pages = collect_pages(urls, cache, failed)
 

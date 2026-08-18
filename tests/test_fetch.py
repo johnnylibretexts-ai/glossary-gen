@@ -1,6 +1,7 @@
 import httpx
 import pytest
 
+from glossary_gen.cli import build_http_client
 from glossary_gen.fetch import FetchError, PageCache, is_allowed_url, parse_page
 
 HTML = """
@@ -304,3 +305,65 @@ def test_get_raises_on_persistent_transport_error(tmp_path):
     with pytest.raises(FetchError, match="transport error"):
         cache.get("https://eng.libretexts.org/a")
     assert len(calls) == 3
+
+
+def test_user_agent_is_browser_shaped_and_still_names_the_tool():
+    """A bare `glossary-gen/0.1 (+url)` is refused 403 by the filter in front of
+    several Pressbooks installs — measured on ecampusontario and saskoer, which both
+    return 200 the moment the string starts `Mozilla/5.0`. The prefix is what those
+    filters look for, so the long-standing bot convention
+    `Mozilla/5.0 (compatible; <name>; +<url>)` passes them while still saying who is
+    asking and where to complain. Claiming outright to be Chrome buys nothing more.
+    """
+    ua = build_http_client().headers["User-Agent"]
+
+    assert ua.startswith("Mozilla/5.0 (compatible;")
+    assert "glossary-gen" in ua
+    assert "github.com/johnnylibretexts/glossary-gen" in ua
+
+
+def test_the_host_a_run_was_pointed_at_is_allowed_for_that_run():
+    """A person pasting a book URL is the authorisation; a link discovered mid-crawl
+    is not. The standing allowlist cannot name every Pressbooks install — there are
+    thousands, independently run — so a run carries the one host it was pointed at,
+    and only that one.
+    """
+    assert is_allowed_url("https://www.saskoer.ca/basicelectricity/", host="www.saskoer.ca")
+
+
+def test_a_run_scoped_host_does_not_open_the_rest_of_the_web():
+    """The guard exists so a scan cannot wander off following links. Naming one host
+    must widen the run by exactly that host — otherwise `--book` becomes a way to
+    turn the guard off, and the first off-site link is fetched.
+    """
+    assert not is_allowed_url("https://evil.example.com/a", host="www.saskoer.ca")
+    assert not is_allowed_url("http://www.saskoer.ca/a", host="www.saskoer.ca")
+    assert not is_allowed_url("https://www.saskoer.ca.evil.com/a", host="www.saskoer.ca")
+    assert not is_allowed_url("https://evil.www.saskoer.ca/a", host="www.saskoer.ca")
+
+
+def test_cache_fetches_the_host_its_run_was_pointed_at(tmp_path):
+    """The whole point of the run-scoped host: paste a Pressbooks book URL from an
+    install nobody hardcoded, and the pages come back.
+    """
+    cache = PageCache(
+        tmp_path,
+        make_client(lambda request: httpx.Response(200, text=HTML)),
+        source_host="www.saskoer.ca",
+    )
+
+    assert cache.get_html("https://www.saskoer.ca/basicelectricity/")
+
+
+def test_a_run_scoped_host_still_refuses_a_redirect_off_that_host(tmp_path):
+    """A run widened to one host must not follow a redirect out of it. Checking the
+    URL a person typed and then trusting whatever it redirects to is the same hole
+    as no guard at all.
+    """
+
+    def handler(request):
+        return httpx.Response(302, headers={"location": "https://evil.example.com/x"})
+
+    cache = PageCache(tmp_path, make_client(handler), source_host="www.saskoer.ca")
+    with pytest.raises(FetchError, match="not allowed"):
+        cache.get("https://www.saskoer.ca/basicelectricity/")

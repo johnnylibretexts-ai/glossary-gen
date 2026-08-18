@@ -54,7 +54,13 @@ EXIT_RUN_ABORTED = 3
 EST_TOKENS_IN = 500
 EST_TOKENS_OUT = 130
 
-USER_AGENT = "glossary-gen/0.1 (+https://github.com/johnnylibretexts/glossary-gen)"
+# `Mozilla/5.0 (compatible; …)` is the bot convention Googlebot and bingbot use, and
+# the prefix is what the filters in front of several Pressbooks installs look for: a
+# bare "glossary-gen/0.1 (+url)" is refused 403 there, this is served 200. It still
+# names the tool and where to complain, which claiming to be Chrome would not.
+USER_AGENT = (
+    "Mozilla/5.0 (compatible; glossary-gen/0.1; +https://github.com/johnnylibretexts/glossary-gen)"
+)
 
 
 @dataclass

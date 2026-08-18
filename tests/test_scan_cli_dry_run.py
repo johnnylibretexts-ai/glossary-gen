@@ -136,3 +136,32 @@ def test_default_model_is_the_same_for_both_commands():
     scan_default = build_parser().parse_args(["--book", BOOK]).model
     gen_default = gen_parser().parse_args(["--input", "x.json"]).model
     assert scan_default == gen_default == "gemini-3.7-flash"
+
+
+def test_run_scopes_the_cache_to_the_host_of_the_book_url(tmp_path, monkeypatch):
+    """`--book` is a person naming a book, which is the only authorisation the guard
+    accepts for a host outside the standing allowlist. Without this wiring the host is
+    never passed on, and pasting a book URL from any Pressbooks install is refused
+    before a request is made.
+    """
+
+    def handler(request):
+        if str(request.url).startswith(API):
+            return httpx.Response(200, json=TOC_WITH_PAGES)
+        return httpx.Response(404)
+
+    seen: dict[str, object] = {}
+    real_cache = scan_cli.PageCache
+
+    def recording_cache(*args, **kwargs):
+        seen.update(kwargs)
+        return real_cache(*args, **kwargs)
+
+    monkeypatch.setattr(scan_cli, "build_http_client", lambda: _mock_client(handler))
+    monkeypatch.setattr(scan_cli, "PageCache", recording_cache)
+
+    scan_cli.run(
+        ["--book", BOOK, "--dry-run", "--delay", "0", "--cache-dir", str(tmp_path / "cache")]
+    )
+
+    assert seen["source_host"] == "eng.libretexts.org"
