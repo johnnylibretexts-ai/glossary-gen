@@ -20,8 +20,8 @@ from dataclasses import dataclass
 
 from bs4 import BeautifulSoup
 
+from glossary_gen.article import extract_content
 from glossary_gen.models import slugify
-from glossary_gen.scan.content import extract_content
 from glossary_gen.scan.evaluate import RecallReport
 
 GLOSSARY_HEADINGS = frozenset({"glossary", "key terms", "glossary entries"})
@@ -71,7 +71,7 @@ def author_glossary(html: str) -> tuple[GlossaryEntry, ...]:
     a", "Answer b") land in the reference set and deflate every recall figure
     computed from it.
     """
-    # Narrow to the article body first, for the reason `scan.content` gives: the
+    # Narrow to the article body first, for the reason `article` gives: the
     # page-info footer is a definition list as well, and on a back-matter glossary
     # page nothing follows it to stop the walk. Harvesting raw HTML turned "Page
     # ID", "License" and "Author" into author-written terms.

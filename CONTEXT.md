@@ -1,6 +1,6 @@
 # glossary-gen
 
-Turns a LibreTexts book into reviewable glossary definitions. Two commands share one domain:
+Turns a book into reviewable glossary definitions. Two commands share one domain:
 `glossary-scan` discovers which terms a book defines, and `glossary-gen` writes a definition for
 each. Every model call costs money, so both are built around never paying twice for the same work.
 
@@ -9,7 +9,9 @@ each. Every model call costs money, so both are built around never paying twice 
 ### The book
 
 **Book**:
-A LibreTexts title, identified by its library, cover and book identifiers.
+A title the tool reads, identified by its library, cover and book identifiers. Those three name
+whatever the platform it came from calls them — a LibreTexts book supplies a library code and a
+numeric cover id, a Pressbooks book a hostname and a slug — and nothing downstream parses them.
 _Avoid_: text, textbook, publication
 
 **Page**:

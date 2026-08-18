@@ -179,11 +179,17 @@ class PageCache:
         raise FetchError(f"{url}: redirect chain exceeded {MAX_REDIRECTS} hops")
 
     def get_html(self, url: str) -> str:
-        """Return the page's raw HTML, via the same cache file, `is_allowed_url` guard,
-        download path, and politeness delay as `get()`. Additive: callers that need the
-        untouched document (e.g. the scan CLI, which narrows it to article content before
-        parsing) use this instead of `get()`, which remains the single source of truth
-        for "download or read cache" so there is one download/caching path, not two.
+        """Return the page's raw HTML, guarded by `is_allowed_url`, served from the cache
+        file when it exists and downloaded once (with the politeness delay) when it does
+        not. The single source of truth for "download or read cache", and the ONLY way a
+        page leaves this class.
+
+        Raw is deliberate. Every caller narrows the document to its article with
+        `article.extract_content` before parsing, and both entry points do so through
+        their own `collect_pages`. A convenience `get()` returning a parsed `Page` used to
+        live here and was removed once its last caller was gone: it was a second, quieter
+        route to the same bytes that skipped the narrowing, which is exactly the mistake
+        a new caller would make by reaching for the shorter name.
         """
         if not is_allowed_url(url, host=self._source_host):
             raise FetchError(
@@ -198,6 +204,3 @@ class PageCache:
         body = self._download(url)
         cached.write_text(body, encoding="utf-8")
         return body
-
-    def get(self, url: str) -> Page:
-        return parse_page(url, self.get_html(url))

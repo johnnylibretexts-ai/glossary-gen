@@ -7,13 +7,21 @@ from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import Any
 
 import httpx
 
+from glossary_gen.article import extract_content
 from glossary_gen.csv_out import write_csv, write_unwritten_csv
 from glossary_gen.excerpt import excerpts_for_term
-from glossary_gen.fetch import FetchError, PageCache
+from glossary_gen.fetch import (
+    ALLOWED_HOST_SUFFIX,
+    FetchError,
+    PageCache,
+    is_allowed_url,
+    parse_page,
+)
 from glossary_gen.generate import generate_entry, load_prompt, prompt_versions
 from glossary_gen.input import InputError, load_input
 from glossary_gen.ledger import Ledger, LedgerRecord
@@ -317,14 +325,72 @@ def build_http_client() -> httpx.Client:
 
 
 def collect_pages(term: Term, cache: PageCache, failed: list[str]) -> list[Page]:
+    """Fetch each of a term's occurrence pages, narrowed to its article.
+
+    Narrowed with the same `extract_content` the scanner uses, and for the same reason:
+    an excerpt is the raw material for explaining a term, so it has to come from what the
+    book's authors wrote rather than from the site around it. Reading the whole rendered
+    document instead was merely noisy on LibreTexts, where the chrome is a display-settings
+    menu and a "Recommended articles" footer. It is not noise on Pressbooks, which repeats
+    the book's entire table of contents on every page — one line per chapter, each a
+    chapter title, which is exactly the shape a term needle matches. A definition grounded
+    in a contents list is grounded in nothing, while `x_source_pages` still names the page.
+    """
     pages: list[Page] = []
     for url in term.pages:
         try:
-            pages.append(cache.get(url))
+            pages.append(parse_page(url, extract_content(cache.get_html(url))))
         except FetchError:
             if url not in failed:
                 failed.append(url)
     return pages
+
+
+def widening_host(book: Book | None) -> str:
+    """The one extra host this run may fetch from, or `""` for none.
+
+    `is_allowed_url` widens by exactly this host and no further — the same rule
+    `glossary-scan` applies to `--book`. It travels through the index because the book
+    block is where the URL a person pasted into the scan is written down. A term's
+    occurrence pages deliberately widen NOTHING: those are data a scan produced, not a
+    book a person named. An index with no book block (every CSV, and a JSON one that
+    omits it) therefore widens nothing and reaches only the standing allowlist, which is
+    exactly where the guard stood before.
+
+    The scheme is checked because this URL arrives inside a data file rather than from a
+    command line, and index files are generated artifacts that get passed around. A
+    plain-`http` `index_url` is refused a widening rather than having its host taken on
+    trust: the guard `glossary-scan` applies to `--book` insists on https too, and the
+    weaker provenance here is a reason to be stricter, not laxer.
+    """
+    if book is None:
+        return ""
+    parts = urlsplit(book.index_url)
+    return parts.hostname or "" if parts.scheme == "https" else ""
+
+
+def no_page_is_allowed(terms: Sequence[Term], source_host: str) -> str:
+    """A refusal to state when not one page of the index can be fetched, else `""`.
+
+    Checked before anything is fetched, because a whole index on an unreachable host is a
+    misconfigured invocation rather than a run that went wrong: every term would end
+    `fetch_error`, the CSV would be written with zero rows, and a `--yes` run in CI would
+    report all of that and exit 0, which reads as "this book has no glossary terms". This
+    is the same reasoning `scan_cli` applies when its table of contents yields no pages.
+
+    Deliberately "not one", not "not all". A single unfetchable page among many is an
+    ordinary partial failure that ADR-0006 already reports in the unwritten sidecar; only
+    an index that cannot be read at all is a misconfiguration.
+    """
+    if any(is_allowed_url(url, host=source_host) for term in terms for url in term.pages):
+        return ""
+    named = f"; the index's book URL widens that by {source_host}" if source_host else ""
+    return (
+        f"no page in this index is on an allowed source (https on "
+        f"*{ALLOWED_HOST_SUFFIX} or a named host{named}). "
+        "An index whose book block has no https `index_url` widens nothing, so a book "
+        "outside the standing allowlist must carry one."
+    )
 
 
 def forced_subjects(values: Sequence[str]) -> set[str]:
@@ -510,7 +576,11 @@ def run(argv: list[str] | None = None) -> int:
         )
         return EXIT_INPUT_ERROR
 
-    cache = PageCache(args.cache_dir, build_http_client())
+    source_host = widening_host(parsed.book)
+    if unreachable := no_page_is_allowed(terms, source_host):
+        print(f"error: {unreachable}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    cache = PageCache(args.cache_dir, build_http_client(), source_host=source_host)
 
     if args.dry_run:
         _print_coverage(dry_run(terms, cache))

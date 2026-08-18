@@ -31,7 +31,7 @@ PAGE2 = Page(
     ),
 )
 # A genuinely contentless page (e.g. "Index", "Table of Contents", "Detailed
-# Licensing" — see the 136-page measurement in scan/content.py): its container held
+# Licensing" — see the 136-page measurement in article.py): its container held
 # only scripts/divs/a footer, so extract_content -> parse_page yields zero blocks.
 EMPTY_PAGE = Page(url="https://eng.libretexts.org/index", blocks=())
 

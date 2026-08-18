@@ -15,6 +15,16 @@ HTML = """
 """
 
 
+def get_page(cache, url):
+    """Fetch then parse, as both entry points' `collect_pages` do.
+
+    `PageCache` serves HTML and nothing else — it deliberately has no method that returns
+    a parsed `Page`, because that would be a second route to the same bytes that skips
+    narrowing the document to its article (see `PageCache.get_html`).
+    """
+    return parse_page(url, cache.get_html(url))
+
+
 def make_client(handler):
     return httpx.Client(transport=httpx.MockTransport(handler))
 
@@ -67,8 +77,8 @@ def test_get_fetches_then_serves_from_cache(tmp_path):
         return httpx.Response(200, text=HTML)
 
     cache = PageCache(tmp_path, make_client(handler))
-    first = cache.get("https://eng.libretexts.org/a")
-    second = cache.get("https://eng.libretexts.org/a")
+    first = get_page(cache, "https://eng.libretexts.org/a")
+    second = get_page(cache, "https://eng.libretexts.org/a")
 
     assert len(calls) == 1
     assert first.blocks == second.blocks
@@ -77,7 +87,7 @@ def test_get_fetches_then_serves_from_cache(tmp_path):
 def test_get_rejects_disallowed_url(tmp_path):
     cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(200, text=HTML)))
     with pytest.raises(FetchError, match="not an allowed"):
-        cache.get("https://evil.example.com/a")
+        get_page(cache, "https://evil.example.com/a")
 
 
 def test_refusal_message_names_the_hosts_that_are_actually_allowed(tmp_path):
@@ -87,7 +97,7 @@ def test_refusal_message_names_the_hosts_that_are_actually_allowed(tmp_path):
     """
     cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(200, text=HTML)))
     with pytest.raises(FetchError, match="ecampusontario.pressbooks.pub"):
-        cache.get("https://evil.example.com/a")
+        get_page(cache, "https://evil.example.com/a")
 
 
 def test_get_retries_on_server_error_then_succeeds(tmp_path):
@@ -97,7 +107,7 @@ def test_get_retries_on_server_error_then_succeeds(tmp_path):
         return responses.pop(0)
 
     cache = PageCache(tmp_path, make_client(handler))
-    page = cache.get("https://eng.libretexts.org/a")
+    page = get_page(cache, "https://eng.libretexts.org/a")
     assert page.blocks
     assert responses == []
 
@@ -105,13 +115,13 @@ def test_get_retries_on_server_error_then_succeeds(tmp_path):
 def test_get_raises_on_persistent_server_error(tmp_path):
     cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(503)))
     with pytest.raises(FetchError, match="503"):
-        cache.get("https://eng.libretexts.org/a")
+        get_page(cache, "https://eng.libretexts.org/a")
 
 
 def test_get_raises_on_not_found(tmp_path):
     cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(404)))
     with pytest.raises(FetchError, match="404"):
-        cache.get("https://eng.libretexts.org/a")
+        get_page(cache, "https://eng.libretexts.org/a")
 
 
 def test_get_enforces_size_cap(tmp_path):
@@ -120,7 +130,7 @@ def test_get_enforces_size_cap(tmp_path):
         tmp_path, make_client(lambda request: httpx.Response(200, text=big)), max_bytes=1000
     )
     with pytest.raises(FetchError, match="too large"):
-        cache.get("https://eng.libretexts.org/a")
+        get_page(cache, "https://eng.libretexts.org/a")
 
 
 def test_get_follows_allowed_redirect(tmp_path):
@@ -132,7 +142,7 @@ def test_get_follows_allowed_redirect(tmp_path):
         return httpx.Response(200, text=HTML)
 
     cache = PageCache(tmp_path, make_client(handler))
-    page = cache.get("https://eng.libretexts.org/a")
+    page = get_page(cache, "https://eng.libretexts.org/a")
     assert page.blocks
 
 
@@ -144,7 +154,7 @@ def test_get_rejects_redirect_to_disallowed_host(tmp_path):
 
     cache = PageCache(tmp_path, make_client(handler))
     with pytest.raises(FetchError, match="not allowed"):
-        cache.get("https://eng.libretexts.org/a")
+        get_page(cache, "https://eng.libretexts.org/a")
 
 
 def test_get_rejects_redirect_to_http(tmp_path):
@@ -155,7 +165,7 @@ def test_get_rejects_redirect_to_http(tmp_path):
 
     cache = PageCache(tmp_path, make_client(handler))
     with pytest.raises(FetchError, match="not allowed"):
-        cache.get("https://eng.libretexts.org/a")
+        get_page(cache, "https://eng.libretexts.org/a")
 
 
 def test_get_rejects_redirect_chain_exceeding_limit(tmp_path):
@@ -175,14 +185,14 @@ def test_get_rejects_redirect_chain_exceeding_limit(tmp_path):
 
     cache = PageCache(tmp_path, make_client(handler))
     with pytest.raises(FetchError, match="exceeded.*hops"):
-        cache.get("https://eng.libretexts.org/a")
+        get_page(cache, "https://eng.libretexts.org/a")
 
 
 def test_get_rejects_redirect_without_location(tmp_path):
     """3xx response without Location header is rejected."""
     cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(302)))
     with pytest.raises(FetchError, match="without Location"):
-        cache.get("https://eng.libretexts.org/a")
+        get_page(cache, "https://eng.libretexts.org/a")
 
 
 def test_get_retries_on_transport_error_then_succeeds(tmp_path):
@@ -196,7 +206,7 @@ def test_get_retries_on_transport_error_then_succeeds(tmp_path):
         return httpx.Response(200, text=HTML)
 
     cache = PageCache(tmp_path, make_client(handler))
-    page = cache.get("https://eng.libretexts.org/a")
+    page = get_page(cache, "https://eng.libretexts.org/a")
     assert page.blocks
     assert len(calls) == 2
 
@@ -216,7 +226,7 @@ def test_get_handles_non_utf8_body_without_raising(tmp_path):
         return httpx.Response(200, content=bad_bytes)
 
     cache = PageCache(tmp_path, make_client(handler))
-    page = cache.get("https://eng.libretexts.org/a")
+    page = get_page(cache, "https://eng.libretexts.org/a")
 
     assert page.blocks
     assert page.blocks[0].kind == "heading"
@@ -236,8 +246,8 @@ def test_get_serves_non_utf8_body_from_cache_without_raising(tmp_path):
         return httpx.Response(200, content=bad_bytes)
 
     cache = PageCache(tmp_path, make_client(handler))
-    first = cache.get("https://eng.libretexts.org/a")
-    second = cache.get("https://eng.libretexts.org/a")  # served from the on-disk cache
+    first = get_page(cache, "https://eng.libretexts.org/a")
+    second = get_page(cache, "https://eng.libretexts.org/a")  # served from the on-disk cache
     assert first.blocks == second.blocks
 
 
@@ -268,16 +278,14 @@ def test_get_html_returns_raw_html_and_get_still_returns_the_same_page(tmp_path)
     cache = PageCache(tmp_path, make_client(lambda request: httpx.Response(200, text=HTML)))
 
     html = cache.get_html("https://eng.libretexts.org/a")
-    page = cache.get("https://eng.libretexts.org/a")
+    page = get_page(cache, "https://eng.libretexts.org/a")
 
     assert html == HTML
     assert page.blocks == parse_page("https://eng.libretexts.org/a", HTML).blocks
 
 
-def test_get_html_and_get_share_one_cache_file(tmp_path):
-    """A `get_html` followed by a `get` for the same URL must not hit the network again —
-    proof the two methods share a single cache file, not two independent caches.
-    """
+def test_a_second_read_of_one_url_is_served_from_disk(tmp_path):
+    """One cache file per URL: the second read must not hit the network again."""
     calls = []
 
     def handler(request):
@@ -286,11 +294,10 @@ def test_get_html_and_get_share_one_cache_file(tmp_path):
 
     cache = PageCache(tmp_path, make_client(handler))
     html = cache.get_html("https://eng.libretexts.org/a")
-    page = cache.get("https://eng.libretexts.org/a")
+    again = cache.get_html("https://eng.libretexts.org/a")
 
     assert len(calls) == 1
-    assert html == HTML
-    assert page.blocks == parse_page("https://eng.libretexts.org/a", HTML).blocks
+    assert html == again == HTML
 
 
 def test_get_raises_on_persistent_transport_error(tmp_path):
@@ -303,7 +310,7 @@ def test_get_raises_on_persistent_transport_error(tmp_path):
 
     cache = PageCache(tmp_path, make_client(handler))
     with pytest.raises(FetchError, match="transport error"):
-        cache.get("https://eng.libretexts.org/a")
+        get_page(cache, "https://eng.libretexts.org/a")
     assert len(calls) == 3
 
 
@@ -366,4 +373,4 @@ def test_a_run_scoped_host_still_refuses_a_redirect_off_that_host(tmp_path):
 
     cache = PageCache(tmp_path, make_client(handler), source_host="www.saskoer.ca")
     with pytest.raises(FetchError, match="not allowed"):
-        cache.get("https://www.saskoer.ca/basicelectricity/")
+        get_page(cache, "https://www.saskoer.ca/basicelectricity/")

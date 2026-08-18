@@ -8,6 +8,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from glossary_gen.article import extract_content
+
 # Reused, not re-declared. The two entry points share one process contract: same exit
 # codes, same User-Agent, same provider construction. Copying them would give the project
 # two sources of truth for values that must agree.
@@ -36,7 +38,6 @@ from glossary_gen.scan.candidates import (
     stale_page_count,
     terms_from_ledger,
 )
-from glossary_gen.scan.content import extract_content
 from glossary_gen.scan.emit import EmitError, index_payload, report_payload, write_json
 from glossary_gen.scan.models import RejectedCandidate, ScanRecord, VerifiedCandidate
 from glossary_gen.scan.propose import load_scan_prompt, propose_terms, scan_prompt_versions
@@ -77,10 +78,11 @@ def structural_preview(pages: Sequence[Page]) -> PreviewReport:
 def collect_pages(urls: Sequence[str], cache: PageCache, failed: list[str]) -> list[Page]:
     """Fetch each page's HTML, narrow it to article content, then parse.
 
-    Unlike `cli.py`'s `collect_pages`, this one does not use `cache.get()` directly:
-    the scanner must not see the rendered page's chrome (nav, display-settings menu,
-    footer), so it fetches raw HTML via `cache.get_html()`, strips everything outside
-    `.mt-content-container` with `extract_content()`, and only then calls `parse_page`.
+    The scanner must not see the rendered page's chrome (nav, display-settings menu,
+    footer), so it fetches raw HTML via `cache.get_html()`, narrows it to the article
+    with `extract_content()`, and only then calls `parse_page`. `cli.collect_pages` now
+    does the same for generation; the two differ only in what they are given (a term's
+    occurrence pages there, a book's leaf URLs here) and what they record about a failure.
     """
     pages: list[Page] = []
     for url in urls:
@@ -116,7 +118,7 @@ class ScanSummary:
     aborted: bool = False
     # Pages whose extracted content had zero blocks (genuinely contentless front/back
     # matter — Index, Table of Contents, Detailed Licensing — see the measurement in
-    # scan/content.py). These are recorded `ok` but never sent to the model, so they are
+    # article.py). These are recorded `ok` but never sent to the model, so they are
     # a subset of `ok`, not an addition to it.
     empty_pages: int = 0
     candidates: list[VerifiedCandidate] = field(default_factory=list)
@@ -183,7 +185,7 @@ def execute(
         }
 
         # A page whose extracted content has zero blocks (Index, Table of Contents,
-        # Detailed Licensing — see scan/content.py) is genuinely contentless: there is
+        # Detailed Licensing — see article.py) is genuinely contentless: there is
         # nothing for a model to find, so asking anyway is a real paid call that always
         # returns nothing. Recorded `ok` rather than a new status for the same resume
         # reason as a term-free-but-nonempty page: `Ledger.has()` only counts `ok`, so

@@ -174,15 +174,23 @@ Only the model call costs money. Verification, corroboration, merging and writin
 over data — which is why the eval harness under `tests/eval/` can replay a recorded scan through
 all of them offline, with no key and no spend.
 
-**It reads the article, not the page.** A LibreTexts page as served carries the site's chrome —
-the reader's display-settings menu, navigation, footer. On one measured page that was 54% of the
-text and 8 of its 11 headings ("Search", "Text Color", "Margin Size", "Recommended articles", …).
-The scanner narrows each page to its `.mt-content-container` element before parsing, which is the
-platform-wide MindTouch/CXone article wrapper rather than anything book- or publisher-specific. If
-a page lacks that container the whole document is used, so an unfamiliar template degrades to
-noisier input rather than to nothing. Pages whose article is genuinely empty — front and back
-matter like Index, Table of Contents and Licensing — are recorded as scanned with zero terms and
-never sent to a model at all.
+**It reads the article, not the page.** A page as served carries the site's chrome — the reader's
+display-settings menu, navigation, footer. On one measured LibreTexts page that was 54% of the text
+and 8 of its 11 headings ("Search", "Text Color", "Margin Size", "Recommended articles", …). Both
+commands narrow a fetched page to its article before parsing (`article.py`), matching one platform
+wrapper per platform, in order: `.mt-content-container` on LibreTexts (the MindTouch/CXone article
+wrapper, platform-wide rather than book- or publisher-specific) and `#content.site-content` on
+Pressbooks (the Buckram wrapper holding the one chapter / front-matter / back-matter section). If a
+page matches neither the whole document is used, so an unfamiliar template degrades to noisier
+input rather than to nothing. Pages whose article is genuinely empty — front and back matter like
+Index, Table of Contents and Licensing — are recorded as scanned with zero terms and never sent to
+a model at all.
+
+On Pressbooks the narrowing is not a tidiness measure. Every page of a Pressbooks book repeats the
+book's whole table of contents in its header, one `<p>` per chapter — measured on *Language
+Foundations Handbook*, 26% of the page's characters and 46% of its blocks, every one of them a
+chapter title, which is the exact shape of "a term this page defines". The evidence gate cannot
+refuse those, because the nav text really is on the page.
 
 **The evidence quote is a gate, not a hint.** Every candidate must arrive with a span the model
 copied verbatim from the page, and that span is then looked for in the page text — whitespace- and
@@ -219,8 +227,7 @@ genuinely distinct terms. Near-duplicates are left for the human doing the revie
 
 | Module | Responsibility |
 |---|---|
-| `scan/toc.py` | table-of-contents walk and book metadata, via the public `getTOC` endpoint |
-| `scan/content.py` | narrowing a fetched page to its article content |
+| `scan/toc.py` | discovery — book metadata and page URLs, via LibreTexts' public `getTOC` endpoint or a Pressbooks book's own front page |
 | `scan/propose.py` | the scan prompt and one model call per page |
 | `scan/candidates.py` | `verify` / `corroborations_on_page` / `merge` — pure, no I/O, no LLM |
 | `scan/emit.py` | writing the index and the diagnostic sidecar |
@@ -421,6 +428,36 @@ with the free `--dry-run` — no key, no cost — and see
 `examples/openstax-python-index.json` has `coverID` set to `REPLACE-ME` — substitute the
 real Conductor coverID for your book, or pass `--cover-id` on the command line.
 
+### Which books these commands will fetch
+
+Both commands refuse any URL that is not `https` on an allowed host. The standing allowlist is
+every `*.libretexts.org` subdomain — matched as a suffix, because every LibreTexts library is one
+host — plus a short list of exact hosts, currently just `ecampusontario.pressbooks.pub`. Pressbooks
+is thousands of independent installs under a shared name, so a suffix there would admit every other
+install on the network and anyone who registers a name ending in it; each entry is a host whose
+operator was considered on its own.
+
+Beyond that list, **each run is widened by the one book it was given**:
+
+| Command | What authorises the widening | Provenance |
+|---|---|---|
+| `glossary-scan` | the host of `--book` | a person pasting a book URL on the command line |
+| `glossary-gen` | the host of the index's `book.index_url` | the same URL, carried inside a data file |
+
+The widening is one **exact** host, never a suffix — a run pointed at `www.saskoer.ca` still
+refuses `evil.www.saskoer.ca`, `www.saskoer.ca.evil.com`, and plain `http` — and every redirect hop
+is re-checked, since validating the typed URL and then trusting wherever it redirects is the same
+hole as no guard. A term's occurrence pages deliberately widen nothing: those are data a scan
+produced, not a book a person named. An index with no `book` block (every CSV one, and any JSON one
+that omits it) therefore reaches only the standing allowlist.
+
+**The two rows have different provenance, and `glossary-gen` is stricter for it.** An index file is
+a generated artifact that gets passed around, so its `book.index_url` is not a person typing a URL
+the way `--book` is. It must be `https` to widen anything at all — an `http://` one is refused a
+widening rather than having its host taken on trust. When the result is that **no** page in the
+index is on an allowed host, the run refuses up front (exit 2) instead of fetching every page,
+failing every one, writing an empty CSV and exiting 0.
+
 ## Input format
 
 Two accepted shapes. JSON is preferred because it carries the book identity.
@@ -543,7 +580,7 @@ regeneration, and the CSV emits the first book's definition stamped with this bo
 | Code | Meaning |
 |---|---|
 | `0` | success (including a user declining the confirmation prompt) |
-| `2` | input error — bad/missing input file, no provider configured, pre-run cost estimate exceeds `--budget-usd`, `--budget-usd` was given for a model with no configured price, `--regenerate` named a term absent from the input, or a non-interactive run was given no `--yes` to consent with. Nothing was spent and there is no ledger to resume |
+| `2` | input error — bad/missing input file, no provider configured, pre-run cost estimate exceeds `--budget-usd`, `--budget-usd` was given for a model with no configured price, `--regenerate` named a term absent from the input, no page in the index is on an allowed source (see [Which books these commands will fetch](#which-books-these-commands-will-fetch)), or a non-interactive run was given no `--yes` to consent with. Nothing was spent and there is no ledger to resume |
 | `3` | the run started but aborted early — 5 consecutive provider failures, or actual spend crossed `--budget-usd` mid-run. Check the ledger for what happened; already-succeeded terms are safe and the run is resumable |
 
 > **Unattended runs need `--yes`, including ones that would cost nothing.** Consent is settled
@@ -736,13 +773,22 @@ both mangled by term extraction rather than by excerpting); at today's floor it 
 Excerpt selection ranks *definitional-looking* text first — a paragraph following a heading
 that matches the term, then one containing "is a"/"is called"/"refers to", then any other
 mention — and keeps the top 3 within a ~6,000-character budget. That ranking is why the
-definitions reflect how *this book* uses a word rather than the word's general meaning.
+definitions reflect how *this book* uses a word rather than the word's general meaning. It
+selects from the page's [article](#how-glossary-scan-works), not the whole rendered document.
+
+**A change to excerpting does not reach a book you have already generated.** The ledger treats a
+term with an `ok` row as done, and there is no blanket `--force` — one would re-pay for a whole
+book. A book generated before excerpting narrowed to the article therefore keeps definitions drawn
+from the whole document, and a resumed run will never revisit them. Name the affected terms with
+`--regenerate`, or start a fresh `--ledger` and re-pay; both are deliberate acts, which is the
+point.
 
 | Module | Responsibility |
 |---|---|
 | `models.py` | shared dataclasses and the `GlossaryEntry` schema |
 | `input.py` | **the only file that knows the index format** |
 | `fetch.py` | page retrieval, on-disk cache, URL allowlist, redirect validation, size cap |
+| `article.py` | narrowing a fetched page to its article content — shared with `glossary-scan` |
 | `excerpt.py` | pure selection of grounding paragraphs — no I/O, no LLM |
 | `ledger.py` | **the only place resumability lives** |
 | `llm.py` | provider clients and the fallback chain |
@@ -756,7 +802,7 @@ format changes, `input.py` changes and nothing else. If the import contract chan
 
 ## Development
 
-    python3 -m pytest          # 274 tests, ~1s
+    python3 -m pytest          # 397 tests, ~1s
     python3 -m ruff check .
     python3 -m ruff format --check .
 
