@@ -220,10 +220,13 @@ def execute(
     there, and everything about what a term's row contains lives here.
     """
     summary = RunSummary()
+    # Shared across every term this run attempts, so a page several terms cite is
+    # fetched and parsed once rather than once per term (#40).
+    page_memo: dict[str, Page] = {}
 
     def attempt(term: Term, subject: str) -> Attempt:
         failed_pages: list[str] = []
-        pages = collect_pages(term, cache, failed_pages)
+        pages = collect_pages(term, cache, failed_pages, page_memo)
         base = {
             # The subject the run keyed on, not `term.slug` recomputed: the row must land
             # under the key `ledger.has()` will look for, or it is re-paid for every resume.
@@ -324,7 +327,9 @@ def build_http_client() -> httpx.Client:
     return httpx.Client(headers={"User-Agent": USER_AGENT})
 
 
-def collect_pages(term: Term, cache: PageCache, failed: list[str]) -> list[Page]:
+def collect_pages(
+    term: Term, cache: PageCache, failed: list[str], memo: dict[str, Page] | None = None
+) -> list[Page]:
     """Fetch each of a term's occurrence pages, narrowed to its article.
 
     Narrowed with the same `extract_content` the scanner uses, and for the same reason:
@@ -335,14 +340,30 @@ def collect_pages(term: Term, cache: PageCache, failed: list[str]) -> list[Page]
     the book's entire table of contents on every page — one line per chapter, each a
     chapter title, which is exactly the shape a term needle matches. A definition grounded
     in a contents list is grounded in nothing, while `x_source_pages` still names the page.
+
+    `memo`, shared across a whole run's calls, is what makes a page cost this once rather
+    than once per term that cites it (#40). It holds the narrowed, parsed `Page`, not raw
+    HTML — that is `PageCache`'s job, and deliberately not this one: `PageCache.get_html`
+    used to have a shortcut that returned a parsed page and skipped the narrowing, and it
+    was removed as the mistake a new caller would reach for by name. `extract_content` and
+    `parse_page` each build their own `BeautifulSoup`, so an unmemoized page is parsed
+    twice even on a single visit; `memo` only removes the repeat visits, which is the
+    bigger cost on a book where terms share pages.
     """
     pages: list[Page] = []
     for url in term.pages:
+        if memo is not None and url in memo:
+            pages.append(memo[url])
+            continue
         try:
-            pages.append(parse_page(url, extract_content(cache.get_html(url))))
+            page = parse_page(url, extract_content(cache.get_html(url)))
         except FetchError:
             if url not in failed:
                 failed.append(url)
+            continue
+        if memo is not None:
+            memo[url] = page
+        pages.append(page)
     return pages
 
 
@@ -432,8 +453,9 @@ def unwritten_path(out: Path) -> Path:
 def dry_run(terms: Sequence[Term], cache: PageCache) -> CoverageReport:
     """Fetch and excerpt every term without calling any model."""
     report = CoverageReport(total=len(terms))
+    page_memo: dict[str, Page] = {}
     for term in terms:
-        pages = collect_pages(term, cache, report.failed_pages)
+        pages = collect_pages(term, cache, report.failed_pages, page_memo)
         if pages and excerpts_for_term(pages, term)[0]:
             report.with_excerpts += 1
         else:

@@ -83,6 +83,24 @@ def test_collect_pages_narrows_to_the_article(tmp_path):
         assert chrome not in text
 
 
+def test_a_page_two_terms_share_is_parsed_once(tmp_path):
+    """`collect_pages` runs once per term, with no memory of what an earlier term
+    already read — each call re-fetches (or re-reads from the on-disk cache) and
+    re-parses (`extract_content` then `parse_page`, two full BeautifulSoup builds)
+    every one of its pages. A page twelve terms share was parsed twelve times: ~500
+    whole-document parses on the 136-page/210-term book the double-parse comment
+    cites became ~1000 (#40). A shared `memo` makes the second term's call return the
+    exact same `Page` object rather than building a new one.
+    """
+    cache = make_cache(tmp_path)
+    memo: dict = {}
+
+    first = collect_pages(_term("Plural", "plural"), cache, [], memo)
+    second = collect_pages(_term("Plurals", "plurals"), cache, [], memo)
+
+    assert first[0] is second[0]
+
+
 def test_a_term_seen_only_in_the_books_navigation_grounds_nothing(tmp_path):
     """`Schwa vowels` is a real term of this book — but this page only lists it in the
     contents sidebar, and a contents line is not a passage to write a definition from.
