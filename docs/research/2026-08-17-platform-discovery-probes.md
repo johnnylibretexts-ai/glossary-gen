@@ -489,3 +489,126 @@ counts rather than leaving the difference to be found in the CSV.
 **What this set has that the API's would not:** the page each term appears on. That is the index
 format this tool consumes, produced as a side effect of the harvest — and the reason the disallowed
 `glossary` endpoint would not have been better even if it were allowed.
+
+## Validated: the shelf/book/chapter properties heuristic does not hold (2026-08-18, [#39](https://github.com/johnnylibretexts/glossary-gen/issues/39))
+
+Probe 1 said to validate the `properties` heuristic across libraries before relying on it — it had
+been checked on one library (`bio`) and three hand-picked nodes. This is that validation, and the
+marker does not survive it: it drops a material share of real shelves and books, and its own premise
+— one property per node kind — is false.
+
+### Method
+
+`getTOC` on each library's `Bookshelves` root, walked recursively. Four of the five named libraries
+were reachable: `bio`, `chem`, `math`, `phys`. **`socialsci.libretexts.org/Bookshelves` returns HTTP
+500 on the live site itself** — confirmed with a plain fetch of the page, not just through `getTOC` —
+so it could not be probed today. That is a site outage, not a defect in the probe or this tool.
+
+Ground truth for "what kind of node is this" came from three signals, none derived from the
+`properties` block under test:
+
+- **shelf**: a node's direct position as a child of `Bookshelves` — the site defines this level as
+  its subject-category shelves, so this is exact, not a proxy.
+- **book-shaped**: depth ≥ 2, has children, and its title matches the `Title (Attribution)` convention
+  seen throughout LibreTexts (e.g. `Crop Genetics (Suza and Lamkey)`). A naming convention, not a
+  property — but a noisy one: the same regex also catches some non-book pages that happen to end in
+  parentheses (an exercise set, a "(New)"-tagged revision). Those false positives would not be
+  expected to carry a book's `overview` property, so the rates below are if anything a slight
+  underestimate of the marker's true reliability on real books, not an overestimate.
+- **chapter**: a leaf node (no `subpages`). Weak on its own — a genuine one-page book looks identical
+  to a chapter by this signal — kept because it is free and the counts below note where it matters.
+
+### Shelf marker (`mindtouch.idf#subpageListing`)
+
+| library | shelves | carry the marker |
+|---|---|---|
+| bio | 16 | 9 (56.3%) |
+| chem | 8 | 8 (100%) |
+| math | 15 | 13 (86.7%) |
+| phys | 14 | 13 (92.9%) |
+| **total** | **53** | **43 (81.1%)** |
+
+19% of real shelves lack it. Named misses: bio — *Agriculture*, *Computational Biology*, *Dance*,
+*Entomology*, *Human Biology*, *Marine Biology and Marine Ecology*, *Zoology*; math — *Arithmetic and
+Basic Math*, *Waves and Acoustics*; phys — *Nuclear and Particle Physics*. A walk that only recurses
+where this property is present skips every one of those shelves, and everything under them, with
+nothing in its own output to say so.
+
+### Book marker (`mindtouch.page#overview`)
+
+| library | book-shaped nodes | carry the marker |
+|---|---|---|
+| bio | 107 | 85 (79.4%) |
+| chem | 197 | 138 (70.1%) |
+| math | 184 | 148 (80.4%) |
+| phys | 90 | 61 (67.8%) |
+| **total** | **578** | **432 (74.7%)** |
+
+A quarter of book-shaped nodes lack it, and the misses are not obscure or malformed pages: *Chemistry
+- Atoms First 2e (OpenStax)*, *Physics (Boundless)*, *Elementary Algebra (Arnold)*, *Precalculus
+(Stitz-Zeager)*, *General Chemistry - An Atoms First Approach (Halpern)*. A walk keyed to this
+property reports each of those as absent from the catalogue, with no error to notice.
+
+### Chapter marker (`mindtouch.page#welcomeHidden`)
+
+| library | leaf nodes | carry the marker |
+|---|---|---|
+| bio | 10,292 | 3,703 (36.0%) |
+| chem | 22,807 | 4,416 (19.4%) |
+| math | 11,362 | 4,108 (36.2%) |
+| phys | 8,120 | 2,291 (28.2%) |
+| **total** | **52,581** | **14,518 (27.6%)** |
+
+Only 28% of leaf pages carry it. It reads less like a chapter marker than like a marker something
+else also carries on many pages — the next section is why.
+
+### The properties are not exclusive per node — this breaks the premise, not just the coverage
+
+Probe 1's own table listed one property per node kind, as though a node carried exactly one. It does
+not. Of the 432 book-shaped nodes that DO carry `overview`, 388 (89.8%) ALSO carry `subpageListing` —
+the property claimed for shelves — on the very same node, at the same time:
+
+| library | has overview | also has subpageListing |
+|---|---|---|
+| bio | 85 | 73 (85.9%) |
+| chem | 138 | 114 (82.6%) |
+| math | 148 | 140 (94.6%) |
+| phys | 61 | 61 (100%) |
+| **total** | **432** | **388 (89.8%)** |
+
+`welcomeHidden` compounds this. Manual inspection on `bio` found it on a shelf (`Agriculture`), a book
+(`Crop Genetics (Suza and Lamkey)`), and a chapter (`Front Matter`) alike, all at once alongside their
+other properties. A classifier built on "which property is present" cannot be built from this data —
+these describe page display behaviour (a table-of-contents widget, a welcome-banner toggle), not a
+taxonomy, and were never meant to encode one.
+
+### Depth is unreliable in exactly the way Probe 1 warned it would be
+
+218 nodes across the four libraries sit at depth ≥ 2, carry `subpageListing`, and do NOT match the
+book-title convention — ambiguous between "a nested shelf" and "an internal volume of a single book
+one level up." *Fundamentals of Biochemistry (Jakubowski and Flatt)* on `bio` is one book with five
+`subpageListing`-carrying "volumes" beneath it (`Fundamentals of Biochemistry Vol. I` through `V`),
+none of which is a second book to survey — they are that one book's own chapters, one layer down.
+`eng`'s cited `Computer_Science/Programming_Languages` nesting, from the issue itself, is the same
+shape on a different library.
+
+| library | ambiguous nodes |
+|---|---|
+| bio | 54 |
+| chem | 128 |
+| math | 24 |
+| phys | 12 |
+| **total** | **218** |
+
+### Where this leaves #39
+
+A negative result, not a fix, and left open rather than closed. Concretely: a walk keyed to presence
+of a single property would misclassify roughly a fifth of shelves and a quarter of books, silently,
+across four libraries with nothing structurally unusual about them. Priority-ordered presence checks
+("if X then shelf, elif Y then book") are not even well-defined here, since the properties are not
+mutually exclusive to begin with — there is no observed rule this data suggests for breaking a tie.
+`socialsci` remains unprobed pending the site's own outage clearing.
+
+The issue's own cheaper fallback — a book's `path` sits directly under a shelf, and its children are
+numbered chapters — was not tested here. That is the natural next probe if a full-catalogue walk
+still needs to be designed.
