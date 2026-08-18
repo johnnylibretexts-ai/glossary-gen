@@ -54,19 +54,28 @@ def _decode(url: str, body: bytes) -> str:
         raise FetchError(f"{url}: could not decode response body ({exc})") from exc
 
 
-def _allowed_sources() -> str:
-    """The allowlist, as a refusal can state it — built from the constants so it
-    cannot drift out of step with what the guard actually permits."""
-    return ", ".join([f"*{ALLOWED_HOST_SUFFIX}", *sorted(ALLOWED_HOSTS)])
+def _allowed_sources(host: str = "") -> str:
+    """The allowlist, as a refusal can state it — built from what the guard actually
+    permits, including this run's own host, so it cannot drift out of step."""
+    named = sorted(ALLOWED_HOSTS | ({host.casefold()} if host else set()))
+    return ", ".join([f"*{ALLOWED_HOST_SUFFIX}", *named])
 
 
-def is_allowed_url(url: str) -> bool:
-    """Only https on an allowed host. Everything else is refused."""
+def is_allowed_url(url: str, *, host: str = "") -> bool:
+    """Only https, on a standing allowed host or the one host this run was given.
+
+    `host` is the run's own source, taken from the book URL a person pasted. That is
+    the authorisation: a human naming a book. A link discovered part-way through a
+    crawl is not, which is why the widening is one exact host and never a suffix — a
+    run pointed at `www.saskoer.ca` must still refuse `evil.www.saskoer.ca`.
+    """
     parts = urlsplit(url)
     if parts.scheme != "https":
         return False
-    host = (parts.hostname or "").casefold()
-    return host.endswith(ALLOWED_HOST_SUFFIX) or host in ALLOWED_HOSTS
+    hostname = (parts.hostname or "").casefold()
+    if hostname.endswith(ALLOWED_HOST_SUFFIX) or hostname in ALLOWED_HOSTS:
+        return True
+    return bool(host) and hostname == host.casefold()
 
 
 def parse_page(url: str, html: str) -> Page:
@@ -104,12 +113,16 @@ class PageCache:
         *,
         max_bytes: int = 2_000_000,
         delay: float = 0.0,
+        source_host: str = "",
     ) -> None:
         self._cache_dir = Path(cache_dir)
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._client = client
         self._max_bytes = max_bytes
         self._delay = delay
+        # The one host this run was pointed at, beyond the standing allowlist. Every
+        # request the run makes — first hop and every redirect — is checked against it.
+        self._source_host = source_host
 
     def _path_for(self, url: str) -> Path:
         return cache_path(self._cache_dir, url)
@@ -141,10 +154,10 @@ class PageCache:
         """
         current_url = url
         for hop in range(MAX_REDIRECTS + 1):
-            if hop > 0 and not is_allowed_url(current_url):
+            if hop > 0 and not is_allowed_url(current_url, host=self._source_host):
                 raise FetchError(
                     f"{url}: redirect to {current_url} is not allowed "
-                    f"(not https on {_allowed_sources()})"
+                    f"(not https on {_allowed_sources(self._source_host)})"
                 )
             with self._client.stream("GET", current_url, timeout=30.0) as response:
                 if response.status_code in RETRYABLE_STATUS:
@@ -172,8 +185,10 @@ class PageCache:
         parsing) use this instead of `get()`, which remains the single source of truth
         for "download or read cache" so there is one download/caching path, not two.
         """
-        if not is_allowed_url(url):
-            raise FetchError(f"{url}: not an allowed source URL (https on {_allowed_sources()})")
+        if not is_allowed_url(url, host=self._source_host):
+            raise FetchError(
+                f"{url}: not an allowed source URL (https on {_allowed_sources(self._source_host)})"
+            )
         cached = self._path_for(url)
         if cached.exists():
             try:

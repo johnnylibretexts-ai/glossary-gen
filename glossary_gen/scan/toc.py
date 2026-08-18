@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import re
 import urllib.parse
 from collections.abc import Iterator
 from typing import Any
 
 import httpx
+from bs4 import BeautifulSoup
 
 from glossary_gen.models import Book, slugify
 
@@ -96,7 +98,70 @@ def book_from_root(root: dict[str, Any], book_url: str) -> Book:
     )
 
 
+# The sections a Pressbooks book's pages live under. Parts are deliberately absent:
+# they are section dividers whose own page is usually a heading and nothing else.
+PRESSBOOKS_SECTIONS = ("front-matter/", "chapter/", "back-matter/")
+
+
+def pressbooks_discover(book_url: str, client: httpx.Client) -> tuple[Book, tuple[str, ...]]:
+    """A Pressbooks book's own front page, read as its table of contents.
+
+    There is no TOC API this tool may use: the platform's default robots.txt disallows
+    the whole `/*/wp-json/` tree. The rendered front page lists the book's sections in
+    reading order, which is the order that makes "the first page to define a term"
+    mean anything.
+    """
+    if urllib.parse.urlparse(book_url).scheme != "https":
+        raise TocError(f"{book_url}: only https book URLs are read")
+    root = book_url if book_url.endswith("/") else f"{book_url}/"
+    try:
+        response = client.get(root, timeout=60.0)
+    except httpx.HTTPError as exc:
+        raise TocError(f"{book_url}: transport error ({exc})") from exc
+    if response.status_code != 200:
+        raise TocError(f"{book_url}: HTTP {response.status_code}")
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    urls: list[str] = []
+    for anchor in soup.select("a[href]"):
+        href = urllib.parse.urljoin(root, anchor["href"]).split("#")[0]
+        # Under this book's own root, so a link to a neighbouring book on the same
+        # network — or anywhere else — is not mistaken for one of its pages.
+        if not href.startswith(root):
+            continue
+        rest = href[len(root) :]
+        if rest.startswith(PRESSBOOKS_SECTIONS) and href not in urls:
+            urls.append(href)
+
+    heading = soup.select_one("h1.book-header__title, h1.entry-title") or soup.find("h1")
+    title = ""
+    if heading:
+        # Pressbooks prefixes the heading with a visually-hidden "Book Title:" for
+        # screen readers. Read as text it lands in the title, the `book_id` slug, and
+        # every row of output.
+        for label in heading.select(".screen-reader-text"):
+            label.decompose()
+        title = re.sub(r"\s+", " ", heading.get_text(" ", strip=True)).strip()
+    parts = urllib.parse.urlparse(root)
+    return (
+        Book(
+            library=(parts.hostname or ""),
+            cover_id=parts.path.strip("/"),
+            book_id=slugify(title),
+            title=title,
+            index_url=book_url,
+        ),
+        tuple(urls),
+    )
+
+
 def discover(book_url: str, client: httpx.Client) -> tuple[Book, tuple[str, ...]]:
-    """Walk a book's TOC into a complete book block plus its leaf page URLs."""
-    root = get_toc(book_url, client)
-    return book_from_root(root, book_url), leaf_urls(root)
+    """Walk a book's TOC into a complete book block plus its leaf page URLs.
+
+    Routed on the host: LibreTexts has a public TOC API, and every other source is
+    read from the book's own front page.
+    """
+    if (urllib.parse.urlparse(book_url).hostname or "").lower().endswith(".libretexts.org"):
+        root = get_toc(book_url, client)
+        return book_from_root(root, book_url), leaf_urls(root)
+    return pressbooks_discover(book_url, client)
