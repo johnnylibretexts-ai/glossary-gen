@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from glossary_gen.models import Block, Page
+from glossary_gen.models import Block, Page, slugify
 from glossary_gen.scan.candidates import corroborations_on_page, merge, verify
 from glossary_gen.scan.models import MergedTerm, PageCandidates, VerifiedCandidate
 
@@ -83,7 +83,21 @@ def replay(fixture: dict[str, Any]) -> list[MergedTerm]:
 
 
 def recall(found: Sequence[MergedTerm], expected: Sequence[str]) -> RecallReport:
+    """Recall against `expected`, counting a term found under either of its names.
+
+    Alias slugs count, and that is the whole subtlety. A scanner that recorded
+    "Cohort effect" as an alias of "Cohort" FOUND the author's term; scoring it missing
+    measures which spelling was promoted rather than whether the term was discovered.
+    `tools/harvest_glossary.py` has always applied that rule when scoring a real index,
+    and this did not — so the same run of the same book scored 0.646 here and 0.770
+    there. One question with two answers is a defect wherever it lives; the harvester's
+    answer is the correct one.
+
+    Every recorded floor predates the fix and was measured without aliases, which is why
+    each eval's docstring carries both figures rather than being rewritten.
+    """
     found_slugs = {term.slug for term in found}
+    found_slugs.update(slugify(alias) for term in found for alias in term.aliases)
     missing = [slug for slug in expected if slug not in found_slugs]
     return RecallReport(
         found=len(expected) - len(missing),

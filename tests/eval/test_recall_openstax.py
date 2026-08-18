@@ -10,6 +10,9 @@ FIXTURE = Path(__file__).parent / "fixtures" / "replay_openstax.json"
 # This floor is rounded DOWN to 0.55 (nearest 0.05) as a REGRESSION FLOOR,
 # not a performance target. Its purpose is to fail CI if a prompt or scoring
 # change silently reduces recall below the measured baseline.
+# Measured at 11/19 = 0.579 before `recall` counted alias slugs; the same fixture
+# now scores 13/19 = 0.684. Left where it was, for the reason spelled out in
+# test_recall_stats_author_glossary.py: a floor records a measurement, not a target.
 RECALL_FLOOR = 0.55
 
 

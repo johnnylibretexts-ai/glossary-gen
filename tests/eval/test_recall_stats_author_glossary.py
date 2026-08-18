@@ -21,6 +21,11 @@ FIXTURE = Path(__file__).parent / "fixtures" / "replay_stats.json"
 # rate = 0.545. Rounded DOWN to 0.50 (nearest 0.05) as a REGRESSION FLOOR, the
 # same convention as RECALL_FLOOR — not a target, and not a claim that half a
 # book's glossary is good enough.
+#
+# That 0.545 was measured before `recall` counted alias slugs; the same fixture now
+# scores 63/101 = 0.624. The floor is deliberately NOT raised to match. It records
+# what was measured on 2026-08-16 and what the run of that day is entitled to claim,
+# and re-cutting a floor to a definition adopted later would quietly rewrite it.
 STATS_RECALL_FLOOR = 0.50
 
 

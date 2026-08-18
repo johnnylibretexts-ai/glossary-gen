@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from glossary_gen.scan.models import Corroboration
+from glossary_gen.scan.models import Corroboration, MergedTerm
 from glossary_gen.scan.evaluate import recall, replay
 
 FIXTURE = Path(__file__).parent / "fixtures" / "replay_minimal.json"
@@ -81,3 +81,17 @@ def test_replay_merge_promotes_the_confident_form_and_preserves_aliases():
         Corroboration.CUE,
         Corroboration.MULTIPAGE,
     }
+
+
+def test_recall_counts_a_term_the_scanner_recorded_as_an_alias():
+    """An author term the scanner kept as an alias was FOUND, and scoring it missing
+    understates recall — the rule `tools/harvest_glossary.py` already applies when it
+    scores a real index. The two disagreed by 12 points on the same run of the same
+    book (0.646 here against the harvester's 0.770) until this was fixed.
+    """
+    found = [MergedTerm(term="Cohort", aliases=["Cohort effect"], pages=["u"], confidence=0.9)]
+
+    report = recall(found, ["cohort", "cohort-effect"])
+
+    assert (report.found, report.total) == (2, 2)
+    assert report.missing == []

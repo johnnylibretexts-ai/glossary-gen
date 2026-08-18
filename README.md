@@ -124,6 +124,21 @@ Against *Introductory Statistics 1e (OpenStax)*, that is 101 author-written term
 pages, of which the scanner proposed 60. Replayed over the 33 recorded pages the figure is 55/101 =
 0.545, pinned at 0.50 in `tests/eval/test_recall_stats_author_glossary.py`.
 
+A third eval scores a whole Pressbooks book against **243** terms its authors published —
+*Research Methods in Psychology*, 100 on its back-matter glossary page and 143 linked inline in its
+chapters. All 83 pages replay, so the figure is the one a real run produces rather than a subset's:
+**187/243 = 0.770**, pinned at 0.75 in `tests/eval/test_recall_psychmethods_author_glossary.py`.
+Nothing was spent recording it — the replies come from the paid run's own ledger, rebuilt with
+`tools/record_fixture.py --from-ledger`, which is ADR-0008's rule applied to fixtures.
+
+**The three floors are not measured the same way, and the difference is recorded rather than
+smoothed over.** `recall` now counts a term the scanner kept as an *alias* — finding "Cohort
+effect" under "Cohort" is finding it, the rule `tools/harvest_glossary.py` always applied — and
+until that was fixed the same run of the same book scored 0.646 in an eval and 0.770 in the
+harvester. The two older floors were measured before the fix (their fixtures now score 0.684 and
+0.624) and are deliberately left where they are: a floor records what was measured on a given day,
+and re-cutting one to a definition adopted later would quietly rewrite it.
+
 **Recall is all this measures.** 155 slugs the scanner proposed for that book are absent from the
 author glossary, and that is not a 73% over-proposal rate: only some pages carry glossary blocks,
 so absence is silence, not a judgement. `coverage` returns a report with no precision field and the
