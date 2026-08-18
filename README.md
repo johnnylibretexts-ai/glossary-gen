@@ -131,6 +131,51 @@ tool prints the caveat on every run. Not every book has one to harvest — Pytho
 (OpenStax) carries none, its back-matter page being the unfilled LibreTexts template. See
 [ADR-0010](docs/adr/0010-reference-sets-come-from-books-not-experts.md).
 
+### Which books publish a glossary at all
+
+`tools/survey_glossaries.py` screens books for one without calling a model. Fetching costs nothing
+but politeness, so the question that decides whether a book can be measured at all is answered
+before a scan is ever paid for.
+
+```bash
+python3 tools/survey_glossaries.py --shelf https://stats.libretexts.org/Bookshelves/Introductory_Statistics
+python3 tools/survey_glossaries.py --network https://ecampusontario.pressbooks.pub --books 80 --out survey.csv
+```
+
+**What that costs, and what a zero is worth, is not the same on the two platforms.**
+
+| | LibreTexts | Pressbooks |
+|---|---|---|
+| how books are enumerated | a shelf URL you paste (`--shelf`) | the network's own catalogue (`--network`) |
+| how one book is screened | `--sample` pages spread across it | one fetch of `back-matter/glossary/`, else a walk |
+| a hit | proof | proof |
+| **a zero** | **"no evidence at 16 pages"** | **no glossary** |
+
+LibreTexts renders glossary entries as ordinary markup, so the only test is to read pages and look
+— and a book carrying blocks on 2.5% of its pages was screened at 12 pages and reported as having
+none. Pressbooks makes terms a post type and renders each one into the page that uses it, so a book
+that published a glossary page is settled by **one** request and a book that did not is settled by
+walking it. `--sample` is ignored there: sampling would re-import a caveat that platform does not
+need.
+
+The `settled` column says which kind of answer a row is. Two more columns need reading with it:
+
+- **A carrier's `terms` is a floor.** The walk stops at the first page carrying a term, because one
+  page carrying one answers the question asked. Only a harvest says how many the book has.
+- **`pages` and `forecast_usd` are blank where nothing measured them.** A book settled by its
+  glossary page was never walked, so it has no page count; a walk that stopped early read the front
+  of a book, which is no basis for projecting a per-page cost across it.
+
+Enumeration is the one Pressbooks API path this tool reads. The platform's default `robots.txt`
+disallows every per-book `/*/wp-json/` endpoint — including the `glossary` route that would return
+an exact term count in one request — but the network-level listing has no path segment before
+`wp-json` and is not matched. Everything after enumeration comes from rendered HTML. Measured in
+[`docs/research/2026-08-17-platform-discovery-probes.md`](docs/research/2026-08-17-platform-discovery-probes.md).
+
+A sweep builds **one page cache per book**, because
+[the widening](#which-books-these-commands-will-fetch) is one exact host and a sweep names a
+different one per book.
+
 A separate, real, billed run — a 20-page bounded scan of the same book — produced 39 verified
 terms, and `glossary-gen` grounded all 39 of them (0 without excerpts, 0 page failures). It
 reported $0.0135 actual against a $0.03 pre-flight estimate — but **both figures were computed
@@ -277,13 +322,16 @@ genuinely distinct terms. Near-duplicates are left for the human doing the revie
 | `scan/emit.py` | writing the index and the diagnostic sidecar |
 | `scan/evaluate.py` | the offline replay harness behind `tests/eval/`, and the recorder that writes its fixtures |
 | `scan/reference.py` | harvesting a book's own author glossary as a reference set |
+| `scan/survey.py` | screening a book for one, by the cheapest route its platform allows |
 | `scan_cli.py` | argument parsing, cost control, the orchestration loop |
 
-Three scripts sit outside the package in `tools/`, because they serve a reviewer or a maintainer
-rather than a run: `harvest_glossary.py` (above), `record_fixture.py` (records an eval fixture from
-the page cache — the only one that spends, and it refuses to without `--yes` or a terminal), and
-`label_sheet.py` (a keyboard labeller for the review sheets in `docs/research/`, which writes only
-what a human types — see [ADR-0005](docs/adr/0005-review-labels-are-collected-blind.md) and
+Five scripts sit outside the package in `tools/`, because they serve a reviewer or a maintainer
+rather than a run: `survey_glossaries.py` and `harvest_glossary.py` (both above),
+`compare_definitions.py` (scores generated definitions against the authors' own),
+`record_fixture.py` (records an eval fixture from the page cache — the only one that spends, and it
+refuses to without `--yes` or a terminal), and `label_sheet.py` (a keyboard labeller for the review
+sheets in `docs/research/`, which writes only what a human types — see
+[ADR-0005](docs/adr/0005-review-labels-are-collected-blind.md) and
 [ADR-0010](docs/adr/0010-reference-sets-come-from-books-not-experts.md)).
 
 The boundaries from [How it works](#how-it-works) still hold, and the scanner is on the far side of

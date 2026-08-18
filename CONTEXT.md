@@ -151,6 +151,18 @@ proposed that the set omits is **not** a cut, because a set covering only some o
 silent about the rest rather than negative.
 _Avoid_: expected terms, gold set, answer key
 
+**Screen**:
+Deciding whether a book carries an author glossary before anything is spent on it. Costs fetching
+and nothing else, so it is done first — a book with no glossary cannot be measured, whatever else
+it is good for.
+_Avoid_: survey (the tool's name, not the act), sample, check, probe
+
+**Settled**:
+A screen's answer that is proof rather than evidence. A hit always settles a book; a zero settles
+one only where every page was read. Unsettled, a zero says nothing was found in what was read, and
+a book carrying glossary blocks on 2.5% of its pages has been reported as having none.
+_Avoid_: confirmed, final, conclusive, negative
+
 ### Spend and resumption
 
 **Run**:

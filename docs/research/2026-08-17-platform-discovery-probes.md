@@ -297,3 +297,76 @@ never listed, `chapter/6-1-1-email-address/`, which **301s to a chapter already 
 stale cross-reference in the part's prose. Kept, it would be fetched, scanned and paid for a second
 time under a second URL, and that URL would be attached to every term found there. A book's own
 prose links to its own pages freely, and some of those links are wrong.
+
+## Built: screening a Pressbooks book, and what it costs (2026-08-18, [#37](https://github.com/johnnylibretexts/glossary-gen/issues/37))
+
+`tools/survey_glossaries.py` was LibreTexts-only. It now routes on the host the way `discover`
+does, and the Pressbooks route is a different kind of answer rather than the same one ported.
+
+### One request settles a carrier, and it is the more complete of the two routes
+
+*Language Foundations Handbook*, measured before anything was written:
+
+| route | requests | terms |
+|---|---|---|
+| `back-matter/glossary/` | **1** | **59** |
+| the 23-page walk, `<dl>` blocks | 23 + discovery | 59 |
+| the 23-page walk, inline `<template>` terms only | 23 + discovery | 26 |
+
+So the glossary page is not merely a shortcut past the walk — on this book the walk finds nothing
+the one request did not, and the inline route alone finds 26 of the 59. (The API reports 64, which
+neither HTML route reaches; five terms are defined and never used.)
+
+It stays an optimisation and never the only route. A glossary page titled anything else — the
+`Glossaire` and `Glossary of Key Terms for Online Learning` recorded above — 404s that URL, and the
+walk reads the book's back matter like any other page. There is a test for exactly that.
+
+### A zero is a zero, which is the whole point
+
+The walk stops at the first page carrying a term, because one page carrying one answers the
+question asked. A book with none is read to the end. So both answers are proof, and `settled` is
+the column that says so — against the LibreTexts screen, where a hit is proof and a zero is "no
+evidence at 24 pages".
+
+What a carrier pays for the early exit is its term count, which becomes a floor: *A Guide to Bears*
+settles on its 2nd page of 26 and reports 1 term where a full harvest finds 2. `read` against
+`pages` says so on the row.
+
+### The cost is real, and it is fetching
+
+20 books, 609 pages read, **1 carrier** (*Supplément FR2805A*, 2 terms). The 11-of-83 rate above
+predicts 2.7 from 20 books, and at these numbers 1 does not disagree with it.
+
+**Cold that took roughly half an hour, and it was throttled part-way**: the fetch rate fell from
+~25 pages/minute to 3, which is what a polite crawl of a whole network looks like when the network
+answers back. **Re-run against the warm cache: 79 seconds**, every page served from disk.
+
+Non-carriers are what costs: every one of them is a complete walk, and 87% of books are
+non-carriers. The fast path saves a whole book walk per carrier-with-a-glossary-page and costs one
+404 per book that has none — roughly a wash across a sweep, and decisive on the books being hunted.
+
+**Two books came back inconclusive on the cold run and settled on the warm one.** Both are 28-page
+program handbooks that lost a single page to a transient failure while the network was visibly
+throttling (the run's fetch rate fell from ~25 pages/minute to 3). 27 of 28 pages is not a book
+without a glossary, and the run said `no evidence` rather than `no glossary` for both. A re-run
+fetched the missing page and settled them. That is the `settled` column earning its place on its
+first real outing.
+
+### Four things the enumerator gets wrong if written the obvious way
+
+- **`per_page` caps at 10**, so a sweep pages. Already recorded above.
+- **The catalogue's last listing page is short** — 3 books, not 10 — and an even spread always
+  includes it, because a spread includes both ends. Sizing a sweep in whole pages therefore returns
+  fewer books than asked for and says nothing about it: `--books 20` came back with 13. The page
+  count is computed from `x-wp-total` instead, and `--books 20` and `--books 80` now return 20 and
+  80 exactly. (The probe's own 83-book sample was 9 listing pages of this shape: 8 full and one
+  of 3.)
+- **Trimming the surplus off the END undoes that.** Reading the extra listing page to reach the
+  newest books and then slicing the list from the front discards exactly that page and nothing
+  else. The count comes out right, so a test that counts rows passes while the reason for the count
+  is broken — this shipped and was caught in review. The surplus is spread out instead, with
+  `evenly_spaced` over the collected books, which keeps both ends by construction.
+- **A `link` from the listing is data, not a host a person named.** Every fetch is checked against
+  a standing allowlist widened by exactly one host — on a sweep, the network URL that was typed.
+  Taking the widening from each book's own `link` instead would let the listing choose what the run
+  fetches, including a host that is not the network's. Entries off the network host are dropped.
