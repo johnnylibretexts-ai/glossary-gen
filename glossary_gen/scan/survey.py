@@ -147,8 +147,23 @@ def _books_payload(response: httpx.Response) -> Any:
         raise TocError(f"{response.url}: response body is not JSON") from exc
 
 
-def _listed_books(payload: Any, host: str) -> list[tuple[str, str]]:
-    """`(title, url)` per entry, for entries on `host`. The title is schema.org metadata.
+@dataclass(frozen=True)
+class ListedBook:
+    """One book to screen.
+
+    `id` is the network's own book id — present when this entry came from a Pressbooks
+    listing, `None` for a `--book`/`--shelf` entry that was never enumerated. Carried
+    through so a run's own sample can be recorded and later pinned, rather than
+    re-derived from the catalogue's shape each time (#41).
+    """
+
+    title: str
+    url: str
+    id: int | None = None
+
+
+def _listed_books(payload: Any, host: str) -> list[ListedBook]:
+    """A `ListedBook` per entry, for entries on `host`. The title is schema.org metadata.
 
     The host filter is the guard, not a tidy-up. Every fetch this tool makes is checked
     against a standing allowlist widened by exactly one host — the one a person named —
@@ -168,7 +183,9 @@ def _listed_books(payload: Any, host: str) -> list[tuple[str, str]]:
             continue
         metadata = entry.get("metadata")
         name = str((metadata or {}).get("name") or "") if isinstance(metadata, dict) else ""
-        books.append((name.strip(), link))
+        entry_id = entry.get("id")
+        book_id = entry_id if isinstance(entry_id, int) else None
+        books.append(ListedBook(name.strip(), link, book_id))
     return books
 
 
@@ -212,11 +229,16 @@ class NetworkSweep:
     every book on its own subdomain screens zero and that must not read as "no books".
     """
 
-    books: list[tuple[str, str]]
+    books: list[ListedBook]
     off_host: int = 0
 
 
-def network_books(network_url: str, client: httpx.Client, limit: int = 0) -> NetworkSweep:
+def network_books(
+    network_url: str,
+    client: httpx.Client,
+    limit: int = 0,
+    ids: Sequence[int] | None = None,
+) -> NetworkSweep:
     """The books a Pressbooks network publishes, and how many listed entries were not.
 
     This is the counterpart to `shelf_books`, and it is a real enumerator rather than
@@ -228,6 +250,15 @@ def network_books(network_url: str, client: httpx.Client, limit: int = 0) -> Net
     whole catalogue rather than taking the first N. eCampusOntario's oldest books
     predate the glossary feature, so the first page of 3,033 is the least representative
     sample available. Fewer come back only where the catalogue itself is smaller.
+
+    `ids`, when given, pins the sweep to exactly those book ids instead of spreading
+    across the catalogue's current shape (`limit` is ignored) — the fix for #41. An
+    evenly-spaced sample is re-derived from `x-wp-totalpages` every run, so it moves
+    under a growing catalogue: measured 32 of 80 books different across two runs of
+    the same `--books 80` four hours apart, because four of nine listing pages the
+    spread landed on had shifted. An id, once assigned, does not move; pages are read
+    in order until every requested id turns up (or the catalogue runs out), stopping
+    as soon as they do.
     """
     parts = urllib.parse.urlsplit(network_url)
     if parts.scheme != "https":
@@ -238,33 +269,51 @@ def network_books(network_url: str, client: httpx.Client, limit: int = 0) -> Net
     first = _books_listing(root, client, 1)
     total_pages = max(_header_count(first, "x-wp-totalpages", 1), 1)
     total = _header_count(first, "x-wp-total", 0)
-    numbers = evenly_spaced(range(1, total_pages + 1), _listing_pages(limit, total_pages, total))
+    wanted = set(ids) if ids is not None else None
+    numbers = (
+        range(1, total_pages + 1)
+        if wanted is not None
+        else evenly_spaced(range(1, total_pages + 1), _listing_pages(limit, total_pages, total))
+    )
 
-    books: list[tuple[str, str]] = []
+    books: list[ListedBook] = []
     listed = 0
+    on_host = 0
+    found_ids: set[int] = set()
     for number in numbers:
+        if wanted is not None and wanted <= found_ids:
+            break
         response = first if number == 1 else _books_listing(root, client, number)
         payload = _books_payload(response)
         listed += len(payload) if isinstance(payload, list) else 0
-        books.extend(_listed_books(payload, host))
-    # A network that gives each book its own subdomain drops to zero books here, and
-    # "screening 0 books" reads as an empty catalogue rather than as a guard that
-    # refused every entry. Said once, at the only point where it is unambiguous.
-    if listed and not books:
+        entries = _listed_books(payload, host)
+        on_host += len(entries)
+        if wanted is None:
+            books.extend(entries)
+        else:
+            for entry in entries:
+                if entry.id in wanted and entry.id not in found_ids:
+                    books.append(entry)
+                    found_ids.add(entry.id)
+    # A network that gives each book its own subdomain drops to zero on-host entries
+    # here, and "screening 0 books" reads as an empty catalogue rather than as a guard
+    # that refused every entry. Said once, at the only point where it is unambiguous —
+    # and gated on `on_host`, not `books`, so a pinned sweep that simply found none of
+    # its requested ids among plenty of on-host entries does not get misdiagnosed as
+    # this. That is a book no longer on the network, a different problem.
+    if listed and not on_host:
         raise TocError(
             f"{root}{PRESSBOOKS_BOOKS_PATH}: all {listed} listed books are on another host, "
             f"so none is reachable from a run pointed at {host}"
         )
-    # A partial drop is ordinary, not an error — but it must not be invisible. The
-    # count is taken here, before the limit trims `books`, because the trim removes
-    # nothing for being off-host and would otherwise understate what the listing pages
-    # actually carried.
-    off_host = listed - len(books)
+    # A partial drop is ordinary, not an error — but it must not be invisible.
+    off_host = listed - on_host
     # Trimmed by spreading again, not by slicing the front. The extra listing page was
     # read precisely to reach the catalogue's newest books, and `books[:limit]` throws
     # away that page and nothing else — leaving the count right and the reason for it
-    # broken, which is what a test counting rows does not catch.
-    trimmed = evenly_spaced(books, limit) if limit > 0 else books
+    # broken, which is what a test counting rows does not catch. A pinned sweep is
+    # already exact and is never trimmed.
+    trimmed = evenly_spaced(books, limit) if wanted is None and limit > 0 else books
     return NetworkSweep(trimmed, off_host)
 
 

@@ -5,6 +5,7 @@ import pytest
 
 from glossary_gen.fetch import PageCache
 from glossary_gen.scan.survey import (
+    ListedBook,
     evenly_spaced,
     network_books,
     screen,
@@ -137,7 +138,7 @@ def test_network_books_reads_the_one_api_path_robots_allows():
     """Every per-book `/*/wp-json/` path is disallowed; the network listing is not."""
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network([_listing("alpha")])))
 
-    assert network_books(NETWORK, client).books == [("Alpha", f"{NETWORK}/alpha/")]
+    assert network_books(NETWORK, client).books == [ListedBook("Alpha", f"{NETWORK}/alpha/", 1)]
 
 
 def test_network_books_pages_because_per_page_caps_at_ten():
@@ -148,8 +149,8 @@ def test_network_books_pages_because_per_page_caps_at_ten():
     books = network_books(NETWORK, client).books
 
     assert len(books) == 30
-    assert books[0][1] == f"{NETWORK}/b0/"
-    assert books[-1][1] == f"{NETWORK}/b29/"
+    assert books[0].url == f"{NETWORK}/b0/"
+    assert books[-1].url == f"{NETWORK}/b29/"
 
 
 def test_a_limited_sweep_spreads_across_the_catalogue():
@@ -162,8 +163,8 @@ def test_a_limited_sweep_spreads_across_the_catalogue():
     books = network_books(NETWORK, client, limit=40).books
 
     assert len(books) == 40
-    assert books[0][1] == f"{NETWORK}/b0/"
-    assert books[-1][1] == f"{NETWORK}/b999/"
+    assert books[0].url == f"{NETWORK}/b0/"
+    assert books[-1].url == f"{NETWORK}/b999/"
 
 
 def test_a_network_url_that_is_not_https_is_refused():
@@ -350,7 +351,7 @@ def test_a_limited_sweep_keeps_the_newest_books_it_paged_to_reach():
 
     books = network_books(NETWORK, client, limit=20).books
 
-    assert (books[0][1], books[-1][1]) == (f"{NETWORK}/b0/", f"{NETWORK}/b92/")
+    assert (books[0].url, books[-1].url) == (f"{NETWORK}/b0/", f"{NETWORK}/b92/")
 
 
 def test_a_small_sweep_is_not_just_the_oldest_books_on_the_network():
@@ -365,7 +366,7 @@ def test_a_small_sweep_is_not_just_the_oldest_books_on_the_network():
     books = network_books(NETWORK, client, limit=10).books
 
     assert len(books) == 10
-    assert books[-1][1] == f"{NETWORK}/b92/"
+    assert books[-1].url == f"{NETWORK}/b92/"
 
 
 def test_a_listing_entry_pointing_off_the_network_is_dropped():
@@ -377,7 +378,7 @@ def test_a_listing_entry_pointing_off_the_network_is_dropped():
     listed.append({"id": 9, "link": "https://attacker.example/x/", "metadata": {"name": "X"}})
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network([listed])))
 
-    assert network_books(NETWORK, client).books == [("Alpha", f"{NETWORK}/alpha/")]
+    assert network_books(NETWORK, client).books == [ListedBook("Alpha", f"{NETWORK}/alpha/", 1)]
 
 
 def test_a_host_that_is_not_a_pressbooks_network_is_skipped_not_crashed():
@@ -439,7 +440,10 @@ def test_a_partial_off_host_drop_is_counted():
 
     found = network_books(NETWORK, client)
 
-    assert found.books == [("Alpha", f"{NETWORK}/alpha/"), ("Beta", f"{NETWORK}/beta/")]
+    assert found.books == [
+        ListedBook("Alpha", f"{NETWORK}/alpha/", 1),
+        ListedBook("Beta", f"{NETWORK}/beta/", 2),
+    ]
     assert found.off_host == 1
 
 
@@ -456,3 +460,65 @@ def test_a_listing_whose_every_book_is_off_host_says_so():
 
     with pytest.raises(TocError, match="off-host|another host"):
         network_books(NETWORK, client)
+
+
+# --- Pinning by id (#41) -----------------------------------------------------
+
+
+def test_pinning_ids_finds_the_same_books_regardless_of_catalogue_growth():
+    """An evenly-spaced sample moves under a growing catalogue — measured 32 of 80
+    books changed in four hours on eCampusOntario, because the spread is re-derived
+    from `x-wp-totalpages` each run. Pinning by id does not re-derive positions from
+    the catalogue's shape: it reads listing pages, in order, until the requested ids
+    turn up, wherever they now sit — and stops there rather than reading every page.
+    """
+    pages = [
+        [
+            {"id": n, "link": f"{NETWORK}/b{n}/", "metadata": {"name": f"B{n}"}}
+            for n in range(page * 10, page * 10 + 10)
+        ]
+        for page in range(9)
+    ]
+    seen_pages = []
+
+    def handler(request):
+        seen_pages.append(int(request.url.params.get("page", 1)))
+        return _pressbooks_network(pages)(request)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    found = network_books(NETWORK, client, ids=[3, 15])
+
+    assert [b.id for b in found.books] == [3, 15]
+    assert [b.url for b in found.books] == [f"{NETWORK}/b3/", f"{NETWORK}/b15/"]
+    assert seen_pages == [1, 2]
+
+
+def test_pinning_ids_still_refuses_a_book_that_moved_off_host():
+    """The host filter is the guard against a listing choosing what gets fetched
+    (test_a_listing_entry_pointing_off_the_network_is_dropped). Pinning by id must
+    not create a second route around it.
+    """
+    listed = [
+        {"id": 1, "link": f"{NETWORK}/alpha/", "metadata": {"name": "Alpha"}},
+        {"id": 2, "link": "https://attacker.example/x/", "metadata": {"name": "X"}},
+    ]
+    client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network([listed])))
+
+    found = network_books(NETWORK, client, ids=[1, 2])
+
+    assert [b.id for b in found.books] == [1]
+    assert found.off_host == 1
+
+
+def test_pinning_to_ids_no_longer_on_the_network_returns_what_is_left():
+    """A book can be unpublished between two runs. That is a different case from every
+    listed book being off-host, and must not raise the all-off-host refusal — the
+    listed books here are on-host, just not the ones asked for.
+    """
+    listed = _listing("alpha", "beta")
+    client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network([listed])))
+
+    found = network_books(NETWORK, client, ids=[999])
+
+    assert found.books == []

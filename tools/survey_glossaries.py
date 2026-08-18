@@ -33,13 +33,28 @@ from glossary_gen.article import extract_content
 from glossary_gen.cli import build_http_client
 from glossary_gen.fetch import PageCache, parse_page
 from glossary_gen.run import PRICES_PATH, load_prices
-from glossary_gen.scan.survey import Screen, network_books, screen, shelf_books
+from glossary_gen.scan.survey import ListedBook, Screen, network_books, screen, shelf_books
 from glossary_gen.scan.toc import TocError, get_toc
 
 # Gemini bills roughly one token per four characters of English prose. Used only to turn
 # a sample's own page text into a forecast, never to bound a run — `--budget-usd` does that.
 CHARS_PER_TOKEN = 4
-COLUMNS = ["title", "url", "pages", "read", "with_glossary", "terms", "settled", "forecast_usd"]
+COLUMNS = [
+    "title",
+    "url",
+    "id",
+    "pages",
+    "read",
+    "with_glossary",
+    "terms",
+    "settled",
+    "forecast_usd",
+]
+
+
+def _book_ids(value: str) -> list[int]:
+    """`--book-ids` as a comma-separated list of ints — the `id` column of a prior run."""
+    return [int(piece) for piece in value.split(",") if piece.strip()]
 
 
 def forecast_usd(page_chars: float, pages: int, model: str) -> float | None:
@@ -84,17 +99,18 @@ def verdict(found: Screen) -> str:
     return "no glossary" if found.result.settled else "no evidence"
 
 
-def collect_books(args: argparse.Namespace, client: httpx.Client) -> list[tuple[str, str]]:
+def collect_books(args: argparse.Namespace, client: httpx.Client) -> list[ListedBook]:
     """Every book to screen, from the enumerator each platform offers."""
-    books: list[tuple[str, str]] = [("", url) for url in args.book]
+    books: list[ListedBook] = [ListedBook("", url) for url in args.book]
     for shelf in args.shelf:
         try:
-            books.extend(shelf_books(get_toc(shelf, client)))
+            toc = get_toc(shelf, client)
+            books.extend(ListedBook(title, url) for title, url in shelf_books(toc))
         except TocError as exc:
             print(f"shelf skipped: {exc}", file=sys.stderr)
     for network in args.network:
         try:
-            sweep = network_books(network, client, limit=args.books)
+            sweep = network_books(network, client, limit=args.books, ids=args.book_ids)
         except TocError as exc:
             print(f"network skipped: {exc}", file=sys.stderr)
             continue
@@ -121,6 +137,14 @@ def main() -> int:
         default=0,
         help="books per network, spread across its catalogue (0 = every book on it)",
     )
+    ap.add_argument(
+        "--book-ids",
+        type=_book_ids,
+        default=None,
+        help="pin --network sweeps to these book ids instead of spreading across the "
+        "catalogue's current shape (comma-separated; from a prior run's `id` column, "
+        "for a reproducible re-run — #41)",
+    )
     ap.add_argument("--book", action="append", default=[], help="book URL (repeatable)")
     ap.add_argument("--sample", type=int, default=16, help="pages to fetch per LibreTexts book")
     ap.add_argument("--cache", type=Path, default=Path("cache"))
@@ -136,18 +160,18 @@ def main() -> int:
         return 1
 
     rows = []
-    for title, url in books:
+    for book in books:
         # A cache per book, because its source host is the book's own. `is_allowed_url`
         # widens by exactly one host — the one a person named — and a sweep names a
         # different one per book. Sharing one cache across a mixed list would either
         # refuse every book but the first or, if opened wider, stop being a guard.
         cache = PageCache(
-            args.cache, client, delay=args.delay, source_host=urlsplit(url).hostname or ""
+            args.cache, client, delay=args.delay, source_host=urlsplit(book.url).hostname or ""
         )
         try:
-            found = screen(url, client, cache, sample=args.sample)
+            found = screen(book.url, client, cache, sample=args.sample)
         except TocError as exc:
-            print(f"  skipped {title or url}: {exc}", file=sys.stderr)
+            print(f"  skipped {book.title or book.url}: {exc}", file=sys.stderr)
             continue
 
         cost = book_forecast(found, args.model)
@@ -155,11 +179,16 @@ def main() -> int:
         # The URL is the last resort, and a real case rather than a defensive one: a
         # book settled by its glossary page is never discovered, so it has no title of
         # its own, and `--book` supplies none either. A network sweep does.
-        label = found.title or title or url
+        label = found.title or book.title or book.url
         rows.append(
             {
-                "title": found.title or title,
-                "url": url,
+                "title": found.title or book.title,
+                "url": book.url,
+                # Blank, not None: a book from `--book`/`--shelf` was never enumerated
+                # and has no id of its own — recorded so a re-run can pin `--book-ids`
+                # to exactly this sample rather than re-deriving it from the catalogue's
+                # shape (#41).
+                "id": "" if book.id is None else book.id,
                 # Blank, not 0: a book settled by its glossary page was never walked,
                 # and 0 would read as a book with no pages.
                 "pages": found.pages or "",
