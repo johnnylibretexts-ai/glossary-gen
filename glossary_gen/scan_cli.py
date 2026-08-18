@@ -229,7 +229,7 @@ def execute(
         # is still written, and `ok`: a resumed run must not re-pay for it, and
         # `harvest_glossary --scan` reads the scan's page list to find the page the
         # glossary is on. Skipping it out of the record would cost the reference set
-        # every term the authors listed there.
+        # every term the authors listed there. ADR-0011.
         if page.url in glossary_pages:
             summary.ok += 1
             summary.glossary_pages += 1

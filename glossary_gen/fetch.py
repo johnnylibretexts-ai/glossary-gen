@@ -79,7 +79,15 @@ def is_allowed_url(url: str, *, host: str = "") -> bool:
 
 
 def parse_page(url: str, html: str) -> Page:
-    """Extract ordered heading and paragraph blocks; drop scripts, styles, and blanks."""
+    """Extract ordered heading and paragraph blocks; drop scripts, styles, and blanks.
+
+    `<dt>` is deliberately not among them, and that is a decision rather than an
+    oversight: adding it would let the scanner read a book's own glossary page, which
+    is the set its recall is measured against. Read
+    `docs/adr/0011-the-scanner-does-not-read-the-authors-glossary.md` before changing
+    this list — the reason lives nowhere near this file, and the evaluation it protects
+    will not complain when it breaks.
+    """
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(["script", "style", "noscript"]):
         tag.decompose()

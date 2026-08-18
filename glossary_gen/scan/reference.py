@@ -114,8 +114,10 @@ def is_author_glossary_page(html: str) -> bool:
     are `<dt>` — which `fetch.parse_page` drops, since it collects headings and `<p>`.
     So the model is handed definitions with no terms attached and proposes nothing.
     Measured on *Research Methods in Psychology*: its 100-entry glossary page was sent
-    to the model, cost 2,580 input tokens, and returned 0 candidates. See
-    docs/research/2026-08-18-psychmethods-scan-vs-author-glossary.md.
+    to the model, cost 2,580 input tokens, and returned 0 candidates. Why the parser is
+    left that way rather than taught about `<dt>`:
+    docs/adr/0011-the-scanner-does-not-read-the-authors-glossary.md, and the measurement
+    behind it, docs/research/2026-08-18-psychmethods-scan-vs-author-glossary.md.
 
     Narrow on purpose, and the narrowness is the whole design. A chapter that ENDS in a
     glossary block is a chapter: LibreTexts books carry those blocks inside chapters

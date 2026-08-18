@@ -48,6 +48,9 @@ correctly proposed none — it cannot name a term whose name is not on the page 
   score by copying the authors' list. Teaching `parse_page` about `<dt>` would raise recall on every
   carrier and destroy the measurement that says so.
 
+Settled as [ADR-0011](../adr/0011-the-scanner-does-not-read-the-authors-glossary.md): the parser
+stays as it is, and the page is skipped rather than paid for.
+
 The cheap half of the fix has no such tension: a page the harvester can read for free is a page
 worth *not* paying a model to read. Skipping author-glossary pages during a scan would save the call
 without touching what the scanner is shown elsewhere.
