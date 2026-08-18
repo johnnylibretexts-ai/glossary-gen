@@ -137,7 +137,7 @@ def test_network_books_reads_the_one_api_path_robots_allows():
     """Every per-book `/*/wp-json/` path is disallowed; the network listing is not."""
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network([_listing("alpha")])))
 
-    assert network_books(NETWORK, client) == [("Alpha", f"{NETWORK}/alpha/")]
+    assert network_books(NETWORK, client).books == [("Alpha", f"{NETWORK}/alpha/")]
 
 
 def test_network_books_pages_because_per_page_caps_at_ten():
@@ -145,7 +145,7 @@ def test_network_books_pages_because_per_page_caps_at_ten():
     pages = [_listing(*[f"b{n}" for n in range(i * 10, i * 10 + 10)]) for i in range(3)]
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network(pages)))
 
-    books = network_books(NETWORK, client)
+    books = network_books(NETWORK, client).books
 
     assert len(books) == 30
     assert books[0][1] == f"{NETWORK}/b0/"
@@ -159,7 +159,7 @@ def test_a_limited_sweep_spreads_across_the_catalogue():
     pages = [_listing(*[f"b{n}" for n in range(i * 10, i * 10 + 10)]) for i in range(100)]
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network(pages)))
 
-    books = network_books(NETWORK, client, limit=40)
+    books = network_books(NETWORK, client, limit=40).books
 
     assert len(books) == 40
     assert books[0][1] == f"{NETWORK}/b0/"
@@ -335,7 +335,7 @@ def test_a_limited_sweep_returns_the_number_of_books_it_was_asked_for():
     pages.append(_listing("b90", "b91", "b92"))
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network(pages)))
 
-    assert len(network_books(NETWORK, client, limit=20)) == 20
+    assert len(network_books(NETWORK, client, limit=20).books) == 20
 
 
 def test_a_limited_sweep_keeps_the_newest_books_it_paged_to_reach():
@@ -348,7 +348,7 @@ def test_a_limited_sweep_keeps_the_newest_books_it_paged_to_reach():
     pages.append(_listing("b90", "b91", "b92"))
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network(pages)))
 
-    books = network_books(NETWORK, client, limit=20)
+    books = network_books(NETWORK, client, limit=20).books
 
     assert (books[0][1], books[-1][1]) == (f"{NETWORK}/b0/", f"{NETWORK}/b92/")
 
@@ -362,7 +362,7 @@ def test_a_small_sweep_is_not_just_the_oldest_books_on_the_network():
     pages.append(_listing("b90", "b91", "b92"))
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network(pages)))
 
-    books = network_books(NETWORK, client, limit=10)
+    books = network_books(NETWORK, client, limit=10).books
 
     assert len(books) == 10
     assert books[-1][1] == f"{NETWORK}/b92/"
@@ -377,7 +377,7 @@ def test_a_listing_entry_pointing_off_the_network_is_dropped():
     listed.append({"id": 9, "link": "https://attacker.example/x/", "metadata": {"name": "X"}})
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network([listed])))
 
-    assert network_books(NETWORK, client) == [("Alpha", f"{NETWORK}/alpha/")]
+    assert network_books(NETWORK, client).books == [("Alpha", f"{NETWORK}/alpha/")]
 
 
 def test_a_host_that_is_not_a_pressbooks_network_is_skipped_not_crashed():
@@ -424,8 +424,23 @@ def test_a_one_book_sweep_does_not_pay_for_a_spread_it_cannot_use():
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
 
-    assert len(network_books(NETWORK, client, limit=1)) == 1
+    assert len(network_books(NETWORK, client, limit=1).books) == 1
     assert seen == [1]
+
+
+def test_a_partial_off_host_drop_is_counted():
+    """Every book being off-host raises; a FEW being off-host must not vanish just
+    because it isn't the all-dropped case. `off_host` says how many were dropped,
+    distinct from the books kept.
+    """
+    listed = _listing("alpha", "beta")
+    listed.append({"id": 9, "link": "https://attacker.example/x/", "metadata": {"name": "X"}})
+    client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network([listed])))
+
+    found = network_books(NETWORK, client)
+
+    assert found.books == [("Alpha", f"{NETWORK}/alpha/"), ("Beta", f"{NETWORK}/beta/")]
+    assert found.off_host == 1
 
 
 def test_a_listing_whose_every_book_is_off_host_says_so():

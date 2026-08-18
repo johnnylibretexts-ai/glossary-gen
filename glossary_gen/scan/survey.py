@@ -202,8 +202,22 @@ def _listing_pages(limit: int, total_pages: int, total: int) -> int:
     return min(total_pages, max(2, needed))
 
 
-def network_books(network_url: str, client: httpx.Client, limit: int = 0) -> list[tuple[str, str]]:
-    """`(title, url)` for the books a Pressbooks network publishes.
+@dataclass(frozen=True)
+class NetworkSweep:
+    """What one Pressbooks network listing sweep found.
+
+    `off_host` is a count, not a list: a per-entry warning on a 3,000-book sweep would
+    be noise, and some entries living elsewhere is ordinary. It is silent only about
+    WHICH entries; the all-dropped case still raises, because a network that puts
+    every book on its own subdomain screens zero and that must not read as "no books".
+    """
+
+    books: list[tuple[str, str]]
+    off_host: int = 0
+
+
+def network_books(network_url: str, client: httpx.Client, limit: int = 0) -> NetworkSweep:
+    """The books a Pressbooks network publishes, and how many listed entries were not.
 
     This is the counterpart to `shelf_books`, and it is a real enumerator rather than
     a shelf someone pasted: `GET /wp-json/pressbooks/v2/books` is the one Pressbooks
@@ -236,17 +250,22 @@ def network_books(network_url: str, client: httpx.Client, limit: int = 0) -> lis
     # A network that gives each book its own subdomain drops to zero books here, and
     # "screening 0 books" reads as an empty catalogue rather than as a guard that
     # refused every entry. Said once, at the only point where it is unambiguous.
-    # Partial drops stay silent: some entries being elsewhere is ordinary.
     if listed and not books:
         raise TocError(
             f"{root}{PRESSBOOKS_BOOKS_PATH}: all {listed} listed books are on another host, "
             f"so none is reachable from a run pointed at {host}"
         )
+    # A partial drop is ordinary, not an error — but it must not be invisible. The
+    # count is taken here, before the limit trims `books`, because the trim removes
+    # nothing for being off-host and would otherwise understate what the listing pages
+    # actually carried.
+    off_host = listed - len(books)
     # Trimmed by spreading again, not by slicing the front. The extra listing page was
     # read precisely to reach the catalogue's newest books, and `books[:limit]` throws
     # away that page and nothing else — leaving the count right and the reason for it
     # broken, which is what a test counting rows does not catch.
-    return evenly_spaced(books, limit) if limit > 0 else books
+    trimmed = evenly_spaced(books, limit) if limit > 0 else books
+    return NetworkSweep(trimmed, off_host)
 
 
 def survey_pages(pages: Iterable[tuple[str, str]], *, settled: bool = False) -> SurveyResult:

@@ -94,15 +94,18 @@ def collect_books(args: argparse.Namespace, client: httpx.Client) -> list[tuple[
             print(f"shelf skipped: {exc}", file=sys.stderr)
     for network in args.network:
         try:
-            listed = network_books(network, client, limit=args.books)
+            sweep = network_books(network, client, limit=args.books)
         except TocError as exc:
             print(f"network skipped: {exc}", file=sys.stderr)
             continue
         # Said before the fetching starts, because `--books 0` is every book on the
         # network and a Pressbooks screen walks each one. eCampusOntario is 3,033 books,
         # which is a day of polite fetching rather than the half hour 20 books takes.
-        print(f"{network}: screening {len(listed)} books")
-        books.extend(listed)
+        off_host = (
+            f" ({sweep.off_host} listed entries are on another host)" if sweep.off_host else ""
+        )
+        print(f"{network}: screening {len(sweep.books)} books{off_host}")
+        books.extend(sweep.books)
     return books
 
 
