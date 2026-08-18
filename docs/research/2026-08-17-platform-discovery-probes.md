@@ -32,7 +32,7 @@ Scale: ~13 libraries, dozens of shelves, and the survey fetches ~1 page/second. 
 pages per book is hours of fetching and **no** model spend. Run it in the background, cached, and
 resumable.
 
-## 2. Pressbooks — the endpoint is better than hoped, and the operators say no
+## 2. Pressbooks — the API is disallowed, the same content is not
 
 Pressbooks is a different platform with a **native glossary feature**: terms are a first-class post
 type rather than markup to be scraped, which would remove the `<dl>`-under-a-heading heuristic and
@@ -158,12 +158,65 @@ currently sends no custom UA at all, so it would be 403'd on this network as wri
 
 **So the original framing was too small.** `fetch.is_allowed_url` refuses any host that is not
 `*.libretexts.org`, and that guard is why this tool cannot wander the open web. Adding a second
-allowlist entry is still the right *mechanism* — never remove the guard — but it is no longer the
-question. The question is whether to fetch endpoints an operator has disallowed for all agents, on
-a platform of thousands of independent installs where each operator's answer may differ. The
-defensible route is **asking a specific network operator** (eCampusOntario is the one that works,
-is CC-licensed, and 403s nobody once past the UA filter) rather than deciding host-by-host in a
-config file.
+allowlist entry is still the right *mechanism* — never remove the guard — but it is not the whole
+question. The rest of it is whether to fetch endpoints an operator has disallowed for all agents, on
+a platform of thousands of independent installs where each operator's answer may differ.
 
-Until that is decided, both probes deliberately used bare `httpx` calls in scratch scripts rather
-than the package's fetch path, and nothing was cached into the repo.
+Both probes deliberately used bare `httpx` calls in scratch scripts rather than the package's fetch
+path, and nothing was cached into the repo. **Probe 2 did fetch roughly 100 disallowed `/*/wp-json/`
+URLs** to produce the measurements above — low volume, nothing retained, and recorded here rather
+than left for someone to discover.
+
+### Correction: the content is reachable on allowed paths, so this is not a blocker
+
+Probed the same day, after the above was written. **It revises the conclusion, not the evidence** —
+every robots.txt finding above still stands. What changed is that the disallowed API turns out not
+to be the only way in.
+
+Pressbooks renders each inline term *and its definition* into the served HTML of the chapter that
+uses it:
+
+```html
+<a class="glossary-term" href="#term_27_447">welcome booth</a>
+<template id="term_27_447">
+  <div class="glossary__definition"><p>A kiosk setup at the airport to welcome arriving
+  international students…</p></div>
+</template>
+```
+
+`/<book>/chapter/<slug>/` is not matched by any `Disallow` line. Measured across the 11 carriers:
+
+| route | robots | books reached |
+|---|---|---|
+| a `<dl>` on a glossary back-matter page | allowed | 4 / 11 |
+| `<template>` blocks in chapter HTML | allowed | 5 of the remaining 7 |
+| **combined** | **allowed** | **9 / 11** |
+
+The two stragglers are one-term books, and one was truncated at 30 of its 80 pages, so the real
+figure is probably better.
+
+`/back-matter/glossary/` on its own is **not** the answer — it 404s on 7 of 11, and walking the
+book's table of contents to find a differently-titled page (`Glossaire`, `Glossary of Key Terms for
+Online Learning`) does not help: those pages exist but render no terms into their HTML.
+
+**Dedupe by the term id, and the match is exact.** The anchor href encodes it as
+`term_<page-id>_<term-id>`. On *Croissance et objectifs*: 44 distinct hrefs (one per occurrence), 30
+distinct surface forms — plurals and inflections pointing at one term — and **19 distinct term ids,
+against the API's 19.** *Canadian Press Writing Style* matched 13/13. A harvester keyed to surface
+forms would have over-reported that book by 58% and looked like it was working.
+
+**One trap, and it fails silently.** BeautifulSoup wraps `<template>` contents in `TemplateString`,
+which `get_text()` skips by default: it returns `''` with no error while `str(node)` plainly shows
+the text. The first run of this probe reported **0 terms across all 7 books** and read as a clean
+negative result. Extract with `BeautifulSoup(block.decode_contents(), "html.parser")` instead, and
+give anything built here a test that would catch it — otherwise it reports "no glossary" forever.
+
+What the HTML route costs against the API: **N requests per book instead of 1**, since the
+`x-wp-total` carrier test is gone and every page must be fetched. The declared sitemap does not
+rescue it — the per-book sitemap lists a single glossary URL and does not enumerate terms.
+
+What it gains, and the API cannot give: **which page each term appears on** — the index format this
+tool consumes as input, free as a side effect of the harvest.
+
+**So the revised position:** asking eCampusOntario for API access is still worth doing, but it is an
+optimisation now, not the unblock. Nothing here requires fetching a disallowed path.
