@@ -40,7 +40,10 @@ the "a zero is only weak evidence" caveat that sampling forces on the LibreTexts
 
 The first probe found the enumerator:
 
-- **`GET https://<network>/wp-json/pressbooks/v2/books?per_page=N` → 200.** Confirmed on
+- **`GET https://<network>/wp-json/pressbooks/v2/books?per_page=N` → 200,** but **`per_page` caps
+  at 10** — anything higher is a `400 rest_invalid_param`, not a clamp (measured 2026-08-17 with
+  `per_page=12`). A sweep across a network's thousands of books therefore pages, and the earlier
+  "83 books sampled" figure below came from paging, not from one large request. Confirmed on
   `ecampusontario.pressbooks.pub`: a JSON list, each entry carrying `id`, `link`, and a
   schema.org `metadata` block (`name`, `alternativeHeadline`, `inLanguage`, `copyrightYear`,
   `image`). This is the enumerator — it replaces both shelf-walking and guesswork.
