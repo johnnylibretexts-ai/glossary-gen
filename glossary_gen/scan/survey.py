@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 import urllib.parse
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, TypeVar
 
@@ -155,11 +155,20 @@ class ListedBook:
     listing, `None` for a `--book`/`--shelf` entry that was never enumerated. Carried
     through so a run's own sample can be recorded and later pinned, rather than
     re-derived from the catalogue's shape each time (#41).
+
+    `listing_page` is which listing page this id was found on THIS run. There is no
+    id-based lookup on this API (confirmed live: `include`, `id`, `book_id` and `ids`
+    query params are all silently ignored), so relocating a pinned id means paging
+    through the listing — and on a 305-page catalogue, starting from page 1 every time
+    cost up to 305 sequential requests to relocate a single id near the far end, which
+    is the common case: an evenly-spread sample always includes the catalogue's last
+    page. Recorded so a pinned re-run can start near where an id was last seen instead.
     """
 
     title: str
     url: str
     id: int | None = None
+    listing_page: int | None = None
 
 
 def _listed_books(payload: Any, host: str) -> list[ListedBook]:
@@ -237,7 +246,7 @@ def network_books(
     network_url: str,
     client: httpx.Client,
     limit: int = 0,
-    ids: Sequence[int] | None = None,
+    ids: Sequence[int] | Mapping[int, int | None] | None = None,
 ) -> NetworkSweep:
     """The books a Pressbooks network publishes, and how many listed entries were not.
 
@@ -259,6 +268,24 @@ def network_books(
     spread landed on had shifted. An id, once assigned, does not move; pages are read
     in order until every requested id turns up (or the catalogue runs out), stopping
     as soon as they do.
+
+    `ids` may instead be a `{id: listing_page}` mapping to jump straight to the
+    remembered pages rather than scanning from page 1 — a live re-run without this
+    hung: there is no id-based lookup on this API at all (`include`, `include[]`, `id`
+    and `book_id` are all silently ignored), so relocating an id with no hint means
+    paging from page 1, and on a 305-page catalogue that is up to 305 sequential
+    requests to relocate ONE id. An evenly-spread sample makes this the common case
+    twice over — it always includes both the catalogue's first AND last page, so half
+    a pinned sample's hints sit near page 1 and half near the far end. Starting the
+    scan at the *earliest* hint (an earlier version of this fix) still had to walk the
+    whole range to reach the later ones; visiting exactly the distinct hinted pages,
+    in order, does not. The hint is only used when every wanted id has one — an id
+    with no hint could be anywhere, so one missing hint falls the whole sweep back to
+    a full scan from page 1 rather than risk that id being unreachable. A wanted id
+    whose hint has drifted (the catalogue moved it to a different page since the hint
+    was recorded) is treated the same as a book no longer on the network: it comes
+    back missing, not re-discovered by a further scan — a deliberate limit on this fix,
+    not an oversight.
     """
     parts = urllib.parse.urlsplit(network_url)
     if parts.scheme != "https":
@@ -270,11 +297,17 @@ def network_books(
     total_pages = max(_header_count(first, "x-wp-totalpages", 1), 1)
     total = _header_count(first, "x-wp-total", 0)
     wanted = set(ids) if ids is not None else None
-    numbers = (
-        range(1, total_pages + 1)
-        if wanted is not None
-        else evenly_spaced(range(1, total_pages + 1), _listing_pages(limit, total_pages, total))
+    hints: dict[int, int] = (
+        {i: p for i, p in ids.items() if isinstance(p, int)} if isinstance(ids, Mapping) else {}
     )
+    fully_hinted = wanted is not None and wanted <= hints.keys()
+    if fully_hinted:
+        numbers = sorted({hints[i] for i in wanted})
+    elif wanted is not None:
+        numbers = range(1, total_pages + 1)
+    else:
+        spread = _listing_pages(limit, total_pages, total)
+        numbers = evenly_spaced(range(1, total_pages + 1), spread)
 
     books: list[ListedBook] = []
     listed = 0
@@ -286,7 +319,7 @@ def network_books(
         response = first if number == 1 else _books_listing(root, client, number)
         payload = _books_payload(response)
         listed += len(payload) if isinstance(payload, list) else 0
-        entries = _listed_books(payload, host)
+        entries = [replace(b, listing_page=number) for b in _listed_books(payload, host)]
         on_host += len(entries)
         if wanted is None:
             books.extend(entries)

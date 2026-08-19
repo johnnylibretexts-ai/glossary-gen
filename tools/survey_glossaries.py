@@ -43,6 +43,7 @@ COLUMNS = [
     "title",
     "url",
     "id",
+    "listing_page",
     "pages",
     "read",
     "with_glossary",
@@ -52,9 +53,24 @@ COLUMNS = [
 ]
 
 
-def _book_ids(value: str) -> list[int]:
-    """`--book-ids` as a comma-separated list of ints — the `id` column of a prior run."""
-    return [int(piece) for piece in value.split(",") if piece.strip()]
+def _book_ids(value: str) -> dict[int, int | None]:
+    """`--book-ids` as a comma-separated list of ints, each optionally suffixed
+    `@<listing_page>` (from a prior run's `id` and `listing_page` columns) — e.g.
+    `42,99@47`. The page hint is what makes a pinned re-run cheap: there is no
+    id-based lookup on this API (verified live: `include`, `id` and `book_id` are all
+    silently ignored), so relocating an unhinted id near a large catalogue's far end
+    can mean paging sequentially from page 1 — hundreds of requests for one id (#41
+    follow-up). A hint only helps when every requested id has one; missing the `@page`
+    on any one of them falls the whole sweep back to scanning from page 1.
+    """
+    ids: dict[int, int | None] = {}
+    for piece in value.split(","):
+        piece = piece.strip()
+        if not piece:
+            continue
+        book_id, _, page = piece.partition("@")
+        ids[int(book_id)] = int(page) if page else None
+    return ids
 
 
 def forecast_usd(page_chars: float, pages: int, model: str) -> float | None:
@@ -142,8 +158,10 @@ def main() -> int:
         type=_book_ids,
         default=None,
         help="pin --network sweeps to these book ids instead of spreading across the "
-        "catalogue's current shape (comma-separated; from a prior run's `id` column, "
-        "for a reproducible re-run — #41)",
+        "catalogue's current shape, for a reproducible re-run (comma-separated; from a "
+        "prior run's `id` column). Suffix each id with @<listing_page> from the same "
+        "row's `listing_page` column to start the search near there instead of paging "
+        "from page 1 to relocate it -- e.g. --book-ids 42,99@47 (#41)",
     )
     ap.add_argument("--book", action="append", default=[], help="book URL (repeatable)")
     ap.add_argument("--sample", type=int, default=16, help="pages to fetch per LibreTexts book")
@@ -189,6 +207,10 @@ def main() -> int:
                 # to exactly this sample rather than re-deriving it from the catalogue's
                 # shape (#41).
                 "id": "" if book.id is None else book.id,
+                # The listing page this id was found on THIS run — pass it back as
+                # `id@listing_page` to `--book-ids` so a re-run starts near here instead
+                # of paging from page 1 to relocate it (#41 follow-up).
+                "listing_page": "" if book.listing_page is None else book.listing_page,
                 # Blank, not 0: a book settled by its glossary page was never walked,
                 # and 0 would read as a book with no pages.
                 "pages": found.pages or "",

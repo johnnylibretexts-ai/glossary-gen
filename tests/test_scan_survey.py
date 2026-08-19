@@ -138,7 +138,7 @@ def test_network_books_reads_the_one_api_path_robots_allows():
     """Every per-book `/*/wp-json/` path is disallowed; the network listing is not."""
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network([_listing("alpha")])))
 
-    assert network_books(NETWORK, client).books == [ListedBook("Alpha", f"{NETWORK}/alpha/", 1)]
+    assert network_books(NETWORK, client).books == [ListedBook("Alpha", f"{NETWORK}/alpha/", 1, 1)]
 
 
 def test_network_books_pages_because_per_page_caps_at_ten():
@@ -378,7 +378,7 @@ def test_a_listing_entry_pointing_off_the_network_is_dropped():
     listed.append({"id": 9, "link": "https://attacker.example/x/", "metadata": {"name": "X"}})
     client = httpx.Client(transport=httpx.MockTransport(_pressbooks_network([listed])))
 
-    assert network_books(NETWORK, client).books == [ListedBook("Alpha", f"{NETWORK}/alpha/", 1)]
+    assert network_books(NETWORK, client).books == [ListedBook("Alpha", f"{NETWORK}/alpha/", 1, 1)]
 
 
 def test_a_host_that_is_not_a_pressbooks_network_is_skipped_not_crashed():
@@ -441,8 +441,8 @@ def test_a_partial_off_host_drop_is_counted():
     found = network_books(NETWORK, client)
 
     assert found.books == [
-        ListedBook("Alpha", f"{NETWORK}/alpha/", 1),
-        ListedBook("Beta", f"{NETWORK}/beta/", 2),
+        ListedBook("Alpha", f"{NETWORK}/alpha/", 1, 1),
+        ListedBook("Beta", f"{NETWORK}/beta/", 2, 1),
     ]
     assert found.off_host == 1
 
@@ -491,7 +491,103 @@ def test_pinning_ids_finds_the_same_books_regardless_of_catalogue_growth():
 
     assert [b.id for b in found.books] == [3, 15]
     assert [b.url for b in found.books] == [f"{NETWORK}/b3/", f"{NETWORK}/b15/"]
+    assert [b.listing_page for b in found.books] == [1, 2]
     assert seen_pages == [1, 2]
+
+
+def test_pinning_with_page_hints_jumps_straight_to_the_remembered_page():
+    """Live-measured (#41 follow-up): eCampusOntario's books listing has no id-based
+    lookup at all — `include`, `include[]`, `id`, `book_id` and `ids` query params are
+    all silently ignored, always returning the default page-1 listing regardless of
+    value. So relocating a pinned id with no hint means paging from page 1, and on a
+    305-page catalogue that is up to 305 sequential requests to relocate ONE id. This
+    is what a live `--book-ids` re-run hung on. `ids` as a `{id: listing_page}`
+    mapping visits exactly the remembered pages instead of scanning from page 1.
+    """
+    pages = [
+        [
+            {"id": n, "link": f"{NETWORK}/b{n}/", "metadata": {"name": f"B{n}"}}
+            for n in range(page * 10, page * 10 + 10)
+        ]
+        for page in range(50)
+    ]
+    seen_pages = []
+
+    def handler(request):
+        seen_pages.append(int(request.url.params.get("page", 1)))
+        return _pressbooks_network(pages)(request)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    # id 495 sits on listing page 50 (10 books/page, 0-indexed).
+    found = network_books(NETWORK, client, ids={495: 50})
+
+    assert [b.id for b in found.books] == [495]
+    assert [b.listing_page for b in found.books] == [50]
+    # Page 1 is unavoidable (it is where total_pages/total come from); pages 2-49 are
+    # not — without the hint this would have been every page from 1 through 50.
+    assert seen_pages == [1, 50]
+
+
+def test_pinning_with_hints_spanning_both_ends_does_not_walk_the_range_between_them():
+    """The realistic case, live-measured: an evenly-spread sample always includes both
+    the catalogue's FIRST and LAST listing page, so a pinned re-run's hints routinely
+    span the whole catalogue rather than clustering near one spot — half the ids near
+    page 1, half near the far end. An earlier version of this fix started the scan at
+    the earliest hint and read forward sequentially, which still had to walk every
+    page in between to reach the far ones — no better than starting at page 1 whenever
+    any hint was near the beginning. Visiting exactly the distinct hinted pages, not a
+    range spanning them, is what actually fixes it.
+    """
+    pages = [
+        [
+            {"id": n, "link": f"{NETWORK}/b{n}/", "metadata": {"name": f"B{n}"}}
+            for n in range(page * 10, page * 10 + 10)
+        ]
+        for page in range(50)
+    ]
+    seen_pages = []
+
+    def handler(request):
+        seen_pages.append(int(request.url.params.get("page", 1)))
+        return _pressbooks_network(pages)(request)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    found = network_books(NETWORK, client, ids={5: 1, 495: 50})
+
+    assert {b.id for b in found.books} == {5, 495}
+    # Not range(1, 51) -- exactly the two hinted pages, nothing between them.
+    assert seen_pages == [1, 50]
+
+
+def test_pinning_falls_back_to_page_one_when_any_wanted_id_lacks_a_hint():
+    """A hint is only useful when EVERY wanted id has one — starting from a middle page
+    would make an id that could be anywhere unreachable if it sits earlier. One
+    unhinted id among several must fall the whole pinned sweep back to page 1, not
+    just skip that one id.
+    """
+    pages = [
+        [
+            {"id": n, "link": f"{NETWORK}/b{n}/", "metadata": {"name": f"B{n}"}}
+            for n in range(page * 10, page * 10 + 10)
+        ]
+        for page in range(50)
+    ]
+    seen_pages = []
+
+    def handler(request):
+        seen_pages.append(int(request.url.params.get("page", 1)))
+        return _pressbooks_network(pages)(request)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    # id 5 (page 1) has no hint; id 495 (page 50) does. The scan must still start at
+    # page 1 to have any chance of finding id 5, so every page 1-50 gets read.
+    found = network_books(NETWORK, client, ids={5: None, 495: 50})
+
+    assert {b.id for b in found.books} == {5, 495}
+    assert seen_pages == list(range(1, 51))
 
 
 def test_pinning_ids_still_refuses_a_book_that_moved_off_host():
