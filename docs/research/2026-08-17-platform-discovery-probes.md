@@ -224,7 +224,7 @@ tool consumes as input, free as a side effect of the harvest.
 **So the revised position:** asking eCampusOntario for API access is still worth doing, but it is an
 optimisation now, not the unblock. Nothing here requires fetching a disallowed path.
 
-## Follow-up: what the front page actually leaves out (2026-08-17, [#38](https://github.com/johnnylibretexts/glossary-gen/issues/38))
+## Follow-up: what the front page actually leaves out (2026-08-17, [#38](https://github.com/johnnylibretexts-ai/glossary-gen/issues/38))
 
 Discovery read a Pressbooks book's front page and kept links under `front-matter/`, `chapter/` and
 `back-matter/`. Parts were excluded on the reasoning that a part is a divider whose page is a
@@ -298,7 +298,7 @@ stale cross-reference in the part's prose. Kept, it would be fetched, scanned an
 time under a second URL, and that URL would be attached to every term found there. A book's own
 prose links to its own pages freely, and some of those links are wrong.
 
-## Built: screening a Pressbooks book, and what it costs (2026-08-18, [#37](https://github.com/johnnylibretexts/glossary-gen/issues/37))
+## Built: screening a Pressbooks book, and what it costs (2026-08-18, [#37](https://github.com/johnnylibretexts-ai/glossary-gen/issues/37))
 
 `tools/survey_glossaries.py` was LibreTexts-only. It now routes on the host the way `discover`
 does, and the Pressbooks route is a different kind of answer rather than the same one ported.
@@ -490,7 +490,7 @@ counts rather than leaving the difference to be found in the CSV.
 format this tool consumes, produced as a side effect of the harvest — and the reason the disallowed
 `glossary` endpoint would not have been better even if it were allowed.
 
-## Validated: the shelf/book/chapter properties heuristic does not hold (2026-08-18, [#39](https://github.com/johnnylibretexts/glossary-gen/issues/39))
+## Validated: the shelf/book/chapter properties heuristic does not hold (2026-08-18, [#39](https://github.com/johnnylibretexts-ai/glossary-gen/issues/39))
 
 Probe 1 said to validate the `properties` heuristic across libraries before relying on it — it had
 been checked on one library (`bio`) and three hand-picked nodes. This is that validation, and the

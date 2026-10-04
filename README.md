@@ -274,7 +274,7 @@ linked was empty, none unlinked carried anything). Measured effect:
 | *BEAR Guide Workshop* | 24 | 26 | a glossary carrier **with** content-bearing parts: 2 harvested terms before and after |
 | *Language Foundations Handbook* | 23 | 23 | no part carries content — unchanged, and its 26 harvested terms with it |
 
-The last row is the check [#38](https://github.com/johnnylibretexts/glossary-gen/issues/38) asks
+The last row is the check [#38](https://github.com/johnnylibretexts-ai/glossary-gen/issues/38) asks
 for and the LibreTexts side has no equivalent of: harvest a Pressbooks book's own glossary before
 and after widening discovery, and the count must not fall. If it rises, discovery was missing pages.
 
@@ -469,7 +469,7 @@ your own.
 
 **1. Install.** No API key needed yet.
 
-    git clone https://github.com/johnnylibretexts/glossary-gen
+    git clone https://github.com/johnnylibretexts-ai/glossary-gen
     cd glossary-gen
     pip install .
 

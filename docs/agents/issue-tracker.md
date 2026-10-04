@@ -1,7 +1,7 @@
 # Issue tracker: GitHub
 
 Issues and specs for this repo live as GitHub issues in
-[`johnnylibretexts/glossary-gen`](https://github.com/johnnylibretexts/glossary-gen).
+[`johnnylibretexts-ai/glossary-gen`](https://github.com/johnnylibretexts-ai/glossary-gen).
 Use the `gh` CLI for all operations.
 
 ## Conventions

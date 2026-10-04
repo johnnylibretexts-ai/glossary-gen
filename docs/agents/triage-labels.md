@@ -16,7 +16,7 @@ Edit the right-hand column to match whatever vocabulary you actually use.
 
 ## Repo state
 
-As of setup, only `wontfix` exists in `johnnylibretexts/glossary-gen` (a GitHub default label).
+As of setup, only `wontfix` exists in `johnnylibretexts-ai/glossary-gen` (a GitHub default label).
 The other four are created on first use:
 
 ```bash

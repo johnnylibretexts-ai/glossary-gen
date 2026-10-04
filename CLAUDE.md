@@ -9,7 +9,7 @@ full reference.
 
 ### Issue tracker
 
-GitHub Issues on `johnnylibretexts/glossary-gen`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+GitHub Issues on `johnnylibretexts-ai/glossary-gen`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

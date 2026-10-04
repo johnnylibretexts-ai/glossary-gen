@@ -2,7 +2,7 @@
 
 Everything the tool had proven on Pressbooks before this was free: discovery, fetching, page
 parsing, author-glossary harvest. Nothing downstream of a model call had ever been run against a
-non-LibreTexts book ([#36](https://github.com/johnnylibretexts/glossary-gen/issues/36)). This is
+non-LibreTexts book ([#36](https://github.com/johnnylibretexts-ai/glossary-gen/issues/36)). This is
 that run, recorded because the artifacts live in gitignored `out/`.
 
 Book: **Language Foundations Handbook**, `ecampusontario.pressbooks.pub/languagefoundationshandbook`,

@@ -67,7 +67,7 @@ EST_TOKENS_OUT = 130
 # bare "glossary-gen/0.1 (+url)" is refused 403 there, this is served 200. It still
 # names the tool and where to complain, which claiming to be Chrome would not.
 USER_AGENT = (
-    "Mozilla/5.0 (compatible; glossary-gen/0.1; +https://github.com/johnnylibretexts/glossary-gen)"
+    "Mozilla/5.0 (compatible; glossary-gen/0.1; +https://github.com/johnnylibretexts-ai/glossary-gen)"
 )
 
 

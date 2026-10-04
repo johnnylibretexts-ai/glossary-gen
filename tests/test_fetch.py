@@ -326,7 +326,7 @@ def test_user_agent_is_browser_shaped_and_still_names_the_tool():
 
     assert ua.startswith("Mozilla/5.0 (compatible;")
     assert "glossary-gen" in ua
-    assert "github.com/johnnylibretexts/glossary-gen" in ua
+    assert "github.com/johnnylibretexts-ai/glossary-gen" in ua
 
 
 def test_the_host_a_run_was_pointed_at_is_allowed_for_that_run():
